@@ -1,26 +1,36 @@
 package gui;
 
+import java.awt.Color;
 import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.KeyEvent;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.DefaultListModel;
-import javax.swing.JButton;
 import javax.swing.JDesktopPane;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JList;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
+import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
+import javax.swing.TransferHandler;
 import javax.swing.UIManager;
 import javax.swing.UIManager.LookAndFeelInfo;
 import javax.swing.UnsupportedLookAndFeelException;
@@ -41,11 +51,11 @@ public final class Ihm extends JFrame {
 
     private static final long serialVersionUID = 1L;
 
-    List<JDesktopPane> desktopPanes;
-    JTabbedPane tabbedPane;
-    DefaultListModel<Measure> listModel;
-    JList<Measure> listVoie;
-    NumberAxis timeAxis;
+    private List<JDesktopPane> desktopPanes;
+    private JTabbedPane tabbedPane;
+    private DefaultListModel<Measure> listModel;
+    private JList<Measure> listVoie;
+    private NumberAxis timeAxis;
 
     private static Log log;
 
@@ -53,12 +63,54 @@ public final class Ihm extends JFrame {
         super("PcsLogViewer");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
+        setJMenuBar(createMenu());
+
         createGUI();
 
         pack();
         setMinimumSize(new Dimension(getWidth(), getHeight()));
 
+        setExtendedState(JFrame.MAXIMIZED_BOTH);
         setVisible(true);
+    }
+
+    private final JMenuBar createMenu() {
+        JMenuBar menuBar = new JMenuBar();
+
+        JMenu menu = new JMenu("Fichier");
+        menuBar.add(menu);
+
+        JMenuItem menuItem = new JMenuItem("Ouvrir log");
+        menuItem.setMnemonic(KeyEvent.VK_O);
+        menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_O, ActionEvent.CTRL_MASK));
+        menuItem.addActionListener(new OpenLog());
+        menu.add(menuItem);
+
+        menuItem = new JMenuItem("Quitter");
+        menuItem.setMnemonic(KeyEvent.VK_Q);
+        menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Q, ActionEvent.CTRL_MASK));
+        menuItem.addActionListener(new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                System.exit(0);
+
+            }
+        });
+        menu.add(menuItem);
+
+        menu = new JMenu("Fenêtre");
+        menuBar.add(menu);
+
+        menuItem = new JMenuItem("Ajouter");
+        menuItem.addActionListener(new AddWindow());
+        menu.add(menuItem);
+
+        menuItem = new JMenuItem("Réorganiser");
+        menuItem.addActionListener(new ArrangeWindow());
+        menu.add(menuItem);
+
+        return menuBar;
     }
 
     private final void createGUI() {
@@ -70,46 +122,6 @@ public final class Ihm extends JFrame {
         final Container root = getContentPane();
 
         root.setLayout(new GridBagLayout());
-
-        final JButton btOpen = new JButton("Ouvrir Log");
-        btOpen.setToolTipText("Ouvrir fichiers AIF");
-        btOpen.addActionListener(new OpenLog());
-        gbc.fill = GridBagConstraints.NONE;
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        gbc.gridwidth = 1;
-        gbc.gridheight = 1;
-        gbc.weightx = 0;
-        gbc.weighty = 0;
-        gbc.insets = new Insets(5, 5, 0, 0);
-        gbc.anchor = GridBagConstraints.FIRST_LINE_START;
-        root.add(btOpen, gbc);
-
-        final JButton btAddWindow = new JButton("Ajouter fenêtre");
-        btAddWindow.addActionListener(new AddWindow());
-        gbc.fill = GridBagConstraints.NONE;
-        gbc.gridx = 1;
-        gbc.gridy = 0;
-        gbc.gridwidth = 1;
-        gbc.gridheight = 1;
-        gbc.weightx = 0;
-        gbc.weighty = 0;
-        gbc.insets = new Insets(5, 5, 0, 0);
-        gbc.anchor = GridBagConstraints.FIRST_LINE_START;
-        root.add(btAddWindow, gbc);
-
-        final JButton btArrangeWindow = new JButton("Arranger fenêtre");
-        btArrangeWindow.addActionListener(new AddWindow());
-        gbc.fill = GridBagConstraints.NONE;
-        gbc.gridx = 2;
-        gbc.gridy = 0;
-        gbc.gridwidth = 1;
-        gbc.gridheight = 1;
-        gbc.weightx = 0;
-        gbc.weighty = 0;
-        gbc.insets = new Insets(5, 5, 0, 0);
-        gbc.anchor = GridBagConstraints.FIRST_LINE_START;
-        root.add(btArrangeWindow, gbc);
 
         listVoie = new JList<Measure>();
         listVoie.addListSelectionListener(new MeasureSelection());
@@ -188,10 +200,68 @@ public final class Ihm extends JFrame {
         @Override
         public void actionPerformed(ActionEvent e) {
             JDesktopPane desktopPane = new JDesktopPane();
+            desktopPane.setBackground(Color.LIGHT_GRAY);
             tabbedPane.addTab("Fenêtre n°" + tabbedPane.getTabCount(), desktopPane);
             desktopPanes.add(desktopPane);
         }
 
+    }
+
+    private final class ArrangeWindow implements ActionListener {
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            int idxSelTab = tabbedPane.getSelectedIndex();
+            if (idxSelTab <= 0) {
+                return;
+            }
+            JDesktopPane desktopPane = (JDesktopPane) tabbedPane.getComponentAt(idxSelTab);
+            int nbWin = desktopPane.getComponentCount();
+
+            int winWidth = desktopPane.getWidth();
+            int winHeight = desktopPane.getHeight() / 4;
+
+            ChartView chartView;
+            for (int n = 0; n < nbWin; n++) {
+                chartView = (ChartView) desktopPane.getComponent(n);
+                chartView.setSize(winWidth, winHeight);
+                chartView.setLocation(0, (n - (n / nbWin) * nbWin) * chartView.getHeight());
+            }
+        }
+
+    }
+
+    private final class MeasureHandler extends TransferHandler {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public boolean canImport(TransferSupport support) {
+            return support.isDataFlavorSupported(DataFlavor.stringFlavor);
+        }
+
+        @Override
+        public boolean importData(TransferSupport support) {
+
+            try {
+                String measureName = (String) support.getTransferable().getTransferData(DataFlavor.stringFlavor);
+                int idxMeasure = listModel.indexOf(new Measure(measureName));
+                int idxWindow = tabbedPane.getSelectedIndex();
+                if (idxMeasure < 0 || idxWindow < 0) {
+                    return false;
+                }
+
+                ChartView chartView = (ChartView) support.getComponent();
+                chartView.addMeasure(listModel.get(idxMeasure));
+
+                return true;
+            } catch (UnsupportedFlavorException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            return false;
+        }
     }
 
     private final class MeasureSelection implements ListSelectionListener {
@@ -203,11 +273,23 @@ public final class Ihm extends JFrame {
                 timeAxis = new NumberAxis("Time");
             }
 
-            ChartView chartView = new ChartView(timeAxis, log.getTime(), listVoie.getSelectedValue());
-
             int idxWindow = tabbedPane.getSelectedIndex();
             if (idxWindow > 0) {
-                desktopPanes.get(idxWindow - 1).add(chartView);
+                JDesktopPane desktopPane = desktopPanes.get(idxWindow - 1);
+
+                int winWidth = desktopPane.getWidth() / 2;
+                int winHeight = desktopPane.getHeight() / 2;
+
+                int nbWin = desktopPane.getComponentCount();
+                if (nbWin > 3) {
+                    JOptionPane.showMessageDialog(Ihm.this, "Quatre graphiques maxi par feuille");
+                    return;
+                }
+                Dimension dim = new Dimension(winWidth, winHeight);
+                ChartView chartView = new ChartView(Integer.toString(nbWin + 1), dim, timeAxis, log.getTime(), listVoie.getSelectedValue());
+                chartView.setTransferHandler(new MeasureHandler());
+                chartView.setLocation((nbWin - (nbWin / 2) * 2) * chartView.getWidth(), (nbWin / 2) * chartView.getHeight());
+                desktopPane.add(chartView);
             }
 
         }

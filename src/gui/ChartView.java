@@ -2,6 +2,7 @@ package gui;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.util.List;
 
 import javax.swing.BorderFactory;
@@ -26,8 +27,8 @@ public final class ChartView extends JInternalFrame {
     private final ChartPanel chartPanel;
     private JFreeChart chart = null;
 
-    public ChartView(NumberAxis timeAxis, Measure time, Measure measure) {
-        super("toto", true, true, true, true);
+    public ChartView(String name, Dimension dim, NumberAxis timeAxis, Measure time, Measure measure) {
+        super("#" + name, true, true, true, true);
         setLayout(new BorderLayout());
         setBorder(BorderFactory.createLineBorder(Color.GRAY));
 
@@ -64,8 +65,29 @@ public final class ChartView extends JInternalFrame {
         chartPanel.setPopupMenu(null);
         add(chartPanel, BorderLayout.CENTER);
 
-        pack();
+        setSize(dim);
         show();
+    }
+
+    public final void addMeasure(Measure measure) {
+        XYSeriesCollection collection = (XYSeriesCollection) chart.getXYPlot().getDataset();
+        XYSeries serie = collection.getSeries(0);
+
+        XYSeries newSerie = new XYSeries(measure.getName());
+
+        int nbPoint = serie.getItemCount();
+
+        for (int n = 0; n < nbPoint; n++) {
+
+            int sizeData = measure.getData().size();
+
+            if (n < sizeData) {
+                newSerie.add(serie.getX(n), measure.getData().get(n));
+            }
+        }
+
+        collection.addSeries(newSerie);
+
     }
 
     public final ChartPanel getChartPanel() {
