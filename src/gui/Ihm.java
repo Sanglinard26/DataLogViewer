@@ -22,6 +22,7 @@ import javax.swing.JList;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
 import javax.swing.KeyStroke;
@@ -33,8 +34,6 @@ import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import javax.swing.filechooser.FileFilter;
-
-import org.jfree.data.xy.XYSeriesCollection;
 
 import log.Log;
 import log.Measure;
@@ -88,7 +87,7 @@ public final class Ihm extends JFrame {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                openConfig(new File("C:\\TEMP\\test.pcs"));
+                JOptionPane.showMessageDialog(Ihm.this, "Fonction pas encore implementee");
             }
         });
         menu.add(menuItem);
@@ -100,7 +99,7 @@ public final class Ihm extends JFrame {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                saveConfig();
+                JOptionPane.showMessageDialog(Ihm.this, "Fonction pas encore implementee");
             }
         });
         menu.add(menuItem);
@@ -320,21 +319,10 @@ public final class Ihm extends JFrame {
 
     private final void saveConfig() {
 
-        for (int i = 0; i < tabbedPane.getTabCount(); i++) {
-            ChartView chartView = (ChartView) tabbedPane.getComponentAt(i);
-            XYSeriesCollection collection = (XYSeriesCollection) chartView.getChartPanel().getChart().getXYPlot().getDataset();
-            for (int j = 0; j < collection.getSeriesCount(); j++) {
-                collection.getSeries(j).clear();
-            }
-            // chartView.serialize(new File("C:\\TEMP\\test.pcs"));
-            ;
-        }
-
     }
 
     private final void openConfig(File file) {
-        tabbedPane.addTab("Fenêtre n°" + tabbedPane.getTabCount(), ChartView.readObject(file));
-        tabbedPane.setSelectedIndex(tabbedPane.getTabCount() - 1);
+
     }
 
     public static void main(String[] args) {
