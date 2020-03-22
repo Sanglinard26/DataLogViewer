@@ -3,11 +3,13 @@
  */
 package log;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Measure implements Comparable<Measure> {
+public class Measure implements Comparable<Measure>, Serializable {
 
+    private static final long serialVersionUID = 1L;
     private String name;
     private String unit;
     private List<Double> data;
