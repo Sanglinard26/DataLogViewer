@@ -3,13 +3,11 @@
  */
 package observer;
 
-import java.util.HashMap;
-
 public interface Observable {
 
     public void addObservateur(Observateur obs);
 
-    public void updateObservateur(HashMap<String, Double> tableValue);
+    public void updateObservateur(String type, Object value);
 
     public void delObservateur();
 

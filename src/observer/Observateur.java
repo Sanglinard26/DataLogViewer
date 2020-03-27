@@ -7,6 +7,8 @@ import java.util.HashMap;
 
 public interface Observateur {
 
-    public void update(HashMap<String, Double> tableValue);
+    public void updateValues(HashMap<String, Double> tableValue);
+
+    public void updateData(String key);
 
 }

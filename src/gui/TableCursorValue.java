@@ -26,7 +26,7 @@ public final class TableCursorValue extends JTable implements Observateur {
     }
 
     @Override
-    public void update(HashMap<String, Double> tableValue) {
+    public void updateValues(HashMap<String, Double> tableValue) {
 
         Set<Entry<String, Double>> set = tableValue.entrySet();
         for (Entry<String, Double> entry : set) {
@@ -36,6 +36,11 @@ public final class TableCursorValue extends JTable implements Observateur {
             }
         }
 
+    }
+
+    @Override
+    public void updateData(String key) {
+        ((DataValueModel) getModel()).removeElement(key);
     }
 
 }

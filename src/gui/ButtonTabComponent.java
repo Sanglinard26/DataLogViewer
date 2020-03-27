@@ -32,6 +32,7 @@
 package gui;
 
 import java.awt.BasicStroke;
+import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
@@ -40,6 +41,8 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
@@ -50,6 +53,7 @@ import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
+import javax.swing.JTextField;
 import javax.swing.plaf.basic.BasicButtonUI;
 
 /**
@@ -69,7 +73,7 @@ public class ButtonTabComponent extends JPanel {
         setOpaque(false);
 
         // make JLabel read titles from JTabbedPane
-        JLabel label = new JLabel() {
+        final JLabel label = new JLabel() {
             private static final long serialVersionUID = 1L;
 
             public String getText() {
@@ -81,7 +85,44 @@ public class ButtonTabComponent extends JPanel {
             }
         };
 
-        add(label);
+        final JTextField textfield = new JTextField();
+
+        final CardLayout cl = new CardLayout();
+        final JPanel panel = new JPanel(cl);
+        panel.setOpaque(false);
+
+        panel.add(label, "label component");
+        panel.add(textfield, "textfield component");
+
+        this.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() > 1) {
+                    textfield.setText(label.getText());
+                    cl.show(panel, "textfield component");
+                } else {
+                    int idx = pane.indexOfTabComponent(ButtonTabComponent.this);
+                    if (idx != -1) {
+                        pane.setSelectedIndex(idx);
+                    }
+                }
+            }
+        });
+
+        textfield.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    int i = pane.indexOfTabComponent(ButtonTabComponent.this);
+                    if (i != -1) {
+                        pane.setTitleAt(i, textfield.getText());
+                        cl.show(panel, "label component");
+                    }
+                }
+            }
+        });
+
+        add(panel);
         // add more space between the label and the button
         label.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 5));
         // tab button
@@ -89,6 +130,7 @@ public class ButtonTabComponent extends JPanel {
         add(button);
         // add more space to the top of the component
         setBorder(BorderFactory.createEmptyBorder(2, 0, 0, 0));
+        setToolTipText("Double click pour renommer");
     }
 
     private class TabButton extends JButton implements ActionListener {

@@ -1,28 +1,21 @@
 package gui;
 
 import java.awt.BasicStroke;
-import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Point;
 import java.awt.Stroke;
+import java.awt.event.ActionEvent;
+import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.awt.event.MouseMotionListener;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-import javax.swing.BorderFactory;
-import javax.swing.JPanel;
+import javax.swing.ImageIcon;
+import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
+import javax.swing.JPopupMenu;
 import javax.swing.SwingUtilities;
 import javax.swing.TransferHandler.DropLocation;
 
@@ -41,33 +34,29 @@ import org.jfree.data.general.DatasetUtilities;
 import org.jfree.data.xy.XYSeries;
 import org.jfree.data.xy.XYSeriesCollection;
 import org.jfree.ui.RectangleEdge;
+import org.jfree.util.ShapeUtilities;
 
 import log.Measure;
 import observer.Observable;
 import observer.Observateur;
 
-public final class ChartView extends JPanel implements Observable {
+public final class ChartView extends ChartPanel implements Observable {
 
     private static final long serialVersionUID = 1L;
 
-    private final ChartPanel chartPanel;
-    private JFreeChart chart = null;
-    final CombinedDomainXYPlot combinedPlot;
-    final Stroke oldStrokePlot;
+    private final CombinedDomainXYPlot combinedPlot;
+    private Stroke oldStrokePlot;
     private final List<String> measuresName;
 
-    private transient List<Observateur> listObservateur = new ArrayList<Observateur>();
+    private List<Observateur> listObservateur = new ArrayList<Observateur>();
 
     public ChartView() {
 
-        setLayout(new BorderLayout());
-        setBorder(BorderFactory.createLineBorder(Color.GRAY));
+        super(null, 680, 420, 300, 200, 1920, 1080, true, true, false, false, true, false);
 
         measuresName = new ArrayList<String>();
 
-        chartPanel = new ChartPanel(null, 680, 420, 300, 200, 1920, 1080, true, true, false, false, true, false);
-
-        chartPanel.setPopupMenu(null);
+        setPopupMenu(createPopupMenu());
 
         combinedPlot = new CombinedDomainXYPlot();
 
@@ -75,119 +64,97 @@ public final class ChartView extends JPanel implements Observable {
         combinedPlot.setOrientation(PlotOrientation.VERTICAL);
         combinedPlot.setGap(10);
 
-        chart = new JFreeChart(combinedPlot);
+        oldStrokePlot = combinedPlot.getOutlineStroke();
 
-        oldStrokePlot = chart.getXYPlot().getOutlineStroke();
+        setChart(new JFreeChart(combinedPlot));
+        setRangeZoomable(false);
+        setDomainZoomable(true);
 
-        chartPanel.setChart(chart);
-        chartPanel.setRangeZoomable(false);
-        chartPanel.setDomainZoomable(true);
+        addMouseListener(new MyChartMouseListener());
+        addMouseMotionListener(new MyChartMouseListener());
+    }
 
-        chartPanel.addMouseListener(new MouseListener() {
+    public ChartView(JFreeChart serializedChart) {
 
-            @Override
-            public void mouseReleased(MouseEvent e) {
-                chartPanel.setDomainZoomable(true);
+        super(serializedChart, 680, 420, 300, 200, 1920, 1080, true, true, false, false, true, false);
 
+        this.measuresName = new ArrayList<String>();
+
+        setPopupMenu(createPopupMenu());
+
+        this.combinedPlot = (CombinedDomainXYPlot) serializedChart.getXYPlot();
+        @SuppressWarnings("unchecked")
+        List<XYPlot> subPlots = combinedPlot.getSubplots();
+        for (XYPlot plot : subPlots) {
+            plot.addChangeListener(combinedPlot);
+            int nbSerie = plot.getDataset().getSeriesCount();
+            for (int i = 0; i < nbSerie; i++) {
+                measuresName.add((String) plot.getDataset().getSeriesKey(i));
             }
+        }
 
-            @Override
-            public void mousePressed(MouseEvent e) {
-                if (SwingUtilities.isLeftMouseButton(e)) {
-                    chartPanel.setDomainZoomable(false);
+        oldStrokePlot = combinedPlot.getOutlineStroke();
 
-                    Rectangle2D dataArea = chartPanel.getScreenDataArea();
+        setRangeZoomable(false);
+        setDomainZoomable(true);
 
-                    Point2D p = chartPanel.translateScreenToJava2D(e.getPoint());
-                    XYPlot plot = combinedPlot.findSubplot(chartPanel.getChartRenderingInfo().getPlotInfo(), p);
-                    if (plot == null) {
-                        return;
-                    }
-                    ValueAxis xAxis = plot.getDomainAxis();
-                    double x = xAxis.java2DToValue(p.getX(), dataArea, RectangleEdge.BOTTOM);
-                    // make the crosshairs disappear if the mouse is out of range
-                    if (!xAxis.getRange().contains(x)) {
-                        x = Double.NaN;
-                    }
+        addMouseListener(new MyChartMouseListener());
+        addMouseMotionListener(new MyChartMouseListener());
 
-                    HashMap<String, Double> tableValue = new HashMap<String, Double>();
+    }
 
-                    @SuppressWarnings("unchecked")
-                    List<XYPlot> subplots = combinedPlot.getSubplots();
-                    for (XYPlot subplot : subplots) {
-                        subplot.setDomainCrosshairValue(x);
-                        for (int i = 0; i < subplot.getDatasetCount(); i++) {
-                            for (int j = 0; j < subplot.getDataset(i).getSeriesCount(); j++) {
-                                tableValue.put(subplot.getDataset(i).getSeriesKey(j).toString(),
-                                        DatasetUtilities.findYValue(subplot.getDataset(i), j, x));
-                            }
-                        }
-                    }
+    private final class MyChartMouseListener extends MouseAdapter {
+        @Override
+        public void mousePressed(MouseEvent e) {
+            if (SwingUtilities.isLeftMouseButton(e)) {
+                setDomainZoomable(false);
+                updateTableValue(e);
+            }
+        }
 
-                    updateObservateur(tableValue);
+        @Override
+        public void mouseReleased(MouseEvent e) {
+            setDomainZoomable(true);
+        }
+
+        @Override
+        public void mouseDragged(MouseEvent e) {
+            if (SwingUtilities.isRightMouseButton(e)) {
+                return;
+            }
+            updateTableValue(e);
+        }
+    }
+
+    private final void updateTableValue(MouseEvent e) {
+        Rectangle2D dataArea = getScreenDataArea();
+
+        Point2D p = translateScreenToJava2D(e.getPoint());
+        XYPlot plot = combinedPlot.findSubplot(getChartRenderingInfo().getPlotInfo(), p);
+        if (plot == null) {
+            return;
+        }
+        ValueAxis xAxis = plot.getDomainAxis();
+        double x = xAxis.java2DToValue(p.getX(), dataArea, RectangleEdge.BOTTOM);
+        // make the crosshairs disappear if the mouse is out of range
+        if (!xAxis.getRange().contains(x)) {
+            x = Double.NaN;
+        }
+
+        HashMap<String, Double> tableValue = new HashMap<String, Double>();
+
+        @SuppressWarnings("unchecked")
+        List<XYPlot> subplots = combinedPlot.getSubplots();
+        for (XYPlot subplot : subplots) {
+            subplot.setDomainCrosshairValue(x);
+            for (int i = 0; i < subplot.getDatasetCount(); i++) {
+                for (int j = 0; j < subplot.getDataset(i).getSeriesCount(); j++) {
+                    tableValue.put(subplot.getDataset(i).getSeriesKey(j).toString(), DatasetUtilities.findYValue(subplot.getDataset(i), j, x));
                 }
-
             }
+        }
 
-            @Override
-            public void mouseExited(MouseEvent e) {
-            }
-
-            @Override
-            public void mouseEntered(MouseEvent e) {
-            }
-
-            @Override
-            public void mouseClicked(MouseEvent e) {
-            }
-        });
-
-        chartPanel.addMouseMotionListener(new MouseMotionListener() {
-
-            @Override
-            public void mouseMoved(MouseEvent e) {
-            }
-
-            @Override
-            public void mouseDragged(MouseEvent e) {
-
-                if (SwingUtilities.isRightMouseButton(e)) {
-                    return;
-                }
-
-                Rectangle2D dataArea = chartPanel.getScreenDataArea();
-
-                Point2D p = chartPanel.translateScreenToJava2D(e.getPoint());
-                XYPlot plot = combinedPlot.findSubplot(chartPanel.getChartRenderingInfo().getPlotInfo(), p);
-                if (plot == null) {
-                    return;
-                }
-                ValueAxis xAxis = plot.getDomainAxis();
-                double x = xAxis.java2DToValue(p.getX(), dataArea, RectangleEdge.BOTTOM);
-                // make the crosshairs disappear if the mouse is out of range
-                if (!xAxis.getRange().contains(x)) {
-                    x = Double.NaN;
-                }
-
-                HashMap<String, Double> tableValue = new HashMap<String, Double>();
-
-                @SuppressWarnings("unchecked")
-                List<XYPlot> subplots = combinedPlot.getSubplots();
-                for (XYPlot subplot : subplots) {
-                    subplot.setDomainCrosshairValue(x);
-                    for (int i = 0; i < subplot.getDatasetCount(); i++) {
-                        for (int j = 0; j < subplot.getDataset(i).getSeriesCount(); j++) {
-                            tableValue.put(subplot.getDataset(i).getSeriesKey(j).toString(),
-                                    DatasetUtilities.findYValue(subplot.getDataset(i), j, x));
-                        }
-                    }
-                }
-
-                updateObservateur(tableValue);
-            }
-        });
-
-        add(chartPanel, BorderLayout.CENTER);
+        updateObservateur("values", tableValue);
     }
 
     public final void addPlot(Measure time, Measure measure) {
@@ -196,6 +163,8 @@ public final class ChartView extends JPanel implements Observable {
         final XYSeriesCollection collections = new XYSeriesCollection(series);
         final NumberAxis yAxis = new NumberAxis(measure.getName());
         final XYItemRenderer renderer = new XYLineAndShapeRenderer(true, true);
+        renderer.setSeriesShape(0, ShapeUtilities.createRegularCross(2, 0.5f));
+        renderer.setSeriesStroke(0, new BasicStroke(1.5f));
         final XYPlot plot = new XYPlot(collections, null, yAxis, renderer);
 
         final List<Double> temps = time.getData();
@@ -223,14 +192,12 @@ public final class ChartView extends JPanel implements Observable {
 
         combinedPlot.add(plot, 1);
 
-        plot.setDataset(collections);
-
         measuresName.add(measure.getName());
     }
 
     public final void addMeasure(Point point, Measure measure) {
 
-        final XYPlot plot = ((CombinedDomainXYPlot) chart.getPlot()).findSubplot(chartPanel.getChartRenderingInfo().getPlotInfo(), point);
+        final XYPlot plot = ((CombinedDomainXYPlot) getChart().getPlot()).findSubplot(getChartRenderingInfo().getPlotInfo(), point);
         final XYSeriesCollection collection = (XYSeriesCollection) plot.getDataset();
         final XYSeries serie = collection.getSeries(0);
 
@@ -247,6 +214,10 @@ public final class ChartView extends JPanel implements Observable {
         }
 
         collection.addSeries(newSerie);
+
+        plot.getRenderer().setSeriesShape(collection.getSeriesCount() - 1, ShapeUtilities.createRegularCross(2, 0.5f));
+        plot.getRenderer().setSeriesStroke(collection.getSeriesCount() - 1, new BasicStroke(1.5f));
+
         plot.setOutlineStroke(oldStrokePlot);
 
         measuresName.add(measure.getName());
@@ -255,7 +226,7 @@ public final class ChartView extends JPanel implements Observable {
 
     public final void highlightPlot(DropLocation dropLocation) {
 
-        ChartEntity chartEntity = chartPanel.getEntityForPoint(dropLocation.getDropPoint().x, dropLocation.getDropPoint().y);
+        ChartEntity chartEntity = getEntityForPoint(dropLocation.getDropPoint().x, dropLocation.getDropPoint().y);
         if (chartEntity instanceof PlotEntity) {
             PlotEntity plotEntity = (PlotEntity) chartEntity;
             plotEntity.getPlot().setOutlineStroke(new BasicStroke(2f));
@@ -269,38 +240,26 @@ public final class ChartView extends JPanel implements Observable {
         }
     }
 
-    public final ChartPanel getChartPanel() {
-        return chartPanel;
+    private final JPopupMenu createPopupMenu() {
+
+        final String ICON_PROPERTIES = "/icon_editPlot_16.png";
+
+        JPopupMenu popUp = new JPopupMenu("Graphique :");
+
+        JMenuItem propertiesItem = new JMenuItem("Propiétes des graphiques", new ImageIcon(getClass().getResource(ICON_PROPERTIES)));
+        propertiesItem.setActionCommand("PROPERTIES");
+        propertiesItem.addActionListener(this);
+        popUp.add(propertiesItem);
+
+        return popUp;
+    }
+
+    public final CombinedDomainXYPlot getPlot() {
+        return this.combinedPlot;
     }
 
     public final List<String> getMeasures() {
         return measuresName;
-    }
-
-    public final void serialize(File file) {
-
-        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(file))) {
-            oos.writeObject(this);
-            oos.flush();
-        } catch (FileNotFoundException e1) {
-            e1.printStackTrace();
-        } catch (IOException e1) {
-            e1.printStackTrace();
-        }
-    }
-
-    public static ChartView readObject(File file) {
-        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
-            ChartView chartView = (ChartView) ois.readObject();
-            return chartView;
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-        }
-        return null;
     }
 
     @Override
@@ -308,16 +267,43 @@ public final class ChartView extends JPanel implements Observable {
         this.listObservateur.add(obs);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public void updateObservateur(HashMap<String, Double> tableValue) {
+    public void updateObservateur(String type, Object object) {
+
         for (Observateur obs : this.listObservateur) {
-            obs.update(tableValue);
+            if ("values".equals(type)) {
+                obs.updateValues((HashMap<String, Double>) object);
+            } else {
+                obs.updateData(object.toString());
+            }
+
         }
     }
 
     @Override
     public void delObservateur() {
         this.listObservateur = new ArrayList<Observateur>();
+    }
+
+    @Override
+    public void actionPerformed(ActionEvent event) {
+
+        String command = event.getActionCommand();
+
+        switch (command) {
+        case "PROPERTIES":
+            DialogProperties propertiesPanel = new DialogProperties(combinedPlot);
+            int res = JOptionPane.showConfirmDialog(this, propertiesPanel, "Propriétés", 2, -1);
+            if (res == JOptionPane.OK_OPTION) {
+                propertiesPanel.updatePlot(this);
+            }
+            break;
+
+        default:
+            break;
+        }
+
     }
 
 }

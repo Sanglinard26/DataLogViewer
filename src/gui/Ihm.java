@@ -13,11 +13,22 @@ import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import javax.swing.DefaultListModel;
+import javax.swing.ImageIcon;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
@@ -34,6 +45,13 @@ import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import javax.swing.filechooser.FileFilter;
+import javax.swing.filechooser.FileNameExtensionFilter;
+
+import org.jfree.chart.JFreeChart;
+import org.jfree.chart.plot.CombinedDomainXYPlot;
+import org.jfree.chart.plot.XYPlot;
+import org.jfree.data.xy.XYSeries;
+import org.jfree.data.xy.XYSeriesCollection;
 
 import log.Log;
 import log.Measure;
@@ -50,6 +68,9 @@ public final class Ihm extends JFrame {
     private DefaultListModel<Measure> listModel;
     private JList<Measure> listVoie;
     private TableCursorValue tableCursorValues;
+
+    private JLabel labelFnr;
+    private JLabel labelLogName;
 
     private static Log log;
 
@@ -69,42 +90,95 @@ public final class Ihm extends JFrame {
     }
 
     private final JMenuBar createMenu() {
+
+        final String ICON_OPEN_LOG = "/icon_openLog_16.png";
+        final String ICON_SAVE_CONFIG = "/icon_saveConfig_16.png";
+        final String ICON_OPEN_CONFIG = "/icon_openConfig_16.png";
+        final String ICON_ADD_WINDOW = "/icon_addWindow_16.png";
+        final String ICON_EXIT = "/icon_exit_16.png";
+        final String ICON_NEW = "/new_icon_16.png";
+
         JMenuBar menuBar = new JMenuBar();
 
         JMenu menu = new JMenu("Fichier");
         menuBar.add(menu);
 
-        JMenuItem menuItem = new JMenuItem("Ouvrir log");
+        JMenuItem menuItem = new JMenuItem("Ouvrir log", new ImageIcon(getClass().getResource(ICON_OPEN_LOG)));
         menuItem.setMnemonic(KeyEvent.VK_O);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_O, ActionEvent.CTRL_MASK));
         menuItem.addActionListener(new OpenLog());
         menu.add(menuItem);
 
-        menuItem = new JMenuItem("Ouvrir configuration");
-        menuItem.setMnemonic(KeyEvent.VK_C);
-        menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_C, ActionEvent.CTRL_MASK));
+        menuItem = new JMenuItem("Ouvrir configuration", new ImageIcon(getClass().getResource(ICON_OPEN_CONFIG)));
+        menuItem.setMnemonic(KeyEvent.VK_I);
+        menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_I, ActionEvent.CTRL_MASK));
         menuItem.addActionListener(new ActionListener() {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                JOptionPane.showMessageDialog(Ihm.this, "Fonction pas encore implementee");
+                final JFileChooser fc = new JFileChooser();
+                fc.setMultiSelectionEnabled(false);
+                fc.setFileSelectionMode(JFileChooser.OPEN_DIALOG);
+                fc.setFileFilter(new FileFilter() {
+
+                    @Override
+                    public String getDescription() {
+                        return "Fichier de configuration graphique (*.cfg)";
+                    }
+
+                    @Override
+                    public boolean accept(File f) {
+                        if (f.isDirectory()) {
+                            return true;
+                        }
+                        return f.getName().toLowerCase().endsWith("cfg");
+                    }
+                });
+                final int reponse = fc.showOpenDialog(Ihm.this);
+                if (reponse == JFileChooser.APPROVE_OPTION) {
+                    openConfig(fc.getSelectedFile());
+                }
+
             }
         });
         menu.add(menuItem);
 
-        menuItem = new JMenuItem("Enregistrer configuration");
+        menuItem = new JMenuItem("Enregistrer configuration", new ImageIcon(getClass().getResource(ICON_SAVE_CONFIG)));
         menuItem.setMnemonic(KeyEvent.VK_S);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, ActionEvent.CTRL_MASK));
         menuItem.addActionListener(new ActionListener() {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                JOptionPane.showMessageDialog(Ihm.this, "Fonction pas encore implementee");
+                final JFileChooser fileChooser = new JFileChooser();
+                fileChooser.setDialogTitle("Enregistement de la configuration");
+                fileChooser.setFileFilter(new FileNameExtensionFilter("Fichier de configuration graphique (*.cfg)", "cfg"));
+                fileChooser.setSelectedFile(new File("config.cfg"));
+                final int rep = fileChooser.showSaveDialog(null);
+
+                if (rep == JFileChooser.APPROVE_OPTION) {
+
+                    String extension = "";
+                    String fileName = fileChooser.getSelectedFile().getAbsolutePath();
+                    File file = fileChooser.getSelectedFile();
+
+                    final int idxDot = fileName.lastIndexOf(".");
+
+                    if (idxDot > -1) {
+                        extension = fileName.substring(idxDot + 1);
+                    }
+                    if (!extension.equalsIgnoreCase("cfg")) {
+                        file = new File(fileName.replace("." + extension, "") + ".cfg");
+                    }
+
+                    saveConfig(file);
+                }
+
             }
         });
         menu.add(menuItem);
 
-        menuItem = new JMenuItem("Quitter");
+        menuItem = new JMenuItem("Quitter", new ImageIcon(getClass().getResource(ICON_EXIT)));
         menuItem.setMnemonic(KeyEvent.VK_Q);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Q, ActionEvent.CTRL_MASK));
         menuItem.addActionListener(new ActionListener() {
@@ -120,15 +194,23 @@ public final class Ihm extends JFrame {
         menu = new JMenu("Fenêtre");
         menuBar.add(menu);
 
-        menuItem = new JMenuItem("Ajouter");
+        menuItem = new JMenuItem("Ajouter", new ImageIcon(getClass().getResource(ICON_ADD_WINDOW)));
         menuItem.addActionListener(new AddWindow());
         menu.add(menuItem);
 
-        menuItem = new JMenuItem("Supprimer");
-        menu.add(menuItem);
-
-        menu = new JMenu("Info");
+        menu = new JMenu("?");
         menuBar.add(menu);
+
+        menuItem = new JMenuItem("ChangeLog", new ImageIcon(getClass().getResource(ICON_NEW)));
+        menuItem.addActionListener(new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                new DialNews(Ihm.this);
+
+            }
+        });
+        menu.add(menuItem);
 
         return menuBar;
     }
@@ -192,7 +274,7 @@ public final class Ihm extends JFrame {
         });
 
         tableCursorValues = new TableCursorValue();
-        gbc.fill = GridBagConstraints.VERTICAL;
+        gbc.fill = GridBagConstraints.BOTH;
         gbc.gridx = 3;
         gbc.gridy = 1;
         gbc.gridwidth = 2;
@@ -203,19 +285,43 @@ public final class Ihm extends JFrame {
         gbc.anchor = GridBagConstraints.FIRST_LINE_START;
         root.add(new JScrollPane(tableCursorValues), gbc);
 
+        labelFnr = new JLabel("Fournisseur du log : ");
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        gbc.gridwidth = 2;
+        gbc.gridheight = 1;
+        gbc.weightx = 0;
+        gbc.weighty = 0;
+        gbc.insets = new Insets(5, 5, 0, 0);
+        gbc.anchor = GridBagConstraints.FIRST_LINE_START;
+        root.add(labelFnr, gbc);
+
+        labelLogName = new JLabel("Nom de l'acquisition : ");
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridx = 0;
+        gbc.gridy = 3;
+        gbc.gridwidth = 2;
+        gbc.gridheight = 1;
+        gbc.weightx = 0;
+        gbc.weighty = 0;
+        gbc.insets = new Insets(5, 5, 5, 0);
+        gbc.anchor = GridBagConstraints.FIRST_LINE_START;
+        root.add(labelLogName, gbc);
+
     }
 
     private final class OpenLog implements ActionListener {
         @Override
         public void actionPerformed(ActionEvent e) {
             final JFileChooser fc = new JFileChooser();
-            fc.setMultiSelectionEnabled(true);
+            fc.setMultiSelectionEnabled(false);
             fc.setFileSelectionMode(JFileChooser.OPEN_DIALOG);
             fc.setFileFilter(new FileFilter() {
 
                 @Override
                 public String getDescription() {
-                    return "Fichier log (*.txt)";
+                    return "Fichier log (*.txt, *.msl)";
                 }
 
                 @Override
@@ -223,7 +329,7 @@ public final class Ihm extends JFrame {
                     if (f.isDirectory()) {
                         return true;
                     }
-                    return f.getName().toLowerCase().endsWith("txt");
+                    return f.getName().toLowerCase().endsWith("txt") || f.getName().toLowerCase().endsWith("msl");
                 }
             });
             final int reponse = fc.showOpenDialog(Ihm.this);
@@ -239,6 +345,11 @@ public final class Ihm extends JFrame {
                     listModel.addElement(measure);
                 }
 
+                labelFnr.setText("<html>Fournisseur du log : " + "<b>" + log.getFnr());
+                labelLogName.setText("<html>Nom de l'acquisition : " + "<b>" + log.getName());
+
+                // load data in chart
+                reloadLogData(log);
             }
 
         }
@@ -251,7 +362,12 @@ public final class Ihm extends JFrame {
             ChartView chartView = new ChartView();
             chartView.addObservateur(tableCursorValues);
             chartView.setTransferHandler(new MeasureHandler());
-            tabbedPane.addTab("Fenêtre n°" + tabbedPane.getTabCount(), chartView);
+            String defaultName = "Fenêtre n°" + tabbedPane.getTabCount();
+            String windowName = JOptionPane.showInputDialog(Ihm.this, "Nom de la fenêtre :", defaultName);
+            if (windowName == null || "".equals(windowName)) {
+                windowName = defaultName;
+            }
+            tabbedPane.addTab(windowName, chartView);
             tabbedPane.setTabComponentAt(tabbedPane.getTabCount() - 1, new ButtonTabComponent(tabbedPane));
             tabbedPane.setSelectedIndex(tabbedPane.getTabCount() - 1);
         }
@@ -301,11 +417,7 @@ public final class Ihm extends JFrame {
     }
 
     private final void measureSelection() {
-        // if (timeAxis == null) {
-        // timeAxis = new NumberAxis("Time");
-        // }
-
-        int idxWindow = tabbedPane.getSelectedIndex();
+        final int idxWindow = tabbedPane.getSelectedIndex();
 
         if (idxWindow < 0) {
             return;
@@ -317,12 +429,107 @@ public final class Ihm extends JFrame {
 
     }
 
-    private final void saveConfig() {
+    private final void reloadLogData(Log log) {
+
+        final int nbTab = tabbedPane.getTabCount();
+        ChartView chartView;
+        XYPlot xyPlot;
+        XYSeries serie;
+        Comparable<?> key;
+        Measure measure = null;
+
+        if (log == null) {
+            return;
+        }
+
+        for (int n = 0; n < nbTab; n++) {
+            chartView = (ChartView) tabbedPane.getComponentAt(n);
+            chartView.restoreAutoBounds();
+            for (Object plot : chartView.getPlot().getSubplots()) {
+                xyPlot = (XYPlot) plot;
+                int nbSerie = xyPlot.getSeriesCount();
+
+                for (int nSerie = 0; nSerie < nbSerie; nSerie++) {
+                    serie = ((XYSeriesCollection) xyPlot.getDataset()).getSeries(nSerie);
+                    serie.clear();
+
+                    key = serie.getKey();
+
+                    int idxMeasure = log.getMeasures().indexOf(new Measure(key.toString()));
+
+                    if (idxMeasure > -1) {
+
+                        measure = log.getMeasures().get(idxMeasure);
+                        final List<Double> temps = log.getTime().getData();
+                        final int nbPoint = temps.size();
+                        final int sizeData = measure.getData().size();
+
+                        for (int n1 = 0; n1 < nbPoint; n1++) {
+
+                            if (n1 < sizeData) {
+                                serie.add(temps.get(n1), measure.getData().get(n1));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private final void saveConfig(File file) {
+
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(file))) {
+            int nbTab = tabbedPane.getTabCount();
+            Map<String, JFreeChart> listChart = new LinkedHashMap<String, JFreeChart>(nbTab);
+
+            for (int i = 0; i < nbTab; i++) {
+                JFreeChart chart = ((ChartView) tabbedPane.getComponentAt(i)).getChart();
+                @SuppressWarnings("unchecked")
+                List<XYPlot> subPlots = ((CombinedDomainXYPlot) chart.getXYPlot()).getSubplots();
+                for (XYPlot subplot : subPlots) {
+                    int nbSerie = subplot.getDataset().getSeriesCount();
+                    for (int j = 0; j < nbSerie; j++) {
+                        ((XYSeriesCollection) subplot.getDataset()).getSeries(j).clear();
+                    }
+                }
+                listChart.put(tabbedPane.getTitleAt(i), chart);
+            }
+
+            oos.writeObject(listChart);
+            oos.flush();
+        } catch (FileNotFoundException e1) {
+            e1.printStackTrace();
+        } catch (IOException e1) {
+            e1.printStackTrace();
+        } finally {
+            reloadLogData(log);
+        }
 
     }
 
     private final void openConfig(File file) {
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
+            @SuppressWarnings("unchecked")
+            Map<String, JFreeChart> map = (LinkedHashMap<String, JFreeChart>) ois.readObject();
 
+            for (Entry<String, JFreeChart> entry : map.entrySet()) {
+                ChartView chartView = new ChartView(entry.getValue());
+                chartView.addObservateur(tableCursorValues);
+                chartView.setTransferHandler(new MeasureHandler());
+                tabbedPane.addTab(entry.getKey(), chartView);
+                tabbedPane.setTabComponentAt(tabbedPane.getTabCount() - 1, new ButtonTabComponent(tabbedPane));
+                tabbedPane.setSelectedIndex(tabbedPane.getTabCount() - 1);
+            }
+
+            reloadLogData(log);
+
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
     }
 
     public static void main(String[] args) {
