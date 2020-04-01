@@ -18,6 +18,8 @@ public final class TableCursorValue extends JTable implements Observateur {
 
     public TableCursorValue() {
         super(new DataValueModel());
+        getColumnModel().getColumn(0).setPreferredWidth(200);
+        getColumnModel().getColumn(1).setPreferredWidth(100);
     }
 
     @Override

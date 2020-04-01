@@ -1,6 +1,7 @@
 package gui;
 
 import java.awt.BasicStroke;
+import java.awt.BorderLayout;
 import java.awt.Point;
 import java.awt.Stroke;
 import java.awt.event.ActionEvent;
@@ -48,6 +49,8 @@ public final class ChartView extends ChartPanel implements Observable {
     private Stroke oldStrokePlot;
     private final List<String> measuresName;
 
+    private static double xValue = Double.NaN;
+
     private List<Observateur> listObservateur = new ArrayList<Observateur>();
 
     public ChartView() {
@@ -78,6 +81,8 @@ public final class ChartView extends ChartPanel implements Observable {
 
         super(serializedChart, 680, 420, 300, 200, 1920, 1080, true, true, false, false, true, false);
 
+        setLayout(new BorderLayout());
+
         this.measuresName = new ArrayList<String>();
 
         setPopupMenu(createPopupMenu());
@@ -100,7 +105,6 @@ public final class ChartView extends ChartPanel implements Observable {
 
         addMouseListener(new MyChartMouseListener());
         addMouseMotionListener(new MyChartMouseListener());
-
     }
 
     private final class MyChartMouseListener extends MouseAdapter {
@@ -135,10 +139,10 @@ public final class ChartView extends ChartPanel implements Observable {
             return;
         }
         ValueAxis xAxis = plot.getDomainAxis();
-        double x = xAxis.java2DToValue(p.getX(), dataArea, RectangleEdge.BOTTOM);
+        xValue = xAxis.java2DToValue(p.getX(), dataArea, RectangleEdge.BOTTOM);
         // make the crosshairs disappear if the mouse is out of range
-        if (!xAxis.getRange().contains(x)) {
-            x = Double.NaN;
+        if (!xAxis.getRange().contains(xValue)) {
+            xValue = Double.NaN;
         }
 
         HashMap<String, Double> tableValue = new HashMap<String, Double>();
@@ -146,10 +150,28 @@ public final class ChartView extends ChartPanel implements Observable {
         @SuppressWarnings("unchecked")
         List<XYPlot> subplots = combinedPlot.getSubplots();
         for (XYPlot subplot : subplots) {
-            subplot.setDomainCrosshairValue(x);
+            subplot.setDomainCrosshairValue(xValue);
             for (int i = 0; i < subplot.getDatasetCount(); i++) {
                 for (int j = 0; j < subplot.getDataset(i).getSeriesCount(); j++) {
-                    tableValue.put(subplot.getDataset(i).getSeriesKey(j).toString(), DatasetUtilities.findYValue(subplot.getDataset(i), j, x));
+                    tableValue.put(subplot.getDataset(i).getSeriesKey(j).toString(), DatasetUtilities.findYValue(subplot.getDataset(i), j, xValue));
+                }
+            }
+        }
+
+        updateObservateur("values", tableValue);
+    }
+
+    public final void updateTableValue() {
+
+        HashMap<String, Double> tableValue = new HashMap<String, Double>();
+
+        @SuppressWarnings("unchecked")
+        List<XYPlot> subplots = combinedPlot.getSubplots();
+        for (XYPlot subplot : subplots) {
+            subplot.setDomainCrosshairValue(xValue);
+            for (int i = 0; i < subplot.getDatasetCount(); i++) {
+                for (int j = 0; j < subplot.getDataset(i).getSeriesCount(); j++) {
+                    tableValue.put(subplot.getDataset(i).getSeriesKey(j).toString(), DatasetUtilities.findYValue(subplot.getDataset(i), j, xValue));
                 }
             }
         }
@@ -256,6 +278,10 @@ public final class ChartView extends ChartPanel implements Observable {
 
     public final CombinedDomainXYPlot getPlot() {
         return this.combinedPlot;
+    }
+
+    public final double getXValue() {
+        return xValue;
     }
 
     public final List<String> getMeasures() {

@@ -226,7 +226,6 @@ public final class Ihm extends JFrame {
         root.setLayout(new GridBagLayout());
 
         listVoie = new JList<Measure>();
-        // listVoie.addListSelectionListener(new MeasureSelection());
         listVoie.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -236,12 +235,12 @@ public final class Ihm extends JFrame {
             }
         });
         listVoie.setModel(listModel);
-        gbc.fill = GridBagConstraints.VERTICAL;
+        gbc.fill = GridBagConstraints.BOTH;
         gbc.gridx = 0;
         gbc.gridy = 1;
         gbc.gridwidth = 1;
         gbc.gridheight = 1;
-        gbc.weightx = 0;
+        gbc.weightx = 5;
         gbc.weighty = 0;
         gbc.insets = new Insets(0, 5, 0, 0);
         gbc.anchor = GridBagConstraints.FIRST_LINE_START;
@@ -253,9 +252,9 @@ public final class Ihm extends JFrame {
         gbc.fill = GridBagConstraints.BOTH;
         gbc.gridx = 1;
         gbc.gridy = 1;
-        gbc.gridwidth = 2;
+        gbc.gridwidth = 1;
         gbc.gridheight = 1;
-        gbc.weightx = 1;
+        gbc.weightx = 90;
         gbc.weighty = 1;
         gbc.insets = new Insets(0, 0, 0, 0);
         gbc.anchor = GridBagConstraints.FIRST_LINE_START;
@@ -269,17 +268,19 @@ public final class Ihm extends JFrame {
                 if (idx > -1) {
                     ChartView chartView = (ChartView) tabbedPane.getComponentAt(idx);
                     ((DataValueModel) tableCursorValues.getModel()).changeList(chartView.getMeasures());
+                    chartView.updateTableValue();
                 }
             }
         });
 
         tableCursorValues = new TableCursorValue();
+        tableCursorValues.setPreferredScrollableViewportSize(tableCursorValues.getPreferredSize());
         gbc.fill = GridBagConstraints.BOTH;
         gbc.gridx = 3;
         gbc.gridy = 1;
-        gbc.gridwidth = 2;
+        gbc.gridwidth = 1;
         gbc.gridheight = 1;
-        gbc.weightx = 0;
+        gbc.weightx = 5;
         gbc.weighty = 1;
         gbc.insets = new Insets(0, 0, 0, 5);
         gbc.anchor = GridBagConstraints.FIRST_LINE_START;
@@ -289,9 +290,9 @@ public final class Ihm extends JFrame {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.gridx = 0;
         gbc.gridy = 2;
-        gbc.gridwidth = 2;
+        gbc.gridwidth = 3;
         gbc.gridheight = 1;
-        gbc.weightx = 0;
+        gbc.weightx = 1;
         gbc.weighty = 0;
         gbc.insets = new Insets(5, 5, 0, 0);
         gbc.anchor = GridBagConstraints.FIRST_LINE_START;
@@ -301,9 +302,9 @@ public final class Ihm extends JFrame {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.gridx = 0;
         gbc.gridy = 3;
-        gbc.gridwidth = 2;
+        gbc.gridwidth = 3;
         gbc.gridheight = 1;
-        gbc.weightx = 0;
+        gbc.weightx = 1;
         gbc.weighty = 0;
         gbc.insets = new Insets(5, 5, 5, 0);
         gbc.anchor = GridBagConstraints.FIRST_LINE_START;
