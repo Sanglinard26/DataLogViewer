@@ -29,7 +29,7 @@ final class DialogProperties extends JPanel
 
     public DialogProperties(CombinedDomainXYPlot combinedplot) {
 
-        model = new DefaultTableModel(new String[] { "Série", "Couleur", "Epaisseur", "Supprimer?" }, 0) {
+        model = new DefaultTableModel(new String[] { "Serie", "Couleur", "Epaisseur", "Supprimer?" }, 0) {
             private static final long serialVersionUID = 1L;
 
             @Override

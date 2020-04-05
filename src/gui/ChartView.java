@@ -2,6 +2,7 @@ package gui;
 
 import java.awt.BasicStroke;
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Point;
 import java.awt.Stroke;
 import java.awt.event.ActionEvent;
@@ -22,6 +23,7 @@ import javax.swing.TransferHandler.DropLocation;
 
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
+import org.jfree.chart.axis.AxisLocation;
 import org.jfree.chart.axis.NumberAxis;
 import org.jfree.chart.axis.ValueAxis;
 import org.jfree.chart.entity.ChartEntity;
@@ -29,9 +31,13 @@ import org.jfree.chart.entity.PlotEntity;
 import org.jfree.chart.plot.CombinedDomainXYPlot;
 import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.chart.plot.XYPlot;
+import org.jfree.chart.renderer.LookupPaintScale;
 import org.jfree.chart.renderer.xy.XYItemRenderer;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
+import org.jfree.chart.renderer.xy.XYShapeRenderer;
+import org.jfree.chart.title.PaintScaleLegend;
 import org.jfree.data.general.DatasetUtilities;
+import org.jfree.data.xy.DefaultXYZDataset;
 import org.jfree.data.xy.XYSeries;
 import org.jfree.data.xy.XYSeriesCollection;
 import org.jfree.ui.RectangleEdge;
@@ -45,7 +51,7 @@ public final class ChartView extends ChartPanel implements Observable {
 
     private static final long serialVersionUID = 1L;
 
-    private final CombinedDomainXYPlot combinedPlot;
+    private final CombinedDomainXYPlot parentPlot;
     private Stroke oldStrokePlot;
     private final List<String> measuresName;
 
@@ -55,21 +61,21 @@ public final class ChartView extends ChartPanel implements Observable {
 
     public ChartView() {
 
-        super(null, 680, 420, 300, 200, 1920, 1080, true, true, false, false, true, false);
+        super(null, 680, 420, 300, 200, 1920, 1080, true, false, false, false, false, false);
 
         measuresName = new ArrayList<String>();
 
         setPopupMenu(createPopupMenu());
 
-        combinedPlot = new CombinedDomainXYPlot();
+        parentPlot = new CombinedDomainXYPlot();
 
-        combinedPlot.setDomainPannable(true);
-        combinedPlot.setOrientation(PlotOrientation.VERTICAL);
-        combinedPlot.setGap(10);
+        parentPlot.setDomainPannable(true);
+        parentPlot.setOrientation(PlotOrientation.VERTICAL);
+        parentPlot.setGap(10);
 
-        oldStrokePlot = combinedPlot.getOutlineStroke();
+        oldStrokePlot = parentPlot.getOutlineStroke();
 
-        setChart(new JFreeChart(combinedPlot));
+        setChart(new JFreeChart(parentPlot));
         setRangeZoomable(false);
         setDomainZoomable(true);
 
@@ -87,18 +93,18 @@ public final class ChartView extends ChartPanel implements Observable {
 
         setPopupMenu(createPopupMenu());
 
-        this.combinedPlot = (CombinedDomainXYPlot) serializedChart.getXYPlot();
+        this.parentPlot = (CombinedDomainXYPlot) serializedChart.getXYPlot();
         @SuppressWarnings("unchecked")
-        List<XYPlot> subPlots = combinedPlot.getSubplots();
+        List<XYPlot> subPlots = parentPlot.getSubplots();
         for (XYPlot plot : subPlots) {
-            plot.addChangeListener(combinedPlot);
+            plot.addChangeListener(parentPlot);
             int nbSerie = plot.getDataset().getSeriesCount();
             for (int i = 0; i < nbSerie; i++) {
                 measuresName.add((String) plot.getDataset().getSeriesKey(i));
             }
         }
 
-        oldStrokePlot = combinedPlot.getOutlineStroke();
+        oldStrokePlot = parentPlot.getOutlineStroke();
 
         setRangeZoomable(false);
         setDomainZoomable(true);
@@ -110,8 +116,14 @@ public final class ChartView extends ChartPanel implements Observable {
     private final class MyChartMouseListener extends MouseAdapter {
         @Override
         public void mousePressed(MouseEvent e) {
-            if (SwingUtilities.isLeftMouseButton(e)) {
+        	if (SwingUtilities.isLeftMouseButton(e)) {
                 setDomainZoomable(false);
+            }
+        }
+        
+        @Override
+        public void mouseClicked(MouseEvent e) {
+        	if (SwingUtilities.isLeftMouseButton(e)) {
                 updateTableValue(e);
             }
         }
@@ -123,7 +135,9 @@ public final class ChartView extends ChartPanel implements Observable {
 
         @Override
         public void mouseDragged(MouseEvent e) {
-            if (SwingUtilities.isRightMouseButton(e)) {
+        	int onmask = MouseEvent.CTRL_DOWN_MASK | MouseEvent.BUTTON1_DOWN_MASK;
+
+            if (SwingUtilities.isRightMouseButton(e) || ((e.getModifiersEx() & onmask) == onmask) ) {
                 return;
             }
             updateTableValue(e);
@@ -134,7 +148,7 @@ public final class ChartView extends ChartPanel implements Observable {
         Rectangle2D dataArea = getScreenDataArea();
 
         Point2D p = translateScreenToJava2D(e.getPoint());
-        XYPlot plot = combinedPlot.findSubplot(getChartRenderingInfo().getPlotInfo(), p);
+        XYPlot plot = parentPlot.findSubplot(getChartRenderingInfo().getPlotInfo(), p);
         if (plot == null) {
             return;
         }
@@ -148,7 +162,7 @@ public final class ChartView extends ChartPanel implements Observable {
         HashMap<String, Double> tableValue = new HashMap<String, Double>();
 
         @SuppressWarnings("unchecked")
-        List<XYPlot> subplots = combinedPlot.getSubplots();
+        List<XYPlot> subplots = parentPlot.getSubplots();
         for (XYPlot subplot : subplots) {
             subplot.setDomainCrosshairValue(xValue);
             for (int i = 0; i < subplot.getDatasetCount(); i++) {
@@ -166,7 +180,7 @@ public final class ChartView extends ChartPanel implements Observable {
         HashMap<String, Double> tableValue = new HashMap<String, Double>();
 
         @SuppressWarnings("unchecked")
-        List<XYPlot> subplots = combinedPlot.getSubplots();
+        List<XYPlot> subplots = parentPlot.getSubplots();
         for (XYPlot subplot : subplots) {
             subplot.setDomainCrosshairValue(xValue);
             for (int i = 0; i < subplot.getDatasetCount(); i++) {
@@ -184,7 +198,7 @@ public final class ChartView extends ChartPanel implements Observable {
         final XYSeries series = new XYSeries(measure.getName());
         final XYSeriesCollection collections = new XYSeriesCollection(series);
         final NumberAxis yAxis = new NumberAxis(measure.getName());
-        final XYItemRenderer renderer = new XYLineAndShapeRenderer(true, true);
+        final XYItemRenderer renderer = new XYLineAndShapeRenderer(true, false);
         renderer.setSeriesShape(0, ShapeUtilities.createRegularCross(2, 0.5f));
         renderer.setSeriesStroke(0, new BasicStroke(1.5f));
         final XYPlot plot = new XYPlot(collections, null, yAxis, renderer);
@@ -198,8 +212,8 @@ public final class ChartView extends ChartPanel implements Observable {
         plot.setDomainCrosshairVisible(true);
         plot.setDomainCrosshairStroke(new BasicStroke(1.5f));
         plot.setDomainCrosshairLockedOnData(false);
-        if (combinedPlot.getSubplots().size() > 0) {
-            crossHairValue = ((XYPlot) combinedPlot.getSubplots().get(0)).getDomainCrosshairValue();
+        if (parentPlot.getSubplots().size() > 0) {
+            crossHairValue = ((XYPlot) parentPlot.getSubplots().get(0)).getDomainCrosshairValue();
         } else {
             crossHairValue = temps.get(nbPoint / 2);
         }
@@ -208,13 +222,42 @@ public final class ChartView extends ChartPanel implements Observable {
         for (int n = 0; n < nbPoint; n++) {
 
             if (n < sizeData) {
-                series.add(temps.get(n), measure.getData().get(n));
+                series.add(temps.get(n), measure.getData().get(n), false);
             }
         }
 
-        combinedPlot.add(plot, 1);
+        series.fireSeriesChanged();
+        parentPlot.add(plot, 1);
 
         measuresName.add(measure.getName());
+    }
+    
+    public final void addScatterPlot(Measure x, Measure y, Measure z) {
+
+
+        final DefaultXYZDataset dataset = new DefaultXYZDataset();
+        double[][] arrayOfDouble = {x.getDouleValue(), y.getDouleValue(), z.getDouleValue()};
+        dataset.addSeries("Series 1", arrayOfDouble);
+        final NumberAxis xAxis = new NumberAxis(x.getName());
+        final NumberAxis yAxis = new NumberAxis(y.getName());
+        final XYShapeRenderer renderer = new XYShapeRenderer();
+        LookupPaintScale localLookupPaintScale = new LookupPaintScale(0, 40, Color.YELLOW);
+		localLookupPaintScale.add(10, Color.ORANGE);
+		localLookupPaintScale.add(30, Color.RED);
+		renderer.setPaintScale(localLookupPaintScale);
+
+        final XYPlot plot = new XYPlot(dataset, xAxis, yAxis, renderer);
+
+        final NumberAxis zAxis = new NumberAxis(z.getName());
+        
+        PaintScaleLegend localPaintScaleLegend = new PaintScaleLegend(localLookupPaintScale, zAxis);
+		localPaintScaleLegend.setPosition(RectangleEdge.RIGHT);
+		localPaintScaleLegend.setMargin(4.0D, 4.0D, 40.0D, 4.0D);
+		localPaintScaleLegend.setAxisLocation(AxisLocation.BOTTOM_OR_RIGHT);
+		getChart().addSubtitle(localPaintScaleLegend);
+		getChart().removeLegend();
+        
+        parentPlot.add(plot, 1);
     }
 
     public final void addMeasure(Point point, Measure measure) {
@@ -231,9 +274,10 @@ public final class ChartView extends ChartPanel implements Observable {
         for (int n = 0; n < nbPoint; n++) {
 
             if (n < sizeData) {
-                newSerie.add(serie.getX(n), measure.getData().get(n));
+                newSerie.add(serie.getX(n), measure.getData().get(n), false);
             }
         }
+        
 
         collection.addSeries(newSerie);
 
@@ -254,7 +298,7 @@ public final class ChartView extends ChartPanel implements Observable {
             plotEntity.getPlot().setOutlineStroke(new BasicStroke(2f));
         } else {
             @SuppressWarnings("unchecked")
-            List<XYPlot> subPlots = combinedPlot.getSubplots();
+            List<XYPlot> subPlots = parentPlot.getSubplots();
             for (XYPlot plot : subPlots) {
                 plot.setOutlineStroke(oldStrokePlot);
             }
@@ -277,7 +321,7 @@ public final class ChartView extends ChartPanel implements Observable {
     }
 
     public final CombinedDomainXYPlot getPlot() {
-        return this.combinedPlot;
+        return this.parentPlot;
     }
 
     public final double getXValue() {
@@ -319,7 +363,7 @@ public final class ChartView extends ChartPanel implements Observable {
 
         switch (command) {
         case "PROPERTIES":
-            DialogProperties propertiesPanel = new DialogProperties(combinedPlot);
+            DialogProperties propertiesPanel = new DialogProperties(parentPlot);
             int res = JOptionPane.showConfirmDialog(this, propertiesPanel, "Propriétés", 2, -1);
             if (res == JOptionPane.OK_OPTION) {
                 propertiesPanel.updatePlot(this);

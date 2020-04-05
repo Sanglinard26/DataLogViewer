@@ -7,19 +7,17 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Measure implements Comparable<Measure>, Serializable {
+public final class Measure implements Comparable<Measure>, Serializable {
 
     private static final long serialVersionUID = 1L;
     private String name;
     private String unit;
     private List<Double> data;
-    private boolean wasted;
 
     public Measure(String name) {
         this.name = name;
         this.unit = "";
         this.data = new ArrayList<Double>();
-        this.wasted = false;
     }
 
     public final String getName() {
@@ -41,17 +39,18 @@ public class Measure implements Comparable<Measure>, Serializable {
     public final List<Double> getData() {
         return this.data;
     }
+    
+    public final double[] getDouleValue()
+    {
+    	final double[] result = new double[data.size()];
+    	  for (int i = 0; i < data.size(); i++) {
+    	    result[i] = data.get(i).doubleValue();
+    	  }
+    	  return result;
+    }
 
     public final void setData(List<Double> data) {
         this.data = data;
-    }
-
-    public final boolean getWasted() {
-        return this.wasted;
-    }
-
-    public final void setWasted(boolean wasted) {
-        this.wasted = wasted;
     }
 
     @Override

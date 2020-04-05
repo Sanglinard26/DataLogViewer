@@ -24,8 +24,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import javax.swing.AbstractAction;
 import javax.swing.DefaultListModel;
 import javax.swing.ImageIcon;
+import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -36,6 +38,7 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
+import javax.swing.JToolBar;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.TransferHandler;
@@ -55,6 +58,8 @@ import org.jfree.data.xy.XYSeriesCollection;
 
 import log.Log;
 import log.Measure;
+import utils.Preference;
+import utils.Utilitaire;
 
 /*
  * Creation : 3 mai 2018
@@ -116,7 +121,7 @@ public final class Ihm extends JFrame {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                final JFileChooser fc = new JFileChooser();
+                final JFileChooser fc = new JFileChooser(Preference.getPreference(Preference.KEY_CONFIG));
                 fc.setMultiSelectionEnabled(false);
                 fc.setFileSelectionMode(JFileChooser.OPEN_DIALOG);
                 fc.setFileFilter(new FileFilter() {
@@ -150,7 +155,7 @@ public final class Ihm extends JFrame {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                final JFileChooser fileChooser = new JFileChooser();
+                final JFileChooser fileChooser = new JFileChooser(Preference.getPreference(Preference.KEY_CONFIG));
                 fileChooser.setDialogTitle("Enregistement de la configuration");
                 fileChooser.setFileFilter(new FileNameExtensionFilter("Fichier de configuration graphique (*.cfg)", "cfg"));
                 fileChooser.setSelectedFile(new File("config.cfg"));
@@ -191,12 +196,53 @@ public final class Ihm extends JFrame {
         });
         menu.add(menuItem);
 
-        menu = new JMenu("Fenêtre");
+        menu = new JMenu("Fen\u00eatre");
         menuBar.add(menu);
 
         menuItem = new JMenuItem("Ajouter", new ImageIcon(getClass().getResource(ICON_ADD_WINDOW)));
         menuItem.addActionListener(new AddWindow());
         menu.add(menuItem);
+        
+        menu = new JMenu("Pr\u00e9f\u00e9rences");
+        menuBar.add(menu);
+        
+        JMenu subMenu = new JMenu("Log");
+        menuItem = new JMenuItem(new AbstractAction("Chemin d'import") {
+
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                final String pathFolder = Utilitaire.getFolder("Choix du chemin",
+                        Preference.getPreference(Preference.KEY_LOG));
+                if (!Preference.KEY_LOG.equals(pathFolder)) {
+                    Preference.setPreference(Preference.KEY_LOG, pathFolder);
+                    ((JMenuItem) e.getSource()).setToolTipText(pathFolder);
+                }
+            }
+        });
+        menuItem.setToolTipText(Preference.getPreference(Preference.KEY_LOG));
+        subMenu.add(menuItem);
+        menu.add(subMenu);
+        
+        subMenu = new JMenu("Configuration");
+        menuItem = new JMenuItem(new AbstractAction("Chemin d'import") {
+
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                final String pathFolder = Utilitaire.getFolder("Choix du chemin",
+                        Preference.getPreference(Preference.KEY_CONFIG));
+                if (!Preference.KEY_CONFIG.equals(pathFolder)) {
+                    Preference.setPreference(Preference.KEY_CONFIG, pathFolder);
+                    ((JMenuItem) e.getSource()).setToolTipText(pathFolder);
+                }
+            }
+        });
+        menuItem.setToolTipText(Preference.getPreference(Preference.KEY_CONFIG));
+        subMenu.add(menuItem);
+        menu.add(subMenu);
 
         menu = new JMenu("?");
         menuBar.add(menu);
@@ -214,6 +260,44 @@ public final class Ihm extends JFrame {
 
         return menuBar;
     }
+    
+    private final JToolBar createToolBar()
+    {
+    	JToolBar bar = new JToolBar();
+    	bar.setFloatable(false);
+    	
+    	JButton btNewPlot = new JButton(new AbstractAction("Nouveau graphique") {
+			
+			private static final long serialVersionUID = 1L;
+
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				
+				ChartView chartView = new ChartView();
+	            chartView.addObservateur(tableCursorValues);
+	            chartView.setTransferHandler(new MeasureHandler());
+	            String defaultName = "Fenetre_" + tabbedPane.getTabCount();
+	            String windowName = JOptionPane.showInputDialog(Ihm.this, "Nom de la fenetre :", defaultName);
+	            if (windowName == null || "".equals(windowName)) {
+	                windowName = defaultName;
+	            }
+	            tabbedPane.addTab(windowName, chartView);
+	            tabbedPane.setTabComponentAt(tabbedPane.getTabCount() - 1, new ButtonTabComponent(tabbedPane));
+	            tabbedPane.setSelectedIndex(tabbedPane.getTabCount() - 1);
+	            
+	            int idxX = log.getMeasures().indexOf(new Measure("RPM(tr/min)"));
+	            int idxY = log.getMeasures().indexOf(new Measure("Intake_manifold_P(mbar)"));
+	            int idxZ = log.getMeasures().indexOf(new Measure("Ign_Avance_app(�V)"));
+				
+		        chartView.addScatterPlot(log.getMeasures().get(idxX), log.getMeasures().get(idxY), log.getMeasures().get(idxZ));
+				
+			}
+		});
+    	btNewPlot.setEnabled(false);
+    	bar.add(btNewPlot);
+    	
+    	return bar;
+    }
 
     private final void createGUI() {
 
@@ -224,6 +308,18 @@ public final class Ihm extends JFrame {
         final Container root = getContentPane();
 
         root.setLayout(new GridBagLayout());
+        
+        
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.gridwidth = 1;
+        gbc.gridheight = 1;
+        gbc.weightx = 0;
+        gbc.weighty = 0;
+        gbc.insets = new Insets(0, 5, 0, 0);
+        gbc.anchor = GridBagConstraints.FIRST_LINE_START;
+        root.add(createToolBar(), gbc);
 
         listVoie = new JList<Measure>();
         listVoie.addMouseListener(new MouseAdapter() {
@@ -315,7 +411,7 @@ public final class Ihm extends JFrame {
     private final class OpenLog implements ActionListener {
         @Override
         public void actionPerformed(ActionEvent e) {
-            final JFileChooser fc = new JFileChooser();
+            final JFileChooser fc = new JFileChooser(Preference.getPreference(Preference.KEY_LOG));
             fc.setMultiSelectionEnabled(false);
             fc.setFileSelectionMode(JFileChooser.OPEN_DIALOG);
             fc.setFileFilter(new FileFilter() {
@@ -363,8 +459,8 @@ public final class Ihm extends JFrame {
             ChartView chartView = new ChartView();
             chartView.addObservateur(tableCursorValues);
             chartView.setTransferHandler(new MeasureHandler());
-            String defaultName = "Fenêtre n°" + tabbedPane.getTabCount();
-            String windowName = JOptionPane.showInputDialog(Ihm.this, "Nom de la fenêtre :", defaultName);
+            String defaultName = "Fenetre_" + tabbedPane.getTabCount();
+            String windowName = JOptionPane.showInputDialog(Ihm.this, "Nom de la fenetre :", defaultName);
             if (windowName == null || "".equals(windowName)) {
                 windowName = defaultName;
             }
@@ -442,10 +538,12 @@ public final class Ihm extends JFrame {
         if (log == null) {
             return;
         }
+        
+        final List<Double> temps = log.getTime().getData();
+        final int nbPoint = temps.size();
 
         for (int n = 0; n < nbTab; n++) {
             chartView = (ChartView) tabbedPane.getComponentAt(n);
-            chartView.restoreAutoBounds();
             for (Object plot : chartView.getPlot().getSubplots()) {
                 xyPlot = (XYPlot) plot;
                 int nbSerie = xyPlot.getSeriesCount();
@@ -461,19 +559,25 @@ public final class Ihm extends JFrame {
                     if (idxMeasure > -1) {
 
                         measure = log.getMeasures().get(idxMeasure);
-                        final List<Double> temps = log.getTime().getData();
-                        final int nbPoint = temps.size();
+                        
                         final int sizeData = measure.getData().size();
 
                         for (int n1 = 0; n1 < nbPoint; n1++) {
 
                             if (n1 < sizeData) {
-                                serie.add(temps.get(n1), measure.getData().get(n1));
+                                serie.add(temps.get(n1), measure.getData().get(n1), false);
                             }
                         }
                     }
+                    
+                    serie.fireSeriesChanged();
                 }
+                
+                //xyPlot.configureRangeAxes();
+                
+                
             }
+            chartView.getPlot().configureDomainAxes();
         }
     }
 
