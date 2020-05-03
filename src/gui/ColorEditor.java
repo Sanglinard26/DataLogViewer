@@ -80,6 +80,12 @@ public class ColorEditor extends AbstractCellEditor implements TableCellEditor, 
         if (EDIT.equals(e.getActionCommand())) {
             // The user has clicked the cell, so
             // bring up the dialog.
+        	
+        	if(currentColor == null)
+        	{
+        		return;
+        	}
+        	
             button.setBackground(currentColor);
             colorChooser.setColor(currentColor);
             dialog.setVisible(true);

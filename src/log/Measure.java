@@ -13,6 +13,8 @@ public final class Measure implements Comparable<Measure>, Serializable {
     private String name;
     private String unit;
     private List<Double> data;
+    private double min = Double.POSITIVE_INFINITY;
+    private double max = Double.NEGATIVE_INFINITY;
 
     public Measure(String name) {
         this.name = name;
@@ -35,6 +37,22 @@ public final class Measure implements Comparable<Measure>, Serializable {
     public final void setUnit(String unit) {
         this.unit = unit;
     }
+    
+    public final double getMin() {
+		return min;
+	}
+    
+    public final double getMax() {
+		return max;
+	}
+    
+    public void setMax(double value) {
+		this.max = Math.max(max, value);
+	}
+    
+    public void setMin(double value) {
+		this.min = Math.min(min, value);
+	}
 
     public final List<Double> getData() {
         return this.data;

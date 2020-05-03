@@ -51,6 +51,7 @@ import javax.swing.AbstractButton;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 import javax.swing.JTextField;
@@ -115,8 +116,16 @@ public class ButtonTabComponent extends JPanel {
                 if (e.getKeyCode() == KeyEvent.VK_ENTER) {
                     int i = pane.indexOfTabComponent(ButtonTabComponent.this);
                     if (i != -1) {
-                        pane.setTitleAt(i, textfield.getText());
-                        cl.show(panel, "label component");
+                    	String newName = textfield.getText();
+                    	int idx = pane.indexOfTab(newName);
+                    	if(idx == -1 || idx == i)
+                    	{
+                    		pane.setTitleAt(i, textfield.getText());
+                            cl.show(panel, "label component");
+                    	}else{
+                    		JOptionPane.showMessageDialog(null, "Il existe d\u00e9j\u00e0 une fen\u00eatre avec ce nom", "INFO", JOptionPane.INFORMATION_MESSAGE);
+                    	}
+                        
                     }
                 }
             }

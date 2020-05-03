@@ -9,6 +9,7 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public final class Log {
@@ -41,7 +42,8 @@ public final class Log {
 				typeFile = "Unknown";
 				break;
 			}
-
+			
+			Collections.sort(datas);
 		}
 	}
 
@@ -88,19 +90,17 @@ public final class Log {
 							}
 
 							try {
-								this.datas.get(idxCol).getData().add(Double.parseDouble(parsedValue.trim()));
+								double value = Double.parseDouble(parsedValue.trim());
+								this.datas.get(idxCol).getData().add(value);
+								this.datas.get(idxCol).setMin(value);
+								this.datas.get(idxCol).setMax(value);
 							} catch (NumberFormatException e) {
 								this.datas.get(idxCol).getData().add(Double.NaN);
 							}
 						}
-					}else{
-						
-						System.out.println("Erreur line : " + cntLine);
-
+					}else{					
+						System.out.println("Erreur ligne : " + cntLine);
 					}
-
-
-
 					break;
 				}
 
@@ -157,10 +157,20 @@ public final class Log {
 				default:
 					if (cntLine > 3 && splitTab.length == this.datas.size()) {
 
-						for (int idxCol = 0; idxCol < splitTab.length; idxCol++) {
-							parsedValue = splitTab[idxCol].trim().replace(',', '.');
+						for (int idxCol = 0; idxCol < this.datas.size(); idxCol++) {
+
+							parsedValue = splitTab[idxCol];
+
+							if(parsedValue.indexOf(",") > -1)
+							{
+								parsedValue = splitTab[idxCol].replace(',', '.');
+							}
+
 							try {
-								this.datas.get(idxCol).getData().add(Double.parseDouble(parsedValue));
+								double value = Double.parseDouble(parsedValue.trim());
+								this.datas.get(idxCol).getData().add(value);
+								this.datas.get(idxCol).setMin(value);
+								this.datas.get(idxCol).setMax(value);
 							} catch (NumberFormatException e) {
 								this.datas.get(idxCol).getData().add(Double.NaN);
 							}
@@ -204,6 +214,14 @@ public final class Log {
 		Measure time = new Measure(timeName);
 		int idx = datas.indexOf(time);
 		return idx > -1 ? datas.get(idx) : time;
+	}
+	
+	public final Measure getMeasure(String name)
+	{
+		final Measure measure = new Measure(name);
+		final int idx = this.datas.indexOf(measure);
+		
+		return idx > 0 ? this.datas.get(idx) : measure;
 	}
 
 }
