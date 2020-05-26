@@ -7,14 +7,14 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-public final class Measure implements Comparable<Measure>, Serializable {
+public class Measure implements Comparable<Measure>, Serializable {
 
     private static final long serialVersionUID = 1L;
-    private String name;
-    private String unit;
-    private List<Double> data;
-    private double min = Double.POSITIVE_INFINITY;
-    private double max = Double.NEGATIVE_INFINITY;
+    protected String name;
+    protected String unit;
+    protected List<Double> data;
+    protected double min = Double.POSITIVE_INFINITY;
+    protected double max = Double.NEGATIVE_INFINITY;
 
     public Measure(String name) {
         this.name = name;

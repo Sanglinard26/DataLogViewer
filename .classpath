@@ -6,5 +6,6 @@
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.7"/>
 	<classpathentry kind="lib" path="jcommon-1.0.23.jar"/>
 	<classpathentry kind="lib" path="jfreechart-1.0.19.jar"/>
+	<classpathentry kind="lib" path="MathParser.org-mXparser-v.4.4.0-jdk7.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

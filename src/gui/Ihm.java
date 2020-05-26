@@ -19,6 +19,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,6 +62,7 @@ import org.jfree.data.xy.DefaultXYZDataset;
 import org.jfree.data.xy.XYSeries;
 import org.jfree.data.xy.XYSeriesCollection;
 
+import log.Formula;
 import log.Log;
 import log.Measure;
 import utils.Preference;
@@ -82,7 +84,8 @@ public final class Ihm extends JFrame {
 	private JLabel labelFnr;
 	private JLabel labelLogName;
 
-	private static Log log;
+	private Log log;
+	private List<Measure> listFormula = new ArrayList<Measure>();
 
 	public Ihm() {
 		super("DataLogViewer");
@@ -221,6 +224,19 @@ public final class Ihm extends JFrame {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				closeWindows();
+			}
+		});
+		menu.add(menuItem);
+		
+		menu = new JMenu("Formules");
+		menuBar.add(menu);
+		
+		menuItem = new JMenuItem("Nouvelle");
+		menuItem.addActionListener(new ActionListener() {
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				new DialNewFormula(Ihm.this);
 			}
 		});
 		menu.add(menuItem);
@@ -499,6 +515,12 @@ public final class Ihm extends JFrame {
 				for (Measure measure : log.getMeasures()) {
 					listModel.addElement(measure);
 				}
+				
+				for(Measure formule : listFormula)
+				{
+					((Formula)formule).calculate(log);
+					listModel.addElement(formule);
+				}
 
 				labelFnr.setText("<html>Fournisseur du log : " + "<b>" + log.getFnr());
 				labelLogName.setText("<html>Nom de l'acquisition : " + "<b>" + log.getName());
@@ -579,6 +601,17 @@ public final class Ihm extends JFrame {
 		}
 
 	}
+	
+	public final Log getLog()
+	{
+		return log;
+	}
+	
+	public final void addMeasure(Measure newMeasure)
+	{
+		listModel.addElement(newMeasure);
+		listFormula.add(newMeasure);
+	}
 
 	private final void directToPlot() {
 		final int idxWindow = tabbedPane.getSelectedIndex();
@@ -637,6 +670,11 @@ public final class Ihm extends JFrame {
 			}
 		}
 	}
+	
+	public final List<Measure> getListFormula()
+	{		
+		return listFormula;
+	}
 
 	private final void reloadLogData(Log log) {
 
@@ -665,10 +703,18 @@ public final class Ihm extends JFrame {
 					if(xyPlot.getDataset() instanceof XYSeriesCollection)
 					{
 						serie = ((XYSeriesCollection) xyPlot.getDataset()).getSeries(nSerie);
+						
+						serie.clear();
 
 						key = serie.getKey();
-
-						measure = log.getMeasure(key.toString());
+						
+						int idx = listModel.indexOf(new Measure(key.toString()));
+						if(idx == -1)
+						{
+							break;
+						}
+						
+						measure = listModel.get(idx);
 
 						final int sizeData = measure.getData().size();
 
@@ -690,6 +736,7 @@ public final class Ihm extends JFrame {
 						String yLabel = xyPlot.getRangeAxis().getLabel();
 						String zLabel = ((PaintScaleLegend)chartView.getChart().getSubtitle(0)).getAxis().getLabel();
 
+						// Changer la source par listModel pour avoir accès aux formules
 						Measure xMeasure = log.getMeasure(xLabel);
 						Measure yMeasure = log.getMeasure(yLabel);
 						Measure zMeasure = log.getMeasure(zLabel);
@@ -722,6 +769,7 @@ public final class Ihm extends JFrame {
 						String xLabel = xyPlot.getDomainAxis().getLabel();
 						String yLabel = xyPlot.getRangeAxis().getLabel();
 
+						// Changer la source par listModel pour avoir accès aux formules
 						Measure xMeasure = log.getMeasure(xLabel);
 						Measure yMeasure = log.getMeasure(yLabel);
 
@@ -804,7 +852,7 @@ public final class Ihm extends JFrame {
 	}
 
 	public static void main(String[] args) {
-
+		
 		try {
 
 			for (LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
