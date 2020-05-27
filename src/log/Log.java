@@ -14,214 +14,209 @@ import java.util.List;
 
 public final class Log {
 
-	private String fnr;
-	private String name;
-	private List<Measure> datas;
-	private int nbPoints = 0;
-	private String typeFile = "Unknown";
-	private String timeName = "";
+    private String fnr;
+    private String name;
+    private List<Measure> datas;
+    private int nbPoints = 0;
+    private String typeFile = "Unknown";
+    private String timeName = "";
 
-	public Log(File file) {
-		if (file != null) {
+    public Log(File file) {
+        if (file != null) {
 
-			this.name = file.getName().substring(0, file.getName().length() - 4);
-			String extension = file.getName().substring(file.getName().lastIndexOf(".") + 1, file.getName().length());
+            this.name = file.getName().substring(0, file.getName().length() - 4);
+            String extension = file.getName().substring(file.getName().lastIndexOf(".") + 1, file.getName().length());
 
-			switch (extension) {
-			case "txt":
-				parseTxt(file);
-				typeFile = "PcsLab";
-				timeName = "Time_ms";
-				break;
-			case "msl":
-				parseMsl(file);
-				typeFile = "MegaSquirt";
-				timeName = "Time";
-				break;
-			default:
-				typeFile = "Unknown";
-				break;
-			}
-			
-			Collections.sort(datas);
-		}
-	}
+            switch (extension) {
+            case "txt":
+                parseTxt(file);
+                typeFile = "PcsLab";
+                timeName = "Time_ms";
+                break;
+            case "msl":
+                parseMsl(file);
+                typeFile = "MegaSquirt";
+                timeName = "Time";
+                break;
+            default:
+                typeFile = "Unknown";
+                break;
+            }
 
-	private final void parseTxt(File file) {
+            Collections.sort(datas);
+        }
+    }
 
-		final String delimiter = "\t|,";
+    private final void parseTxt(File file) {
 
-		try (BufferedReader bf = new BufferedReader(new FileReader(file))) {
+        final String delimiter = "\t|,";
 
-			String line;
-			String parsedValue;
-			String[] splitTab;
+        try (BufferedReader bf = new BufferedReader(new FileReader(file))) {
 
-			int cntLine = 0;
+            String line;
+            String parsedValue;
+            String[] splitTab;
 
-			while ((line = bf.readLine()) != null) {
+            int cntLine = 0;
 
-				splitTab = line.split(delimiter);
+            while ((line = bf.readLine()) != null) {
 
-				switch (cntLine) {
-				case 0:
-					if (splitTab.length > 0) {
-						this.fnr = splitTab[0].replaceAll("\"", "");
-					}
-					break;
-				case 1:
-					this.datas = new ArrayList<Measure>(splitTab.length);
+                splitTab = line.split(delimiter);
 
-					for (String nameMeasure : splitTab) {
-						this.datas.add(new Measure(nameMeasure));
-					}
-					break;
-				default:
+                switch (cntLine) {
+                case 0:
+                    if (splitTab.length > 0) {
+                        this.fnr = splitTab[0].replaceAll("\"", "");
+                    }
+                    break;
+                case 1:
+                    this.datas = new ArrayList<Measure>(splitTab.length);
 
-					if(splitTab.length == this.datas.size())
-					{
-						for (int idxCol = 0; idxCol < this.datas.size(); idxCol++) {
+                    for (String nameMeasure : splitTab) {
+                        this.datas.add(new Measure(nameMeasure));
+                    }
+                    break;
+                default:
 
-							parsedValue = splitTab[idxCol];
+                    if (splitTab.length == this.datas.size()) {
+                        for (int idxCol = 0; idxCol < this.datas.size(); idxCol++) {
 
-							if(parsedValue.indexOf(",") > -1)
-							{
-								parsedValue = splitTab[idxCol].replace(',', '.');
-							}
+                            parsedValue = splitTab[idxCol];
 
-							try {
-								double value = Double.parseDouble(parsedValue.trim());
-								this.datas.get(idxCol).getData().add(value);
-								this.datas.get(idxCol).setMin(value);
-								this.datas.get(idxCol).setMax(value);
-							} catch (NumberFormatException e) {
-								this.datas.get(idxCol).getData().add(Double.NaN);
-							}
-						}
-					}else{					
-						System.out.println("Erreur ligne : " + cntLine);
-					}
-					break;
-				}
+                            if (parsedValue.indexOf(",") > -1) {
+                                parsedValue = splitTab[idxCol].replace(',', '.');
+                            }
 
-				cntLine++;
-			}
+                            try {
+                                double value = Double.parseDouble(parsedValue.trim());
+                                this.datas.get(idxCol).getData().add(value);
+                                this.datas.get(idxCol).setMin(value);
+                                this.datas.get(idxCol).setMax(value);
+                            } catch (NumberFormatException e) {
+                                this.datas.get(idxCol).getData().add(Double.NaN);
+                            }
+                        }
+                    } else {
+                        System.out.println("Erreur ligne : " + cntLine);
+                    }
+                    break;
+                }
 
-			for (Measure measure : this.datas) {
-				this.nbPoints = Math.max(this.nbPoints, measure.getData().size());
-			}
+                cntLine++;
+            }
 
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
+            for (Measure measure : this.datas) {
+                this.nbPoints = Math.max(this.nbPoints, measure.getData().size());
+            }
 
-	private final void parseMsl(File file) {
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
-		final String TAB = "\t";
+    private final void parseMsl(File file) {
 
-		try (BufferedReader bf = new BufferedReader(new FileReader(file))) {
+        final String TAB = "\t";
 
-			String line;
-			String parsedValue;
-			String[] splitTab;
+        try (BufferedReader bf = new BufferedReader(new FileReader(file))) {
 
-			int cntLine = 0;
+            String line;
+            String parsedValue;
+            String[] splitTab;
 
-			while ((line = bf.readLine()) != null) {
+            int cntLine = 0;
 
-				splitTab = line.split(TAB);
+            while ((line = bf.readLine()) != null) {
 
-				switch (cntLine) {
-				case 0:
-					if (splitTab.length > 0) {
-						this.fnr = splitTab[0].replaceAll("\"", "");
-					}
-					break;
-				case 2:
-					this.datas = new ArrayList<Measure>(splitTab.length);
+                splitTab = line.split(TAB);
 
-					for (String nameMeasure : splitTab) {
-						this.datas.add(new Measure(nameMeasure));
-					}
-					break;
-				case 3:
-					if (splitTab.length == datas.size()) {
-						for (int idxCol = 0; idxCol < splitTab.length; idxCol++) {
-							this.datas.get(idxCol).setUnit(splitTab[idxCol]);
-						}
-					}
-					break;
-				default:
-					if (cntLine > 3 && splitTab.length == this.datas.size()) {
+                switch (cntLine) {
+                case 0:
+                    if (splitTab.length > 0) {
+                        this.fnr = splitTab[0].replaceAll("\"", "");
+                    }
+                    break;
+                case 2:
+                    this.datas = new ArrayList<Measure>(splitTab.length);
 
-						for (int idxCol = 0; idxCol < this.datas.size(); idxCol++) {
+                    for (String nameMeasure : splitTab) {
+                        this.datas.add(new Measure(nameMeasure));
+                    }
+                    break;
+                case 3:
+                    if (splitTab.length == datas.size()) {
+                        for (int idxCol = 0; idxCol < splitTab.length; idxCol++) {
+                            this.datas.get(idxCol).setUnit(splitTab[idxCol]);
+                        }
+                    }
+                    break;
+                default:
+                    if (cntLine > 3 && splitTab.length == this.datas.size()) {
 
-							parsedValue = splitTab[idxCol];
+                        for (int idxCol = 0; idxCol < this.datas.size(); idxCol++) {
 
-							if(parsedValue.indexOf(",") > -1)
-							{
-								parsedValue = splitTab[idxCol].replace(',', '.');
-							}
+                            parsedValue = splitTab[idxCol];
 
-							try {
-								double value = Double.parseDouble(parsedValue.trim());
-								this.datas.get(idxCol).getData().add(value);
-								this.datas.get(idxCol).setMin(value);
-								this.datas.get(idxCol).setMax(value);
-							} catch (NumberFormatException e) {
-								this.datas.get(idxCol).getData().add(Double.NaN);
-							}
-						}
-					}
-					break;
-				}
+                            if (parsedValue.indexOf(",") > -1) {
+                                parsedValue = splitTab[idxCol].replace(',', '.');
+                            }
 
-				cntLine++;
-			}
+                            try {
+                                double value = Double.parseDouble(parsedValue.trim());
+                                this.datas.get(idxCol).getData().add(value);
+                                this.datas.get(idxCol).setMin(value);
+                                this.datas.get(idxCol).setMax(value);
+                            } catch (NumberFormatException e) {
+                                this.datas.get(idxCol).getData().add(Double.NaN);
+                            }
+                        }
+                    }
+                    break;
+                }
 
-			for (Measure measure : this.datas) {
-				this.nbPoints = Math.max(this.nbPoints, measure.getData().size());
-			}
+                cntLine++;
+            }
 
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
+            for (Measure measure : this.datas) {
+                this.nbPoints = Math.max(this.nbPoints, measure.getData().size());
+            }
 
-	public final List<Measure> getMeasures() {
-		return this.datas;
-	}
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
-	public final String getName() {
-		return name;
-	}
+    public final List<Measure> getMeasures() {
+        return this.datas;
+    }
 
-	public final String getFnr() {
-		return this.fnr;
-	}
+    public final String getName() {
+        return name;
+    }
 
-	public final String getFileType()
-	{
-		return typeFile;
-	}
+    public final String getFnr() {
+        return this.fnr;
+    }
 
-	public final Measure getTime() {
-		Measure time = new Measure(timeName);
-		int idx = datas.indexOf(time);
-		return idx > -1 ? datas.get(idx) : time;
-	}
-	
-	public final Measure getMeasure(String name)
-	{
-		final Measure measure = new Measure(name);
-		final int idx = this.datas.indexOf(measure);
-		
-		return idx > 0 ? this.datas.get(idx) : measure;
-	}
+    public final String getFileType() {
+        return typeFile;
+    }
+
+    public final Measure getTime() {
+        Measure time = new Measure(timeName);
+        int idx = datas.indexOf(time);
+        return idx > -1 ? datas.get(idx) : time;
+    }
+
+    public final Measure getMeasure(String name) {
+        final Measure measure = new Measure(name);
+        final int idx = this.datas.indexOf(measure);
+
+        return idx > -1 ? this.datas.get(idx) : measure;
+    }
 
 }

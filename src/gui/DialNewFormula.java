@@ -5,7 +5,6 @@ import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.Insets;
 import java.awt.Toolkit;
-import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
 import java.awt.datatransfer.UnsupportedFlavorException;
@@ -16,8 +15,8 @@ import java.io.IOException;
 import javax.swing.AbstractAction;
 import javax.swing.JButton;
 import javax.swing.JDialog;
-import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
@@ -27,197 +26,203 @@ import log.Formula;
 
 public final class DialNewFormula extends JDialog {
 
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	private final JTextField txtName;
-	private final JTextField txtUnit;
-	private final JTextArea formulaText;
+    private final JTextField txtName;
+    private final JTextField txtUnit;
+    private final JTextArea formulaText;
 
-	public DialNewFormula(final Ihm ihm) {
+    public DialNewFormula(final Ihm ihm) {
+        this(ihm, "");
+    }
 
-		super(ihm, "Edition de formule", false);
-		setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+    public DialNewFormula(final Ihm ihm, String formulaExpression) {
 
-		final GridBagConstraints gbc = new GridBagConstraints();
+        super(ihm, "Edition de formule", false);
+        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
 
-		setLayout(new GridBagLayout());
+        final GridBagConstraints gbc = new GridBagConstraints();
 
-		gbc.fill = GridBagConstraints.NONE;
-		gbc.gridx = 0;
-		gbc.gridy = 0;
-		gbc.gridwidth = 1;
-		gbc.gridheight = 1;
-		gbc.weightx = 0;
-		gbc.weighty = 0;
-		gbc.insets = new Insets(10, 5, 0, 0);
-		gbc.anchor = GridBagConstraints.CENTER;
-		add(new JLabel("Nom :"), gbc);
+        setLayout(new GridBagLayout());
 
-		txtName = new JTextField(20);
-		gbc.fill = GridBagConstraints.NONE;
-		gbc.gridx = 1;
-		gbc.gridy = 0;
-		gbc.gridwidth = 1;
-		gbc.gridheight = 1;
-		gbc.weightx = 0;
-		gbc.weighty = 0;
-		gbc.insets = new Insets(0, 0, 0, 5);
-		gbc.anchor = GridBagConstraints.CENTER;
-		add(txtName, gbc);
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.gridwidth = 1;
+        gbc.gridheight = 1;
+        gbc.weightx = 0;
+        gbc.weighty = 0;
+        gbc.insets = new Insets(10, 5, 0, 0);
+        gbc.anchor = GridBagConstraints.CENTER;
+        add(new JLabel("Nom :"), gbc);
 
-		gbc.fill = GridBagConstraints.CENTER;
-		gbc.gridx = 0;
-		gbc.gridy = 1;
-		gbc.gridwidth = 1;
-		gbc.gridheight = 1;
-		gbc.weightx = 0;
-		gbc.weighty = 0;
-		gbc.insets = new Insets(0, 5, 0, 0);
-		gbc.anchor = GridBagConstraints.CENTER;
-		add(new JLabel("Unite :"), gbc);
+        txtName = new JTextField(20);
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.gridx = 1;
+        gbc.gridy = 0;
+        gbc.gridwidth = 1;
+        gbc.gridheight = 1;
+        gbc.weightx = 0;
+        gbc.weighty = 0;
+        gbc.insets = new Insets(0, 0, 0, 5);
+        gbc.anchor = GridBagConstraints.CENTER;
+        add(txtName, gbc);
 
-		txtUnit = new JTextField(20);
-		gbc.fill = GridBagConstraints.NONE;
-		gbc.gridx = 1;
-		gbc.gridy = 1;
-		gbc.gridwidth = 1;
-		gbc.gridheight = 1;
-		gbc.weightx = 0;
-		gbc.weighty = 0;
-		gbc.insets = new Insets(0, 0, 0, 5);
-		gbc.anchor = GridBagConstraints.CENTER;
-		add(txtUnit, gbc);
+        gbc.fill = GridBagConstraints.CENTER;
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        gbc.gridwidth = 1;
+        gbc.gridheight = 1;
+        gbc.weightx = 0;
+        gbc.weighty = 0;
+        gbc.insets = new Insets(0, 5, 0, 0);
+        gbc.anchor = GridBagConstraints.CENTER;
+        add(new JLabel("Unite :"), gbc);
 
-		gbc.fill = GridBagConstraints.BOTH;
-		gbc.gridx = 0;
-		gbc.gridy = 2;
-		gbc.gridwidth = 2;
-		gbc.gridheight = 1;
-		gbc.weightx = 1;
-		gbc.weighty = 1;
-		gbc.insets = new Insets(0, 5, 0, 0);
-		gbc.anchor = GridBagConstraints.CENTER;
-		formulaText = new JTextArea(5, 60);
-		formulaText.setLineWrap(true);
-		formulaText.setWrapStyleWord(true);
-		formulaText.setTransferHandler(new TransferHandler("measure")
-		{
-			private static final long serialVersionUID = 1L;
+        txtUnit = new JTextField(20);
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.gridx = 1;
+        gbc.gridy = 1;
+        gbc.gridwidth = 1;
+        gbc.gridheight = 1;
+        gbc.weightx = 0;
+        gbc.weighty = 0;
+        gbc.insets = new Insets(0, 0, 0, 5);
+        gbc.anchor = GridBagConstraints.CENTER;
+        add(txtUnit, gbc);
 
-			@Override
-			public boolean canImport(TransferSupport support) {
-				return true;
-			}
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        gbc.gridwidth = 2;
+        gbc.gridheight = 1;
+        gbc.weightx = 1;
+        gbc.weighty = 1;
+        gbc.insets = new Insets(0, 5, 0, 0);
+        gbc.anchor = GridBagConstraints.CENTER;
+        formulaText = new JTextArea(formulaExpression, 5, 60);
+        formulaText.setLineWrap(true);
+        formulaText.setWrapStyleWord(true);
+        formulaText.setTransferHandler(new TransferHandler("measure") {
+            private static final long serialVersionUID = 1L;
 
-			@Override
-			public boolean importData(TransferSupport supp) {
-				// Fetch the Transferable and its data
-				Transferable t = supp.getTransferable();
-				String data = "";
-				try {
-					data = (String) t.getTransferData(DataFlavor.stringFlavor);
-					
-					if(!data.equals(Toolkit.getDefaultToolkit().getSystemClipboard().getContents(null).getTransferData(DataFlavor.stringFlavor))) //vérification si ça vient du presse-papier
-					{
-						data = "<" + data + ">";
-					}
+            @Override
+            public boolean canImport(TransferSupport support) {
+                return true;
+            }
 
-				} catch (UnsupportedFlavorException e) {
-					if(!"".equals(data))
-					{
-						data = "<" + data + ">";
-					}
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-				
-				formulaText.insert(data, formulaText.getCaretPosition());
+            @Override
+            public boolean importData(TransferSupport supp) {
+                // Fetch the Transferable and its data
+                Transferable t = supp.getTransferable();
+                String data = "";
+                try {
+                    data = (String) t.getTransferData(DataFlavor.stringFlavor);
 
-				return true;
-			}
-		});
-		add(formulaText, gbc);
+                    if (!data.equals(Toolkit.getDefaultToolkit().getSystemClipboard().getContents(null).getTransferData(DataFlavor.stringFlavor))) // vï¿½rification
+                                                                                                                                                   // si
+                                                                                                                                                   // ï¿½a
+                                                                                                                                                   // vient
+                                                                                                                                                   // du
+                                                                                                                                                   // presse-papier
+                    {
+                        data = "<" + data + ">";
+                    }
 
-		gbc.fill = GridBagConstraints.HORIZONTAL;
-		gbc.gridx = 0;
-		gbc.gridy = 3;
-		gbc.gridwidth = 2;
-		gbc.gridheight = 1;
-		gbc.weightx = 1;
-		gbc.weighty = 0;
-		gbc.insets = new Insets(5, 5, 0, 5);
-		gbc.anchor = GridBagConstraints.CENTER;
-		add(createPad(), gbc);
+                } catch (UnsupportedFlavorException e) {
+                    if (!"".equals(data)) {
+                        data = "<" + data + ">";
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
 
-		gbc.fill = GridBagConstraints.HORIZONTAL;
-		gbc.gridx = 0;
-		gbc.gridy = 4;
-		gbc.gridwidth = 2;
-		gbc.gridheight = 1;
-		gbc.weightx = 1;
-		gbc.weighty = 0;
-		gbc.insets = new Insets(5, 5, 0, 5);
-		gbc.anchor = GridBagConstraints.CENTER;
-		add(new JButton("Annuler"), gbc);
+                formulaText.insert(data, formulaText.getCaretPosition());
 
-		gbc.fill = GridBagConstraints.HORIZONTAL;
-		gbc.gridx = 0;
-		gbc.gridy = 5;
-		gbc.gridwidth = 2;
-		gbc.gridheight = 1;
-		gbc.weightx = 1;
-		gbc.weighty = 0;
-		gbc.insets = new Insets(0, 5, 10, 5);
-		gbc.anchor = GridBagConstraints.CENTER;
-		add(new JButton(new AbstractAction("Valider") {
+                return true;
+            }
+        });
+        add(formulaText, gbc);
 
-			private static final long serialVersionUID = 1L;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridx = 0;
+        gbc.gridy = 3;
+        gbc.gridwidth = 2;
+        gbc.gridheight = 1;
+        gbc.weightx = 1;
+        gbc.weighty = 0;
+        gbc.insets = new Insets(5, 5, 0, 5);
+        gbc.anchor = GridBagConstraints.CENTER;
+        add(createPad(), gbc);
 
-			@Override
-			public void actionPerformed(ActionEvent arg0) {
-				Formula formula = new Formula(txtName.getText(), formulaText.getText(), ihm.getLog());
-				if(formula.isValid())
-				{
-					ihm.addMeasure(formula);
-					dispose();
-				}
-			}
-		}), gbc);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridx = 0;
+        gbc.gridy = 4;
+        gbc.gridwidth = 2;
+        gbc.gridheight = 1;
+        gbc.weightx = 1;
+        gbc.weighty = 0;
+        gbc.insets = new Insets(5, 5, 0, 5);
+        gbc.anchor = GridBagConstraints.CENTER;
+        add(new JButton("Annuler"), gbc);
 
-		pack();
-		setLocationRelativeTo(null);
-		setResizable(true);
-		setVisible(true);
-	}
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridx = 0;
+        gbc.gridy = 5;
+        gbc.gridwidth = 2;
+        gbc.gridheight = 1;
+        gbc.weightx = 1;
+        gbc.weighty = 0;
+        gbc.insets = new Insets(0, 5, 10, 5);
+        gbc.anchor = GridBagConstraints.CENTER;
+        add(new JButton(new AbstractAction("Valider") {
 
+            private static final long serialVersionUID = 1L;
 
-	private final JPanel createPad()
-	{
-		String[] tab_string = new String[]{"^", "sqrt()", "cos()", "sin()", "tan()", "+","-", "*", "/", ".", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"};
-		JButton[] tab_button = new JButton[tab_string.length];
+            @Override
+            public void actionPerformed(ActionEvent arg0) {
+                Formula formula = new Formula(txtName.getText(), formulaText.getText(), ihm.getLog());
+                if (formula.isValid() && !ihm.getListFormula().contains(formula)) {
+                    ihm.addMeasure(formula);
+                    dispose();
+                } else {
+                    JOptionPane.showMessageDialog(null, "Une voie existe dejÃ  sous ce nom lÃ ", "Info", JOptionPane.WARNING_MESSAGE);
+                }
+            }
+        }), gbc);
 
-		JPanel pad = new JPanel(new GridLayout(4, 5));
+        pack();
+        setLocationRelativeTo(null);
+        setResizable(true);
+        setVisible(true);
+    }
 
-		for(int i = 0; i < tab_string.length; i++){
-			tab_button[i] = new JButton(tab_string[i]);
-			tab_button[i].addActionListener(new PadListener());
-			pad.add(tab_button[i]);
-		}
+    private final JPanel createPad() {
+        String[] tab_string = new String[] { "^", "sqrt()", "cos()", "sin()", "tan()", "+", "-", "*", "/", ".", "0", "1", "2", "3", "4", "5", "6",
+                "7", "8", "9" };
+        JButton[] tab_button = new JButton[tab_string.length];
 
-		return pad;
-	}
+        JPanel pad = new JPanel(new GridLayout(4, 5));
 
-	private final class PadListener implements ActionListener
-	{
+        for (int i = 0; i < tab_string.length; i++) {
+            tab_button[i] = new JButton(tab_string[i]);
+            tab_button[i].addActionListener(new PadListener());
+            pad.add(tab_button[i]);
+        }
 
-		@Override
-		public void actionPerformed(ActionEvent e) {
-			//On affiche le chiffre additionnel dans le label
-			String str = ((JButton)e.getSource()).getText();
-			formulaText.insert(str, formulaText.getCaretPosition());
+        return pad;
+    }
 
-		}
+    private final class PadListener implements ActionListener {
 
-	}
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            // On affiche le chiffre additionnel dans le label
+            String str = ((JButton) e.getSource()).getText();
+            formulaText.insert(str, formulaText.getCaretPosition());
+
+        }
+
+    }
 
 }
