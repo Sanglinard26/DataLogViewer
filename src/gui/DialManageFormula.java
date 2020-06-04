@@ -14,6 +14,7 @@ import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JOptionPane;
 
+import log.Formula;
 import log.Measure;
 
 public final class DialManageFormula extends JDialog {
@@ -22,7 +23,7 @@ public final class DialManageFormula extends JDialog {
 
     public DialManageFormula(final Ihm ihm) {
 
-        super(ihm, "Edition de formule", true);
+        super(ihm, "Edition de formule", false);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
 
         final GridBagConstraints gbc = new GridBagConstraints();
@@ -94,7 +95,7 @@ public final class DialManageFormula extends JDialog {
 
             @Override
             public void actionPerformed(ActionEvent arg0) {
-                new DialNewFormula(ihm, "");
+                new DialNewFormula(ihm, ((Formula)listFormula.getSelectedValue()));
             }
         }), gbc);
 

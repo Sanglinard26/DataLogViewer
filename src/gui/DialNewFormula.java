@@ -33,10 +33,10 @@ public final class DialNewFormula extends JDialog {
     private final JTextArea formulaText;
 
     public DialNewFormula(final Ihm ihm) {
-        this(ihm, "");
+        this(ihm, null);
     }
 
-    public DialNewFormula(final Ihm ihm, String formulaExpression) {
+    public DialNewFormula(final Ihm ihm, final Formula formula) {
 
         super(ihm, "Edition de formule", false);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
@@ -100,7 +100,7 @@ public final class DialNewFormula extends JDialog {
         gbc.weighty = 1;
         gbc.insets = new Insets(0, 5, 0, 0);
         gbc.anchor = GridBagConstraints.CENTER;
-        formulaText = new JTextArea(formulaExpression, 5, 60);
+        formulaText = new JTextArea(5, 60);
         formulaText.setLineWrap(true);
         formulaText.setWrapStyleWord(true);
         formulaText.setTransferHandler(new TransferHandler("measure") {
@@ -143,6 +143,13 @@ public final class DialNewFormula extends JDialog {
             }
         });
         add(formulaText, gbc);
+        
+        if(formula!=null)
+        {
+        	txtName.setText(formula.getName());
+        	txtUnit.setText(formula.getUnit());
+        	formulaText.setText(formula.getExpression());
+        }
 
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.gridx = 0;
@@ -181,13 +188,26 @@ public final class DialNewFormula extends JDialog {
 
             @Override
             public void actionPerformed(ActionEvent arg0) {
-                Formula formula = new Formula(txtName.getText(), formulaText.getText(), ihm.getLog());
-                if (formula.isValid() && !ihm.getListFormula().contains(formula)) {
-                    ihm.addMeasure(formula);
-                    dispose();
-                } else {
-                    JOptionPane.showMessageDialog(null, "Une voie existe dejà sous ce nom là", "Info", JOptionPane.WARNING_MESSAGE);
+                
+                
+                if(formula == null)
+                {
+                	Formula newFormula = new Formula(txtName.getText(), formulaText.getText(), ihm.getLog());
+                	if (newFormula.isValid() && !ihm.getListFormula().contains(newFormula)) {
+                        ihm.addMeasure(newFormula);
+                        dispose();
+                    } else {
+                        JOptionPane.showMessageDialog(null, "Une voie existe dejà sous ce nom là", "Info", JOptionPane.WARNING_MESSAGE);
+                    }
+                }else{
+                	formula.setName(txtName.getText());
+                	formula.setUnit(txtUnit.getText());
+                	formula.setExpression(formulaText.getText());
+                	formula.calculate(ihm.getLog());
+                	dispose();
                 }
+                
+                
             }
         }), gbc);
 

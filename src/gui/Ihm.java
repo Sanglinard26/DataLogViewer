@@ -19,11 +19,13 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
@@ -85,7 +87,7 @@ public final class Ihm extends JFrame {
     private JLabel labelLogName;
 
     private Log log;
-    private List<Measure> listFormula = new ArrayList<Measure>();
+    private Set<Measure> listFormula = new HashSet<Measure>();
 
     public Ihm() {
         super("DataLogViewer");
@@ -443,6 +445,8 @@ public final class Ihm extends JFrame {
                     ChartView chartView = (ChartView) tabbedPane.getComponentAt(idx);
                     ((DataValueModel) tableCursorValues.getModel()).changeList(chartView.getMeasures());
                     chartView.updateTableValue();
+                }else{
+                	((DataValueModel) tableCursorValues.getModel()).changeList(Collections.<String> emptySet());
                 }
             }
         });
@@ -520,7 +524,7 @@ public final class Ihm extends JFrame {
                 for (Measure measure : log.getMeasures()) {
                     listModel.addElement(measure);
                 }
-
+                
                 for (Measure formule : listFormula) {
                     ((Formula) formule).calculate(log);
                     listModel.addElement(formule);
@@ -671,7 +675,7 @@ public final class Ihm extends JFrame {
         }
     }
 
-    public final List<Measure> getListFormula() {
+    public final Set<Measure> getListFormula() {
         return listFormula;
     }
 
@@ -809,11 +813,23 @@ public final class Ihm extends JFrame {
 
             oos.writeObject(listChart);
             oos.flush();
+            
+            
+            for (Measure formule : listFormula) {
+                ((Formula) formule).clearData();
+            }
+            oos.writeObject(listFormula);
+            oos.flush();
         } catch (FileNotFoundException e1) {
             e1.printStackTrace();
         } catch (IOException e1) {
             e1.printStackTrace();
         } finally {
+            
+            for (Measure formule : listFormula) {
+                ((Formula) formule).calculate(log);
+            }
+            
             reloadLogData(log);
         }
 
@@ -831,6 +847,15 @@ public final class Ihm extends JFrame {
                 tabbedPane.addTab(entry.getKey(), chartView);
                 tabbedPane.setTabComponentAt(tabbedPane.getTabCount() - 1, new ButtonTabComponent(tabbedPane));
                 tabbedPane.setSelectedIndex(tabbedPane.getTabCount() - 1);
+            }
+            
+            @SuppressWarnings("unchecked")
+			Set<Measure> list = (Set<Measure>) ois.readObject();
+            
+            for (Measure formule : list) {
+            	((Formula) formule).deserialize();
+                ((Formula) formule).calculate(log);
+                listFormula.add(formule);
             }
 
             reloadLogData(log);

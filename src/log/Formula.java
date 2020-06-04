@@ -17,13 +17,30 @@ public final class Formula extends Measure {
 
 	private String literalExpression;
 	private String internExpression;
-	private Expression expression;
+	private transient Expression expression;
 	private Map<Character, String> variables;
 	private boolean valid = false;
 
 	public Formula(String name, String baseExpression, Log log) {
 		super(name);
+		if("".equals(baseExpression))
+		{
+			return;
+		}
 		this.literalExpression = baseExpression;
+
+		build();
+
+		if(valid)
+		{
+			calculate(log);
+		}else{
+			JOptionPane.showMessageDialog(null, "V\u00e9rifiez la synthaxe svp", "Erreur", JOptionPane.ERROR_MESSAGE);
+		}
+	}
+
+	private final void build()
+	{
 		variables = new LinkedHashMap<Character, String>();
 		renameVariables();
 
@@ -35,15 +52,14 @@ public final class Formula extends Measure {
 			args[cnt++] = new Argument(var.toString(),Double.NaN);
 		}
 
-		expression = new Expression(this.internExpression, args);
+		this.expression = new Expression(this.internExpression, args);
 		valid = expression.checkSyntax();
-		if(valid)
-		{
-			calculate(log);
-		}else{
-			JOptionPane.showMessageDialog(null, "V\u00e9rifiez la synthaxe svp", "Erreur", JOptionPane.ERROR_MESSAGE);
-		}
 
+	}
+	
+	public final void deserialize()
+	{
+		build();
 	}
 
 	private final void renameVariables()
@@ -81,9 +97,7 @@ public final class Formula extends Measure {
 
 		if(!data.isEmpty())
 		{
-			data.clear();
-			min = Double.POSITIVE_INFINITY;
-		    max = Double.NEGATIVE_INFINITY;
+			clearData();
 		}
 
 		if(log!=null)
@@ -128,6 +142,12 @@ public final class Formula extends Measure {
 	public final String getExpression()
 	{
 		return this.literalExpression;
+	}
+
+	public void setExpression(String expression) {
+		this.literalExpression = expression;
+
+		build();
 	}
 
 }

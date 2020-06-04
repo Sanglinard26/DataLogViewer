@@ -128,13 +128,18 @@ final class DataValueModel extends AbstractTableModel {
         fireTableDataChanged();
     }
 
-    public final void changeList(List<String> newLabels) {
+    public final void changeList(Set<String> newLabels) {
         this.labels.clear();
         this.values.clear();
-        for (int i = 0; i < newLabels.size(); i++) {
-            this.labels.add(newLabels.get(i));
+        for(String label : newLabels)
+        {
+        	this.labels.add(label);
             this.values.add(Double.NaN);
         }
+        //for (int i = 0; i < newLabels.size(); i++) {
+            //this.labels.add(newLabels.get(i));
+            //this.values.add(Double.NaN);
+        //}
         fireTableDataChanged();
     }
 

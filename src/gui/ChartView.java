@@ -11,7 +11,9 @@ import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import javax.swing.ImageIcon;
 import javax.swing.JMenuItem;
@@ -357,9 +359,9 @@ public final class ChartView extends ChartPanel implements Observable {
         return xValue;
     }
 
-    public final List<String> getMeasures() {
+    public final Set<String> getMeasures() {
     	
-    	List<String> listMeasure = new ArrayList<String>();
+    	Set<String> listMeasure = new HashSet<String>();
     	XYPlot xyPlot;
         XYSeries serie;
         Comparable<?> key;

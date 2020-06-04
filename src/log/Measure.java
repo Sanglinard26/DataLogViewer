@@ -70,10 +70,22 @@ public class Measure implements Comparable<Measure>, Serializable {
     public final void setData(List<Double> data) {
         this.data = data;
     }
+    
+    public final void clearData()
+    {
+    	data.clear();
+    	min = Double.POSITIVE_INFINITY;
+    	max = Double.NEGATIVE_INFINITY;
+    }
 
     @Override
     public String toString() {
         return this.name;
+    }
+    
+    @Override
+    public int hashCode() {
+    	return this.name.hashCode();
     }
 
     @Override
