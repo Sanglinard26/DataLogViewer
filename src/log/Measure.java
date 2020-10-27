@@ -37,55 +37,59 @@ public class Measure implements Comparable<Measure>, Serializable {
     public final void setUnit(String unit) {
         this.unit = unit;
     }
-    
+
     public final double getMin() {
-		return min;
-	}
-    
+        return min;
+    }
+
     public final double getMax() {
-		return max;
-	}
-    
+        return max;
+    }
+
     public void setMax(double value) {
-		this.max = Math.max(max, value);
-	}
-    
+        if (Double.isNaN(value)) {
+            return;
+        }
+        this.max = Math.max(max, value);
+    }
+
     public void setMin(double value) {
-		this.min = Math.min(min, value);
-	}
+        if (Double.isNaN(value)) {
+            return;
+        }
+        this.min = Math.min(min, value);
+    }
 
     public final List<Double> getData() {
         return this.data;
     }
-    
-    public final double[] getDouleValue()
-    {
-    	final double[] result = new double[data.size()];
-    	  for (int i = 0; i < data.size(); i++) {
-    	    result[i] = data.get(i).doubleValue();
-    	  }
-    	  return result;
+
+    public final double[] getDouleValue() {
+        final double[] result = new double[data.size()];
+        for (int i = 0; i < data.size(); i++) {
+            result[i] = data.get(i).doubleValue();
+        }
+        return result;
     }
 
     public final void setData(List<Double> data) {
         this.data = data;
     }
-    
-    public final void clearData()
-    {
-    	data.clear();
-    	min = Double.POSITIVE_INFINITY;
-    	max = Double.NEGATIVE_INFINITY;
+
+    public final void clearData() {
+        data.clear();
+        min = Double.POSITIVE_INFINITY;
+        max = Double.NEGATIVE_INFINITY;
     }
 
     @Override
     public String toString() {
         return this.name;
     }
-    
+
     @Override
     public int hashCode() {
-    	return this.name.hashCode();
+        return this.name.hashCode();
     }
 
     @Override

@@ -5,6 +5,8 @@ package gui;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
+import java.awt.Shape;
+import java.awt.geom.Ellipse2D;
 
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -25,121 +27,127 @@ abstract class DialogFactory {
 final class DialogProperties extends JPanel
 
 {
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	private final DefaultTableModel model;
+    private final DefaultTableModel model;
 
-	public DialogProperties(CombinedDomainXYPlot combinedplot) {
+    public DialogProperties(CombinedDomainXYPlot combinedplot) {
 
-		model = new DefaultTableModel(new String[] { "Serie", "Couleur", "Epaisseur", "Supprimer?" }, 0) {
-			private static final long serialVersionUID = 1L;
+        model = new DefaultTableModel(new String[] { "Serie", "Couleur", "Taille", "Supprimer?" }, 0) {
+            private static final long serialVersionUID = 1L;
 
-			@Override
-			public Class<?> getColumnClass(int columnIndex) {
-				switch (columnIndex) {
-				case 0:
-					return String.class;
-				case 1:
-					return Color.class;
-				case 2:
-					return Float.class;
-				case 3:
-					return Boolean.class;
-				default:
-					return String.class;
-				}
-			}
+            @Override
+            public Class<?> getColumnClass(int columnIndex) {
+                switch (columnIndex) {
+                case 0:
+                    return String.class;
+                case 1:
+                    return Color.class;
+                case 2:
+                    return Float.class;
+                case 3:
+                    return Boolean.class;
+                default:
+                    return String.class;
+                }
+            }
 
-			@Override
-			public boolean isCellEditable(int row, int column) {
-				return column > 0 ? true : false;
-			}
-		};
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return column > 0 ? true : false;
+            }
+        };
 
-		JTable table = new JTable(model);
-		table.setRowSelectionAllowed(false);
+        JTable table = new JTable(model);
+        table.setRowSelectionAllowed(false);
 
-		table.setDefaultRenderer(Color.class, new ColorRenderer(true));
+        table.setDefaultRenderer(Color.class, new ColorRenderer(true));
 
-		table.setDefaultEditor(Color.class, new ColorEditor());
+        table.setDefaultEditor(Color.class, new ColorEditor());
 
-		add(new JScrollPane(table));
+        add(new JScrollPane(table));
 
-		XYPlot xyPlot;
-		Comparable<?> key;
-		XYItemRenderer renderer;
+        XYPlot xyPlot;
+        Comparable<?> key;
+        XYItemRenderer renderer;
 
-		for (Object plot : combinedplot.getSubplots()) {
-			xyPlot = (XYPlot) plot;
-			int nbSerie = xyPlot.getSeriesCount();
+        for (Object plot : combinedplot.getSubplots()) {
+            xyPlot = (XYPlot) plot;
+            int nbSerie = xyPlot.getSeriesCount();
 
-			renderer = xyPlot.getRenderer();
+            renderer = xyPlot.getRenderer();
 
-			if(renderer instanceof XYLineAndShapeRenderer)
-			{
-				for (int nSerie = 0; nSerie < nbSerie; nSerie++) {
+            if (renderer instanceof XYLineAndShapeRenderer) {
+                for (int nSerie = 0; nSerie < nbSerie; nSerie++) {
 
-					key = xyPlot.getDataset().getSeriesKey(nSerie);
+                    key = xyPlot.getDataset().getSeriesKey(nSerie);
 
-					model.addRow(new Object[] { key, (Color) renderer.getSeriesPaint(nSerie),
-							((BasicStroke) renderer.getSeriesStroke(nSerie)).getLineWidth(), Boolean.FALSE });
+                    model.addRow(new Object[] { key, (Color) renderer.getSeriesPaint(nSerie),
+                            ((BasicStroke) renderer.getSeriesStroke(nSerie)).getLineWidth(), Boolean.FALSE });
 
-				}
-			}else{
-				
-				key = xyPlot.getDataset().getSeriesKey(0);
-				
-				model.addRow(new Object[] { key, null, null, Boolean.FALSE });
-			}
+                }
+            } else {
 
+                key = xyPlot.getDataset().getSeriesKey(0);
 
-		}
-	}
+                XYShapeRenderer shapeRenderer = (XYShapeRenderer) renderer;
 
-	public final void updatePlot(ChartView chartView) {
+                model.addRow(new Object[] { key, (Color) renderer.getSeriesPaint(0), ((Ellipse2D) shapeRenderer.getBaseShape()).getHeight(),
+                        Boolean.FALSE });
+            }
 
-		CombinedDomainXYPlot combinedplot = chartView.getPlot();
-		XYPlot xyPlot;
-		String serieName;
+        }
+    }
 
-		for (int i = 0; i < model.getRowCount(); i++) {
-			serieName = model.getValueAt(i, 0).toString();
+    public final void updatePlot(ChartView chartView) {
 
-			boolean delete = (boolean) model.getValueAt(i, 3);
+        CombinedDomainXYPlot combinedplot = chartView.getPlot();
+        XYPlot xyPlot;
+        String serieName;
 
-			for (Object plot : combinedplot.getSubplots()) {
-				xyPlot = (XYPlot) plot;
-				
-				if(xyPlot.getRenderer() instanceof XYShapeRenderer)
-				{
-					if(delete)
-					{
-						combinedplot.remove(xyPlot);
-					}
-					break;
-				}
+        for (int i = 0; i < model.getRowCount(); i++) {
+            serieName = model.getValueAt(i, 0).toString();
 
-				int idxSerie = ((XYSeriesCollection) xyPlot.getDataset()).getSeriesIndex(serieName);
+            boolean delete = (boolean) model.getValueAt(i, 3);
+            Color color;
 
-				if (idxSerie > -1) {
-					if (delete) {
-						if (((XYSeriesCollection) xyPlot.getDataset()).getSeriesCount() == 1) {
-							combinedplot.remove(xyPlot);
-						} else {
-							((XYSeriesCollection) xyPlot.getDataset()).removeSeries(idxSerie);
-						}
-						chartView.updateObservateur("data", serieName);
-						break;
-					}
-					Color color = (Color) model.getValueAt(i, 1);
-					float widthLine = (float) model.getValueAt(i, 2);
-					xyPlot.getRenderer().setSeriesPaint(idxSerie, color);
-					xyPlot.getRenderer().setSeriesStroke(idxSerie, new BasicStroke(widthLine));
-					break;
-				}
+            for (Object plot : combinedplot.getSubplots()) {
+                xyPlot = (XYPlot) plot;
 
-			}
-		}
-	}
+                if (xyPlot.getRenderer() instanceof XYShapeRenderer) {
+                    if (delete) {
+                        combinedplot.remove(xyPlot);
+                    }
+
+                    color = (Color) model.getValueAt(i, 1);
+                    xyPlot.getRenderer().setSeriesPaint(0, color);
+                    double size = Double.parseDouble(model.getValueAt(i, 2).toString());
+                    Shape shape = new Ellipse2D.Double(-size / 2, -size / 2, size, size);
+                    xyPlot.getRenderer().setBaseShape(shape);
+                    break;
+                }
+
+                int idxSerie = ((XYSeriesCollection) xyPlot.getDataset()).getSeriesIndex(serieName);
+
+                if (idxSerie > -1) {
+                    if (delete) {
+                        if (((XYSeriesCollection) xyPlot.getDataset()).getSeriesCount() == 1) {
+                            combinedplot.remove(xyPlot);
+                        } else {
+                            ((XYSeriesCollection) xyPlot.getDataset()).removeSeries(idxSerie);
+                        }
+                        chartView.updateObservateur("data", serieName);
+                        break;
+                    }
+                    color = (Color) model.getValueAt(i, 1);
+                    float widthLine = (float) model.getValueAt(i, 2);
+                    xyPlot.getRenderer().setSeriesPaint(idxSerie, color);
+                    xyPlot.getRenderer().setSeriesStroke(idxSerie, new BasicStroke(widthLine));
+                    break;
+                }
+
+            }
+        }
+    }
 
 }

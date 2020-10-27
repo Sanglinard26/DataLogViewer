@@ -42,6 +42,7 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
+import javax.swing.JToggleButton;
 import javax.swing.JToolBar;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
@@ -55,10 +56,13 @@ import javax.swing.filechooser.FileFilter;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
 import org.jfree.chart.JFreeChart;
+import org.jfree.chart.axis.NumberAxis;
+import org.jfree.chart.axis.ValueAxis;
 import org.jfree.chart.plot.CombinedDomainXYPlot;
 import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.renderer.xy.XYShapeRenderer;
 import org.jfree.chart.title.PaintScaleLegend;
+import org.jfree.data.Range;
 import org.jfree.data.xy.DefaultXYDataset;
 import org.jfree.data.xy.DefaultXYZDataset;
 import org.jfree.data.xy.XYSeries;
@@ -113,6 +117,7 @@ public final class Ihm extends JFrame {
         final String ICON_CLOSE_WINDOW = "/icon_closeWindow_16.png";
         final String ICON_EXIT = "/icon_exit_16.png";
         final String ICON_NEW = "/new_icon_16.png";
+        final String ICON_NOTICE = "/icon_manual_16.png";
 
         JMenuBar menuBar = new JMenuBar();
 
@@ -306,13 +311,26 @@ public final class Ihm extends JFrame {
         });
         menu.add(menuItem);
 
+        menuItem = new JMenuItem("Notice", new ImageIcon(getClass().getResource(ICON_NOTICE)));
+        menuItem.addActionListener(new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                new DialNotice(Ihm.this);
+
+            }
+        });
+        menu.add(menuItem);
+
         return menuBar;
     }
 
     private final JToolBar createToolBar() {
         final String ICON_OPEN_LOG = "/icon_openLog_32.png";
         final String ICON_OPEN_CONFIG = "/icon_openConfig_32.png";
+        final String ICON_ADD_WINDOW = "/icon_addWindow_32.png";
         final String ICON_NEW_PLOT = "/icon_newPlot_32.png";
+        final String ICON_SHARE_AXIS = "/icon_shareAxis_32.png";
 
         JToolBar bar = new JToolBar();
         bar.setFloatable(false);
@@ -360,6 +378,21 @@ public final class Ihm extends JFrame {
 
         bar.addSeparator();
 
+        JButton btAddWindow = new JButton(new AbstractAction(null, new ImageIcon(getClass().getResource(ICON_ADD_WINDOW))) {
+
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public void actionPerformed(ActionEvent arg0) {
+
+                addWindow();
+
+            }
+        });
+        btAddWindow.setEnabled(true);
+        btAddWindow.setToolTipText("Ajouter fen\u00eatre");
+        bar.add(btAddWindow);
+
         JButton btNewPlot = new JButton(new AbstractAction(null, new ImageIcon(getClass().getResource(ICON_NEW_PLOT))) {
 
             private static final long serialVersionUID = 1L;
@@ -374,6 +407,53 @@ public final class Ihm extends JFrame {
         btNewPlot.setEnabled(true);
         btNewPlot.setToolTipText("Nouveau graphique");
         bar.add(btNewPlot);
+
+        final JToggleButton btSynchro = new JToggleButton(new ImageIcon(getClass().getResource(ICON_SHARE_AXIS)));
+        btSynchro.setToolTipText("Synchroniser les axes des abcisses");
+        btSynchro.addActionListener(new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+
+                if (log == null) {
+                    return;
+                }
+
+                if (btSynchro.isSelected()) {
+                    final int idxWindow = tabbedPane.getSelectedIndex();
+
+                    if (idxWindow < 0) {
+                        return;
+                    }
+
+                    ChartView chartView = (ChartView) tabbedPane.getComponentAt(idxWindow);
+                    ValueAxis domainAxis = chartView.getPlot().getDomainAxis();
+                    ChartView otherChart;
+                    for (int i = 0; i < tabbedPane.getTabCount(); i++) {
+                        otherChart = (ChartView) tabbedPane.getComponentAt(i);
+                        if (i == idxWindow || !log.getTime().getName().equals(otherChart.getPlot().getDomainAxis().getLabel())) {
+                            continue;
+                        }
+                        otherChart.getPlot().setDomainAxis(domainAxis);
+                    }
+                } else {
+                    ChartView chartView;
+                    Measure time = log.getTime();
+                    Range xAxisRange;
+                    for (int i = 0; i < tabbedPane.getTabCount(); i++) {
+                        chartView = (ChartView) tabbedPane.getComponentAt(i);
+                        if (!log.getTime().getName().equals(chartView.getPlot().getDomainAxis().getLabel())) {
+                            continue;
+                        }
+                        xAxisRange = chartView.getPlot().getDomainAxis().getRange();
+                        chartView.getPlot().setDomainAxis(new NumberAxis(time.getName()));
+                        chartView.getPlot().getDomainAxis().setRange(xAxisRange);
+                    }
+                }
+
+            }
+        });
+        bar.add(btSynchro);
 
         return bar;
     }
@@ -445,8 +525,8 @@ public final class Ihm extends JFrame {
                     ChartView chartView = (ChartView) tabbedPane.getComponentAt(idx);
                     ((DataValueModel) tableCursorValues.getModel()).changeList(chartView.getMeasures());
                     chartView.updateTableValue();
-                }else{
-                	((DataValueModel) tableCursorValues.getModel()).changeList(Collections.<String> emptySet());
+                } else {
+                    ((DataValueModel) tableCursorValues.getModel()).changeList(Collections.<String> emptySet());
                 }
             }
         });
@@ -524,7 +604,7 @@ public final class Ihm extends JFrame {
                 for (Measure measure : log.getMeasures()) {
                     listModel.addElement(measure);
                 }
-                
+
                 for (Measure formule : listFormula) {
                     ((Formula) formule).calculate(log);
                     listModel.addElement(formule);
@@ -813,8 +893,7 @@ public final class Ihm extends JFrame {
 
             oos.writeObject(listChart);
             oos.flush();
-            
-            
+
             for (Measure formule : listFormula) {
                 ((Formula) formule).clearData();
             }
@@ -825,11 +904,11 @@ public final class Ihm extends JFrame {
         } catch (IOException e1) {
             e1.printStackTrace();
         } finally {
-            
+
             for (Measure formule : listFormula) {
                 ((Formula) formule).calculate(log);
             }
-            
+
             reloadLogData(log);
         }
 
@@ -848,12 +927,12 @@ public final class Ihm extends JFrame {
                 tabbedPane.setTabComponentAt(tabbedPane.getTabCount() - 1, new ButtonTabComponent(tabbedPane));
                 tabbedPane.setSelectedIndex(tabbedPane.getTabCount() - 1);
             }
-            
+
             @SuppressWarnings("unchecked")
-			Set<Measure> list = (Set<Measure>) ois.readObject();
-            
+            Set<Measure> list = (Set<Measure>) ois.readObject();
+
             for (Measure formule : list) {
-            	((Formula) formule).deserialize();
+                ((Formula) formule).deserialize();
                 ((Formula) formule).calculate(log);
                 listFormula.add(formule);
             }

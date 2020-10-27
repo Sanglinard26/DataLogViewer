@@ -1,0 +1,19 @@
+Quelques notes sur l'utilisation :
+
+- ouvrir un log
+- ajouter une fenêtre
+- tracer une variable (en fontion du temps) en double cliquant sur celle-ci
+- pour ajouter une variable à un graphique existant il suffit de la faire glisser depuis la liste
+- pour ajouter un graphique type "nuage de point", appuyer sur le bouton "Nouveau grpahique" et faite glisser les variables voulues
+- quelques propriétés sur les graphiques sont modifiables, clic droit sur le graphique en question pour y accéder
+- il est possible de sauvegarder les diverses créées en faisant "Enregistrer configuration"
+- un curseur est disponible avec un clic gauche sur un graphique, il sera synchronisé sur toutes les fenêtres
+- il est possible de gérer le zoom de l'axe des abcisses avec le bouton droit de la souris :
+        - zoom : maintient bouton droit + déplacement vers la droite
+        - plage de temps complète : maintient bouton droit + déplacement vers la gauche
+- défilement de la plage de temps une fois zoomée : bouton "ctrl" + bouton gauche souris + déplacement gauche/droite
+- le bouton "Synchroniser les axes des abcisses" permet d'avoir la même plage de temps sur toutes les fenêtres
+
+Il est possible que des petits bugs trainent, n'hésitez pas à recharger le log si quelque chose ne se passent pas correctement.
+
+Bug ou demande d'évolution ==> kraillon26@gmail.com
