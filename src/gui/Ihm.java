@@ -68,6 +68,7 @@ import org.jfree.data.xy.DefaultXYZDataset;
 import org.jfree.data.xy.XYSeries;
 import org.jfree.data.xy.XYSeriesCollection;
 
+import calib.MapCal;
 import log.Formula;
 import log.Log;
 import log.Measure;
@@ -85,6 +86,8 @@ public final class Ihm extends JFrame {
     private JTabbedPane tabbedPane;
     private DefaultListModel<Measure> listModel;
     private JList<Measure> listVoie;
+    private JScrollPane scrollListVoie;
+    private JScrollPane scrollTableCursorValues;
     private TableCursorValue tableCursorValues;
 
     private JLabel labelFnr;
@@ -220,7 +223,7 @@ public final class Ihm extends JFrame {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                addWindow();
+                addChartWindow();
             }
         });
         menu.add(menuItem);
@@ -328,9 +331,11 @@ public final class Ihm extends JFrame {
     private final JToolBar createToolBar() {
         final String ICON_OPEN_LOG = "/icon_openLog_32.png";
         final String ICON_OPEN_CONFIG = "/icon_openConfig_32.png";
+        final String ICON_OPEN_MAP = "/icon_mapFile_32.png";
         final String ICON_ADD_WINDOW = "/icon_addWindow_32.png";
         final String ICON_NEW_PLOT = "/icon_newPlot_32.png";
         final String ICON_SHARE_AXIS = "/icon_shareAxis_32.png";
+        final String ICON_NEW_TABLE = "/icon_table_32.png";
 
         JToolBar bar = new JToolBar();
         bar.setFloatable(false);
@@ -376,7 +381,43 @@ public final class Ihm extends JFrame {
         btOpenConfig.setToolTipText("Ouvrir configuration");
         bar.add(btOpenConfig);
 
-        bar.addSeparator();
+        JButton btOpenMap = new JButton(new AbstractAction(null, new ImageIcon(getClass().getResource(ICON_OPEN_MAP))) {
+
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public void actionPerformed(ActionEvent arg0) {
+
+                final JFileChooser fc = new JFileChooser();
+                fc.setMultiSelectionEnabled(false);
+                fc.setFileSelectionMode(JFileChooser.OPEN_DIALOG);
+                fc.setFileFilter(new FileFilter() {
+
+                    @Override
+                    public String getDescription() {
+                        return "Fichier de calibration (*.map)";
+                    }
+
+                    @Override
+                    public boolean accept(File f) {
+                        if (f.isDirectory()) {
+                            return true;
+                        }
+                        return f.getName().toLowerCase().endsWith("map");
+                    }
+                });
+                final int reponse = fc.showOpenDialog(Ihm.this);
+                if (reponse == JFileChooser.APPROVE_OPTION) {
+                    addMapWindow(new MapCal(fc.getSelectedFile()));
+                }
+
+            }
+        });
+        btOpenMap.setEnabled(true);
+        btOpenMap.setToolTipText("Ouvrir un fichier de calibration");
+        bar.add(btOpenMap);
+
+        bar.addSeparator(new Dimension(20, 32));
 
         JButton btAddWindow = new JButton(new AbstractAction(null, new ImageIcon(getClass().getResource(ICON_ADD_WINDOW))) {
 
@@ -385,7 +426,7 @@ public final class Ihm extends JFrame {
             @Override
             public void actionPerformed(ActionEvent arg0) {
 
-                addWindow();
+                addChartWindow();
 
             }
         });
@@ -407,6 +448,21 @@ public final class Ihm extends JFrame {
         btNewPlot.setEnabled(true);
         btNewPlot.setToolTipText("Nouveau graphique");
         bar.add(btNewPlot);
+
+        JButton btNewTable = new JButton(new AbstractAction(null, new ImageIcon(getClass().getResource(ICON_NEW_TABLE))) {
+
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public void actionPerformed(ActionEvent arg0) {
+
+                DataTable table = addTableWindow();
+
+            }
+        });
+        btNewTable.setEnabled(true);
+        btNewTable.setToolTipText("Nouvelle table");
+        bar.add(btNewTable);
 
         final JToggleButton btSynchro = new JToggleButton(new ImageIcon(getClass().getResource(ICON_SHARE_AXIS)));
         btSynchro.setToolTipText("Synchroniser les axes des abcisses");
@@ -473,7 +529,7 @@ public final class Ihm extends JFrame {
         gbc.gridy = 0;
         gbc.gridwidth = 4;
         gbc.gridheight = 1;
-        gbc.weightx = 0;
+        gbc.weightx = 1;
         gbc.weighty = 0;
         gbc.insets = new Insets(0, 5, 0, 0);
         gbc.anchor = GridBagConstraints.FIRST_LINE_START;
@@ -495,12 +551,13 @@ public final class Ihm extends JFrame {
         gbc.gridy = 1;
         gbc.gridwidth = 1;
         gbc.gridheight = 1;
-        gbc.weightx = 5;
+        gbc.weightx = 15;
         gbc.weighty = 0;
         gbc.insets = new Insets(0, 5, 0, 0);
         gbc.anchor = GridBagConstraints.FIRST_LINE_START;
         listVoie.setDragEnabled(true);
-        root.add(new JScrollPane(listVoie), gbc);
+        scrollListVoie = new JScrollPane(listVoie);
+        root.add(scrollListVoie, gbc);
 
         tabbedPane = new JTabbedPane();
         tabbedPane.setBorder(BorderFactory.createEtchedBorder());
@@ -510,7 +567,7 @@ public final class Ihm extends JFrame {
         gbc.gridy = 1;
         gbc.gridwidth = 1;
         gbc.gridheight = 1;
-        gbc.weightx = 90;
+        gbc.weightx = 70;
         gbc.weighty = 1;
         gbc.insets = new Insets(0, 0, 0, 0);
         gbc.anchor = GridBagConstraints.FIRST_LINE_START;
@@ -522,9 +579,16 @@ public final class Ihm extends JFrame {
             public void stateChanged(ChangeEvent e) {
                 int idx = tabbedPane.getSelectedIndex();
                 if (idx > -1) {
-                    ChartView chartView = (ChartView) tabbedPane.getComponentAt(idx);
-                    ((DataValueModel) tableCursorValues.getModel()).changeList(chartView.getMeasures());
-                    chartView.updateTableValue();
+                    if (tabbedPane.getComponentAt(idx) instanceof ChartView) {
+                        scrollListVoie.setVisible(true);
+                        scrollTableCursorValues.setVisible(true);
+                        ChartView chartView = (ChartView) tabbedPane.getComponentAt(idx);
+                        ((DataValueModel) tableCursorValues.getModel()).changeList(chartView.getMeasures());
+                        chartView.updateTableValue();
+                    } else if (tabbedPane.getComponentAt(idx) instanceof MapView) {
+                        scrollListVoie.setVisible(false);
+                        scrollTableCursorValues.setVisible(false);
+                    }
                 } else {
                     ((DataValueModel) tableCursorValues.getModel()).changeList(Collections.<String> emptySet());
                 }
@@ -538,11 +602,12 @@ public final class Ihm extends JFrame {
         gbc.gridy = 1;
         gbc.gridwidth = 1;
         gbc.gridheight = 1;
-        gbc.weightx = 5;
+        gbc.weightx = 15;
         gbc.weighty = 1;
         gbc.insets = new Insets(0, 0, 0, 5);
         gbc.anchor = GridBagConstraints.FIRST_LINE_START;
-        root.add(new JScrollPane(tableCursorValues), gbc);
+        scrollTableCursorValues = new JScrollPane(tableCursorValues);
+        root.add(scrollTableCursorValues, gbc);
 
         labelFnr = new JLabel("Fournisseur du log : ");
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -606,6 +671,7 @@ public final class Ihm extends JFrame {
                 }
 
                 for (Measure formule : listFormula) {
+                    log.getMeasures().add(formule);
                     ((Formula) formule).calculate(log);
                     listModel.addElement(formule);
                 }
@@ -620,7 +686,33 @@ public final class Ihm extends JFrame {
         }
     }
 
-    private final ChartView addWindow() {
+    private final void addMapWindow(MapCal mapCal) {
+
+        MapView mapView = new MapView(mapCal);
+        tabbedPane.addTab(mapCal.getName(), mapView);
+        tabbedPane.setTabComponentAt(tabbedPane.getTabCount() - 1, new ButtonTabComponent(tabbedPane));
+        tabbedPane.setSelectedIndex(tabbedPane.getTabCount() - 1);
+
+    }
+
+    private final DataTable addTableWindow() {
+        String defaultName = "Fenetre_" + tabbedPane.getTabCount();
+        String windowName = JOptionPane.showInputDialog(Ihm.this, "Nom de la fenetre :", defaultName);
+        if (windowName == null) {
+            return null;
+        }
+        if ("".equals(windowName)) {
+            windowName = defaultName;
+        }
+        DataTable table = new DataTable(null);
+        tabbedPane.addTab(windowName, table);
+        tabbedPane.setTabComponentAt(tabbedPane.getTabCount() - 1, new ButtonTabComponent(tabbedPane));
+        tabbedPane.setSelectedIndex(tabbedPane.getTabCount() - 1);
+
+        return table;
+    }
+
+    private final ChartView addChartWindow() {
 
         ChartView chartView = new ChartView();
         chartView.addObservateur(tableCursorValues);
@@ -696,12 +788,14 @@ public final class Ihm extends JFrame {
         if (!listModel.contains(newMeasure)) {
             listModel.addElement(newMeasure);
             listFormula.add(newMeasure);
+            log.getMeasures().add(newMeasure);
         }
     }
 
     public final void deleteMeasure(Measure newMeasure) {
         listModel.removeElement(newMeasure);
         listFormula.remove(newMeasure);
+        log.getMeasures().remove(newMeasure);
     }
 
     private final void directToPlot() {
@@ -736,10 +830,10 @@ public final class Ihm extends JFrame {
         if (idxWindow > -1) {
             chartView = (ChartView) tabbedPane.getComponentAt(idxWindow);
             if (chartView.getPlot().getSubplots().size() > 0) {
-                chartView = addWindow();
+                chartView = addChartWindow();
             }
         } else {
-            chartView = addWindow();
+            chartView = addChartWindow();
         }
 
         if (chartView != null) {
@@ -783,83 +877,86 @@ public final class Ihm extends JFrame {
         final int nbPoint = temps.size();
 
         for (int n = 0; n < nbTab; n++) {
-            chartView = (ChartView) tabbedPane.getComponentAt(n);
-            for (Object plot : chartView.getPlot().getSubplots()) {
-                xyPlot = (XYPlot) plot;
-                int nbSerie = xyPlot.getSeriesCount();
+            if (tabbedPane.getComponentAt(n) instanceof ChartView) {
+                chartView = (ChartView) tabbedPane.getComponentAt(n);
+                for (Object plot : chartView.getPlot().getSubplots()) {
+                    xyPlot = (XYPlot) plot;
+                    int nbSerie = xyPlot.getSeriesCount();
 
-                for (int nSerie = 0; nSerie < nbSerie; nSerie++) {
+                    for (int nSerie = 0; nSerie < nbSerie; nSerie++) {
 
-                    if (xyPlot.getDataset() instanceof XYSeriesCollection) {
-                        serie = ((XYSeriesCollection) xyPlot.getDataset()).getSeries(nSerie);
+                        if (xyPlot.getDataset() instanceof XYSeriesCollection) {
+                            serie = ((XYSeriesCollection) xyPlot.getDataset()).getSeries(nSerie);
 
-                        serie.clear();
+                            serie.clear();
 
-                        key = serie.getKey();
+                            key = serie.getKey();
 
-                        measure = pickMeasureFromList(key.toString());
+                            measure = pickMeasureFromList(key.toString());
 
-                        final int sizeData = measure.getData().size();
+                            final int sizeData = measure.getData().size();
 
-                        for (int n1 = 0; n1 < nbPoint; n1++) {
+                            for (int n1 = 0; n1 < nbPoint; n1++) {
 
-                            if (n1 < sizeData) {
-                                serie.add(temps.get(n1), measure.getData().get(n1), false);
+                                if (n1 < sizeData) {
+                                    serie.add(temps.get(n1), measure.getData().get(n1), false);
+                                }
                             }
-                        }
 
-                        serie.fireSeriesChanged();
-                        xyPlot.configureRangeAxes();
-                    } else if (xyPlot.getDataset() instanceof DefaultXYZDataset) {
-                        Comparable<?> serieKey = ((DefaultXYZDataset) xyPlot.getDataset()).getSeriesKey(nSerie);
+                            serie.fireSeriesChanged();
+                            xyPlot.configureRangeAxes();
+                        } else if (xyPlot.getDataset() instanceof DefaultXYZDataset) {
+                            Comparable<?> serieKey = ((DefaultXYZDataset) xyPlot.getDataset()).getSeriesKey(nSerie);
 
-                        String xLabel = xyPlot.getDomainAxis().getLabel();
-                        String yLabel = xyPlot.getRangeAxis().getLabel();
-                        String zLabel = ((PaintScaleLegend) chartView.getChart().getSubtitle(0)).getAxis().getLabel();
+                            String xLabel = xyPlot.getDomainAxis().getLabel();
+                            String yLabel = xyPlot.getRangeAxis().getLabel();
+                            String zLabel = ((PaintScaleLegend) chartView.getChart().getSubtitle(0)).getAxis().getLabel();
 
-                        Measure xMeasure = pickMeasureFromList(xLabel);
-                        Measure yMeasure = pickMeasureFromList(yLabel);
-                        Measure zMeasure = pickMeasureFromList(zLabel);
+                            Measure xMeasure = pickMeasureFromList(xLabel);
+                            Measure yMeasure = pickMeasureFromList(yLabel);
+                            Measure zMeasure = pickMeasureFromList(zLabel);
 
-                        XYShapeRenderer renderer = (XYShapeRenderer) xyPlot.getRenderer();
-                        ColorPaintScale scale = ((ColorPaintScale) renderer.getPaintScale());
+                            XYShapeRenderer renderer = (XYShapeRenderer) xyPlot.getRenderer();
+                            ColorPaintScale scale = ((ColorPaintScale) renderer.getPaintScale());
 
-                        double delta = zMeasure.getMax() - zMeasure.getMin();
-                        double min;
-                        double max;
+                            double delta = zMeasure.getMax() - zMeasure.getMin();
+                            double min;
+                            double max;
 
-                        if (delta == 0) {
-                            double offset = Math.abs(zMeasure.getMax() / 100);
-                            min = zMeasure.getMin() - offset;
-                            max = zMeasure.getMax() + offset;
+                            if (delta == 0) {
+                                double offset = Math.abs(zMeasure.getMax() / 100);
+                                min = zMeasure.getMin() - offset;
+                                max = zMeasure.getMax() + offset;
+                            } else {
+                                min = zMeasure.getMin();
+                                max = zMeasure.getMax();
+                            }
+
+                            scale.setBounds(min, max);
+                            ((PaintScaleLegend) chartView.getChart().getSubtitle(0)).getAxis().setRange(scale.getLowerBound(), scale.getUpperBound());
+
+                            ((DefaultXYZDataset) xyPlot.getDataset()).addSeries(serieKey,
+                                    new double[][] { xMeasure.getDouleValue(), yMeasure.getDouleValue(), zMeasure.getDouleValue() });
                         } else {
-                            min = zMeasure.getMin();
-                            max = zMeasure.getMax();
+                            Comparable<?> serieKey = ((DefaultXYDataset) xyPlot.getDataset()).getSeriesKey(nSerie);
+
+                            String xLabel = xyPlot.getDomainAxis().getLabel();
+                            String yLabel = xyPlot.getRangeAxis().getLabel();
+
+                            Measure xMeasure = pickMeasureFromList(xLabel);
+                            Measure yMeasure = pickMeasureFromList(yLabel);
+
+                            ((DefaultXYDataset) xyPlot.getDataset()).addSeries(serieKey,
+                                    new double[][] { xMeasure.getDouleValue(), yMeasure.getDouleValue() });
+
                         }
-
-                        scale.setBounds(min, max);
-                        ((PaintScaleLegend) chartView.getChart().getSubtitle(0)).getAxis().setRange(scale.getLowerBound(), scale.getUpperBound());
-
-                        ((DefaultXYZDataset) xyPlot.getDataset()).addSeries(serieKey,
-                                new double[][] { xMeasure.getDouleValue(), yMeasure.getDouleValue(), zMeasure.getDouleValue() });
-                    } else {
-                        Comparable<?> serieKey = ((DefaultXYDataset) xyPlot.getDataset()).getSeriesKey(nSerie);
-
-                        String xLabel = xyPlot.getDomainAxis().getLabel();
-                        String yLabel = xyPlot.getRangeAxis().getLabel();
-
-                        Measure xMeasure = pickMeasureFromList(xLabel);
-                        Measure yMeasure = pickMeasureFromList(yLabel);
-
-                        ((DefaultXYDataset) xyPlot.getDataset()).addSeries(serieKey,
-                                new double[][] { xMeasure.getDouleValue(), yMeasure.getDouleValue() });
 
                     }
-
                 }
+                chartView.getPlot().configureDomainAxes();
             }
-            chartView.getPlot().configureDomainAxes();
         }
+
     }
 
     private final void saveConfig(File file) {
@@ -930,6 +1027,13 @@ public final class Ihm extends JFrame {
 
             @SuppressWarnings("unchecked")
             Set<Measure> list = (Set<Measure>) ois.readObject();
+
+            if (log != null) {
+                for (Measure formule : list) {
+                    log.getMeasures().add(formule);
+                    listModel.addElement(formule);
+                }
+            }
 
             for (Measure formule : list) {
                 ((Formula) formule).deserialize();

@@ -5,8 +5,9 @@ package gui;
 
 import java.awt.Toolkit;
 import java.io.BufferedReader;
-import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 
 import javax.swing.JDialog;
 import javax.swing.JEditorPane;
@@ -31,7 +32,9 @@ public final class DialNotice extends JDialog {
 
         String line;
 
-        try (BufferedReader br = new BufferedReader(new FileReader(getClass().getResource(NOTICE).getFile()))) {
+        InputStream is = getClass().getResourceAsStream(NOTICE);
+
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(is))) {
             while ((line = br.readLine()) != null) {
                 content.append(line + "\n");
             }

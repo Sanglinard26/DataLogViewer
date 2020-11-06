@@ -18,6 +18,7 @@ import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.renderer.xy.XYItemRenderer;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
 import org.jfree.chart.renderer.xy.XYShapeRenderer;
+import org.jfree.data.Range;
 import org.jfree.data.xy.XYSeriesCollection;
 
 abstract class DialogFactory {
@@ -33,7 +34,7 @@ final class DialogProperties extends JPanel
 
     public DialogProperties(CombinedDomainXYPlot combinedplot) {
 
-        model = new DefaultTableModel(new String[] { "Serie", "Couleur", "Taille", "Supprimer?" }, 0) {
+        model = new DefaultTableModel(new String[] { "Serie", "Couleur", "Taille", "Plage Y", "Supprimer?" }, 0) {
             private static final long serialVersionUID = 1L;
 
             @Override
@@ -46,6 +47,8 @@ final class DialogProperties extends JPanel
                 case 2:
                     return Float.class;
                 case 3:
+                    return String.class;
+                case 4:
                     return Boolean.class;
                 default:
                     return String.class;
@@ -70,10 +73,14 @@ final class DialogProperties extends JPanel
         XYPlot xyPlot;
         Comparable<?> key;
         XYItemRenderer renderer;
+        Range yRange;
 
         for (Object plot : combinedplot.getSubplots()) {
             xyPlot = (XYPlot) plot;
             int nbSerie = xyPlot.getSeriesCount();
+
+            yRange = xyPlot.getRangeAxis().getRange();
+            String txtYRange = yRange.getLowerBound() + ";" + yRange.getUpperBound();
 
             renderer = xyPlot.getRenderer();
 
@@ -83,7 +90,7 @@ final class DialogProperties extends JPanel
                     key = xyPlot.getDataset().getSeriesKey(nSerie);
 
                     model.addRow(new Object[] { key, (Color) renderer.getSeriesPaint(nSerie),
-                            ((BasicStroke) renderer.getSeriesStroke(nSerie)).getLineWidth(), Boolean.FALSE });
+                            ((BasicStroke) renderer.getSeriesStroke(nSerie)).getLineWidth(), txtYRange, Boolean.FALSE });
 
                 }
             } else {
@@ -93,7 +100,7 @@ final class DialogProperties extends JPanel
                 XYShapeRenderer shapeRenderer = (XYShapeRenderer) renderer;
 
                 model.addRow(new Object[] { key, (Color) renderer.getSeriesPaint(0), ((Ellipse2D) shapeRenderer.getBaseShape()).getHeight(),
-                        Boolean.FALSE });
+                        txtYRange, Boolean.FALSE });
             }
 
         }
@@ -108,11 +115,26 @@ final class DialogProperties extends JPanel
         for (int i = 0; i < model.getRowCount(); i++) {
             serieName = model.getValueAt(i, 0).toString();
 
-            boolean delete = (boolean) model.getValueAt(i, 3);
+            boolean delete = (boolean) model.getValueAt(i, 4);
             Color color;
 
             for (Object plot : combinedplot.getSubplots()) {
                 xyPlot = (XYPlot) plot;
+
+                String[] splitRange = model.getValueAt(i, 3).toString().split(";");
+                if (splitRange.length == 2) {
+                    try {
+                        double lowerBound = Double.parseDouble(splitRange[0]);
+                        double upperBound = Double.parseDouble(splitRange[1]);
+                        Range newRange = new Range(lowerBound, upperBound);
+                        if (!xyPlot.getRangeAxis().getRange().equals(newRange)) {
+                            xyPlot.getRangeAxis().setRange(newRange);
+                        }
+
+                    } catch (NumberFormatException e) {
+                        // TODO: handle exception
+                    }
+                }
 
                 if (xyPlot.getRenderer() instanceof XYShapeRenderer) {
                     if (delete) {
