@@ -456,7 +456,7 @@ public final class Ihm extends JFrame {
             @Override
             public void actionPerformed(ActionEvent arg0) {
 
-                DataTable table = addTableWindow();
+                CalTable table = addTableWindow();
 
             }
         });
@@ -590,6 +590,8 @@ public final class Ihm extends JFrame {
                         scrollTableCursorValues.setVisible(false);
                     }
                 } else {
+                    scrollListVoie.setVisible(true);
+                    scrollTableCursorValues.setVisible(true);
                     ((DataValueModel) tableCursorValues.getModel()).changeList(Collections.<String> emptySet());
                 }
             }
@@ -695,7 +697,7 @@ public final class Ihm extends JFrame {
 
     }
 
-    private final DataTable addTableWindow() {
+    private final CalTable addTableWindow() {
         String defaultName = "Fenetre_" + tabbedPane.getTabCount();
         String windowName = JOptionPane.showInputDialog(Ihm.this, "Nom de la fenetre :", defaultName);
         if (windowName == null) {
@@ -704,7 +706,7 @@ public final class Ihm extends JFrame {
         if ("".equals(windowName)) {
             windowName = defaultName;
         }
-        DataTable table = new DataTable(null);
+        CalTable table = new CalTable(null);
         tabbedPane.addTab(windowName, table);
         tabbedPane.setTabComponentAt(tabbedPane.getTabCount() - 1, new ButtonTabComponent(tabbedPane));
         tabbedPane.setSelectedIndex(tabbedPane.getTabCount() - 1);
@@ -963,29 +965,31 @@ public final class Ihm extends JFrame {
 
         try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(file))) {
             int nbTab = tabbedPane.getTabCount();
-            Map<String, JFreeChart> listChart = new LinkedHashMap<String, JFreeChart>(nbTab);
+            Map<String, JFreeChart> listChart = new LinkedHashMap<String, JFreeChart>();
 
             for (int i = 0; i < nbTab; i++) {
-                JFreeChart chart = ((ChartView) tabbedPane.getComponentAt(i)).getChart();
-                @SuppressWarnings("unchecked")
-                List<XYPlot> subPlots = ((CombinedDomainXYPlot) chart.getXYPlot()).getSubplots();
-                for (XYPlot subplot : subPlots) {
-                    int nbSerie = subplot.getDataset().getSeriesCount();
-                    for (int j = 0; j < nbSerie; j++) {
-                        if (subplot.getDataset() instanceof XYSeriesCollection) {
-                            ((XYSeriesCollection) subplot.getDataset()).getSeries(j).clear();
-                        } else if (subplot.getDataset() instanceof DefaultXYZDataset) {
-                            Comparable<?> serieKey = ((DefaultXYZDataset) subplot.getDataset()).getSeriesKey(j);
-                            ((DefaultXYZDataset) subplot.getDataset()).removeSeries(serieKey);
-                            ((DefaultXYZDataset) subplot.getDataset()).addSeries(serieKey, new double[3][1]);
-                        } else {
-                            Comparable<?> serieKey = ((DefaultXYDataset) subplot.getDataset()).getSeriesKey(j);
-                            ((DefaultXYDataset) subplot.getDataset()).removeSeries(serieKey);
-                            ((DefaultXYDataset) subplot.getDataset()).addSeries(serieKey, new double[2][1]);
+                if (tabbedPane.getComponentAt(i) instanceof ChartView) {
+                    JFreeChart chart = ((ChartView) tabbedPane.getComponentAt(i)).getChart();
+                    @SuppressWarnings("unchecked")
+                    List<XYPlot> subPlots = ((CombinedDomainXYPlot) chart.getXYPlot()).getSubplots();
+                    for (XYPlot subplot : subPlots) {
+                        int nbSerie = subplot.getDataset().getSeriesCount();
+                        for (int j = 0; j < nbSerie; j++) {
+                            if (subplot.getDataset() instanceof XYSeriesCollection) {
+                                ((XYSeriesCollection) subplot.getDataset()).getSeries(j).clear();
+                            } else if (subplot.getDataset() instanceof DefaultXYZDataset) {
+                                Comparable<?> serieKey = ((DefaultXYZDataset) subplot.getDataset()).getSeriesKey(j);
+                                ((DefaultXYZDataset) subplot.getDataset()).removeSeries(serieKey);
+                                ((DefaultXYZDataset) subplot.getDataset()).addSeries(serieKey, new double[3][1]);
+                            } else {
+                                Comparable<?> serieKey = ((DefaultXYDataset) subplot.getDataset()).getSeriesKey(j);
+                                ((DefaultXYDataset) subplot.getDataset()).removeSeries(serieKey);
+                                ((DefaultXYDataset) subplot.getDataset()).addSeries(serieKey, new double[2][1]);
+                            }
                         }
                     }
+                    listChart.put(tabbedPane.getTitleAt(i), chart);
                 }
-                listChart.put(tabbedPane.getTitleAt(i), chart);
             }
 
             oos.writeObject(listChart);

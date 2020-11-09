@@ -6,8 +6,6 @@ package gui;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -29,7 +27,7 @@ public final class MapView extends JPanel {
     private static final long serialVersionUID = 1L;
 
     private final JList<Variable> listVariable;
-    private DataTable dataTable;
+    private CalTable dataTable;
     private SurfaceChart surfaceChart;
     private JSplitPane splitPane;
 
@@ -42,27 +40,6 @@ public final class MapView extends JPanel {
 
         splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, true);
         splitPane.setOneTouchExpandable(true);
-
-        splitPane.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY, new PropertyChangeListener() {
-            @Override
-            public void propertyChange(PropertyChangeEvent pce) {
-                float newVal = Float.parseFloat(pce.getNewValue().toString());
-                float oldVal = Float.parseFloat(pce.getOldValue().toString());
-                // System.out.println("oldVal=" + oldVal + ", newVal=" + newVal);
-                if (oldVal < 0) {
-                    return;
-                }
-                float oldHeight = splitPane.getHeight() - oldVal;
-                float newHeight = splitPane.getHeight() - newVal;
-                float gain = Math.min(1 + ((newHeight - oldHeight) / oldHeight), 1.5f);
-                // float gain = 1 + ((newHeight - oldHeight) / oldHeight);
-                // System.out.println("gain=" + gain);
-                // Projector proj = surfaceChart.getArraySurfaceModel().getProjector();
-                // System.out.println("oldScal=" + proj.get2DScaling());
-                // proj.set2DScaling(proj.get2DScaling() * gain);
-                // System.out.println("newScal=" + proj.get2DScaling());
-            }
-        });
 
         gbc.fill = GridBagConstraints.BOTH;
         gbc.gridx = 1;
@@ -96,13 +73,12 @@ public final class MapView extends JPanel {
             public void valueChanged(ListSelectionEvent e) {
                 if (listVariable.getSelectedIndex() > -1 && !e.getValueIsAdjusting()) {
                     Variable variable = listVariable.getSelectedValue();
-                    // variable.printInfo();
+
                     remove(dataTable);
-                    dataTable = new DataTable(variable);
+                    dataTable = new CalTable(variable);
                     splitPane.setTopComponent(dataTable);
                     revalidate();
                     repaint();
-                    Projector proj = surfaceChart.getArraySurfaceModel().getProjector();
 
                     splitPane.setDividerLocation(dataTable.getTableHeight());
 
@@ -112,7 +88,7 @@ public final class MapView extends JPanel {
             }
         });
 
-        dataTable = new DataTable(null);
+        dataTable = new CalTable(null);
         splitPane.setTopComponent(dataTable);
 
         surfaceChart = new SurfaceChart();

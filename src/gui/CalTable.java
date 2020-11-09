@@ -24,7 +24,7 @@ import javax.swing.table.TableColumnModel;
 
 import calib.Variable;
 
-public class DataTable extends JPanel {
+public class CalTable extends JPanel {
 
     private static final long serialVersionUID = 1L;
 
@@ -32,7 +32,7 @@ public class DataTable extends JPanel {
     private RowNumberTable rowTable;
     JScrollPane scrollPane;
 
-    public DataTable(Variable variable) {
+    public CalTable(Variable variable) {
         super();
 
         if (variable == null) {
@@ -68,7 +68,6 @@ public class DataTable extends JPanel {
 
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
         scrollPane.setRowHeaderView(rowTable);
-        // scrollPane.setCorner(ScrollPaneConstants.UPPER_LEFT_CORNER, new JButton("bt"));
 
         populate(variable);
 
@@ -182,6 +181,7 @@ public class DataTable extends JPanel {
             }
         }
         adjustCells();
+
     }
 
     private final void adjustCells() {
