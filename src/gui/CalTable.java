@@ -6,15 +6,33 @@ package gui;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.StringSelection;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
 import java.util.Arrays;
 
 import javax.swing.BorderFactory;
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JTextField;
+import javax.swing.JToggleButton;
+import javax.swing.JToolBar;
 import javax.swing.SwingConstants;
+import javax.swing.border.MatteBorder;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.table.JTableHeader;
@@ -23,6 +41,7 @@ import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
 
 import calib.Variable;
+import utils.Interpolation;
 
 public class CalTable extends JPanel {
 
@@ -30,14 +49,26 @@ public class CalTable extends JPanel {
 
     private JTable table;
     private RowNumberTable rowTable;
-    JScrollPane scrollPane;
+    private BarControl control;
+    private JScrollPane scrollPane;
+    private Variable variable;
+    private JTableHeader header;
+    private JPopupMenu renamePopup;
+    private JTextField text;
+    private TableColumn column;
+    private int rowBrkPt;
 
     public CalTable(Variable variable) {
-        super();
+        super(new BorderLayout(0, 0));
+
+        control = new BarControl();
+        add(control, BorderLayout.NORTH);
 
         if (variable == null) {
             return;
         }
+
+        this.variable = variable;
 
         int nbRow = variable.getDimY();
         int nbCol = variable.getDimX();
@@ -54,14 +85,26 @@ public class CalTable extends JPanel {
             break;
         }
 
-        setLayout(new BorderLayout());
-
         table = new JTable(nbRow, nbCol);
+
         table.setTableHeader(new CustomTableHeader(table));
-        table.getTableHeader().setDefaultRenderer(new SimpleHeaderRenderer());
+        header = table.getTableHeader();
+        header.setDefaultRenderer(new SimpleHeaderRenderer());
         table.setCellSelectionEnabled(true);
         table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         table.getTableHeader().setReorderingAllowed(false);
+
+        text = new JTextField();
+        text.setBorder(null);
+        text.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                changeBreakPoint();
+            }
+        });
+
+        renamePopup = new JPopupMenu();
+        renamePopup.setBorder(new MatteBorder(0, 1, 1, 1, Color.DARK_GRAY));
+        renamePopup.add(text);
 
         scrollPane = new JScrollPane(table);
         rowTable = new RowNumberTable(table);
@@ -75,10 +118,92 @@ public class CalTable extends JPanel {
 
     }
 
-    public final int getTableHeight() {
+    private void editColumnAt(Point p) {
+        int columnIndex = header.columnAtPoint(p);
+
+        if (columnIndex != -1) {
+            column = header.getColumnModel().getColumn(columnIndex);
+            Rectangle columnRectangle = header.getHeaderRect(columnIndex);
+
+            text.setText(column.getHeaderValue().toString());
+            renamePopup.setPreferredSize(new Dimension(columnRectangle.width, columnRectangle.height - 1));
+            renamePopup.show(header, columnRectangle.x, 0);
+
+            text.requestFocusInWindow();
+            text.selectAll();
+        }
+    }
+
+    private void editRowAt(Point p) {
+        rowBrkPt = rowTable.rowAtPoint(p);
+
+        if (rowBrkPt != -1) {
+            Rectangle rowRectangle = rowTable.getCellRect(rowBrkPt, 0, false);
+            text.setText(rowTable.getValueAt(rowBrkPt, 0).toString());
+            renamePopup.setPreferredSize(new Dimension(rowRectangle.width, rowRectangle.height - 1));
+            renamePopup.show(rowTable, rowRectangle.x, rowRectangle.y);
+
+            text.requestFocusInWindow();
+            text.selectAll();
+        }
+    }
+
+    private void changeBreakPoint() {
+        if (column != null) {
+            column.setHeaderValue(text.getText());
+            header.repaint();
+        } else {
+            if (rowBrkPt != -1) {
+                rowTable.setValueAt(text.getText(), rowBrkPt, 0);
+            }
+        }
+        renamePopup.setVisible(false);
+        calcZvalue();
+    }
+
+    public final void calcZvalue() {
+
+        final double[][] datasTable = getTableDoubleValue();
+        double result = Double.NaN;
+
+        for (int row = 0; row < table.getRowCount(); row++) {
+
+            if (variable.getDimY() > 2) {
+                for (int x = 1; x < variable.getDimX(); x++) {
+                    result = Interpolation.interpLinear2D(variable.toDouble2D(), datasTable[0][x], datasTable[row + 1][0]);
+                    int diff = Double.compare(result, Double.parseDouble(table.getValueAt(row, x - 1).toString()));
+                    if (diff > 0) {
+                        System.out.println("augmente");
+                    } else if (diff < 0) {
+                        System.out.println("diminue");
+                    } else {
+                        System.out.println("égale");
+                    }
+                    table.setValueAt(result, row, x - 1);
+                }
+            }
+
+            if (variable.getDimY() == 2) {
+                for (int x = 0; x < variable.getDimX(); x++) {
+                    result = Interpolation.interpLinear1D(variable.toDouble2D(), datasTable[0][x]);
+                    int diff = Double.compare(result, Double.parseDouble(table.getValueAt(0, x).toString()));
+                    if (diff > 0) {
+                        System.out.println("augmente");
+                    } else if (diff < 0) {
+                        System.out.println("diminue");
+                    } else {
+                        System.out.println("égale");
+                    }
+                    table.setValueAt(result, 0, x);
+                }
+            }
+        }
+    }
+
+    public final int getComponentHeight() {
         int hBarVisible = scrollPane.getHorizontalScrollBar().isVisible() ? 1 : 0;
         int dataHeight = (table.getRowCount() + 1 + hBarVisible * 1) * (table.getRowHeight() + table.getRowMargin() + 1);
-        return dataHeight;
+        return dataHeight + control.getPreferredSize().height;
     }
 
     public class CustomTableHeader extends JTableHeader {
@@ -136,7 +261,6 @@ public class CalTable extends JPanel {
 
             return this;
         }
-
     }
 
     public final void populate(Variable variable) {
@@ -209,6 +333,155 @@ public class CalTable extends JPanel {
             column.setPreferredWidth(maxWidth + 5);
         }
 
+    }
+
+    private class MyMouseListener extends MouseAdapter {
+        @Override
+        public void mouseClicked(MouseEvent event) {
+            if (event.getClickCount() == 2) {
+                if (event.getComponent() instanceof CustomTableHeader) {
+                    editColumnAt(event.getPoint());
+                } else {
+                    column = null;
+                    editRowAt(event.getPoint());
+                }
+
+            }
+        }
+    }
+
+    private final double[][] getTableDoubleValue() {
+
+        final TableColumnModel columnModel = table.getColumnModel();
+        final int nbCol = columnModel.getColumnCount();
+        final int nbRow = table.getRowCount();
+
+        if (nbCol * nbRow <= 1) {
+            return new double[][] { { Double.parseDouble(table.getValueAt(0, 0).toString()) } };
+        }
+
+        double[][] doubleValues = new double[variable.getDimY()][variable.getDimX()];
+
+        doubleValues[0][0] = Double.NaN;
+
+        if (variable.getDimY() > 2) {
+            for (int col = 0; col < nbCol; col++) {
+                doubleValues[0][col + 1] = Double.parseDouble(columnModel.getColumn(col).getHeaderValue().toString());
+            }
+            for (int row = 0; row < nbRow; row++) {
+                doubleValues[row + 1][0] = Double.parseDouble(rowTable.getValueAt(row, 0).toString());
+            }
+            for (int row = 0; row < nbRow; row++) {
+                for (int col = 0; col < nbCol; col++) {
+                    doubleValues[row + 1][col + 1] = Double.parseDouble(table.getValueAt(row, col).toString());
+                }
+            }
+        } else {
+            for (int col = 0; col < nbCol; col++) {
+                doubleValues[0][col] = Double.parseDouble(columnModel.getColumn(col).getHeaderValue().toString());
+                doubleValues[1][col] = Double.parseDouble(table.getValueAt(0, col).toString());
+            }
+        }
+
+        return doubleValues;
+
+    }
+
+    private final String getTableValue() {
+        final TableColumnModel columnModel = table.getColumnModel();
+        final int nbCol = columnModel.getColumnCount();
+        final int nbRow = table.getRowCount();
+
+        final int startCol = nbRow > 1 ? -1 : 0;
+        final int startRow = nbCol > 1 ? -1 : 0;
+
+        StringBuilder sb = new StringBuilder();
+
+        if (nbCol * nbRow <= 1) {
+            sb.append(table.getValueAt(0, 0));
+            return sb.toString();
+        }
+
+        for (int row = startRow; row < nbRow; row++) {
+            for (int col = startCol; col < nbCol; col++) {
+
+                if (row == -1 && col == -1) {
+                    sb.append("Y \\ X" + "\t");
+                }
+                if (row == -1 && col > -1) {
+                    sb.append(columnModel.getColumn(col).getHeaderValue() + "\t");
+                }
+                if (col == -1 && row > -1) {
+                    sb.append(rowTable.getValueAt(row, 0) + "\t");
+                }
+                if (row > -1 && col > -1) {
+                    sb.append(table.getValueAt(row, col) + "\t");
+                }
+            }
+            sb.append("\n");
+        }
+        return sb.toString();
+    }
+
+    private final class BarControl extends JToolBar {
+
+        private static final long serialVersionUID = 1L;
+
+        final String ICON_COPY = "/icon_copy_24.png";
+
+        final String ICON_MATH = "/icon_math_24.png";
+
+        public BarControl() {
+            super();
+            setFloatable(false);
+            setBorder(BorderFactory.createEtchedBorder());
+
+            JButton btCopy = new JButton(null, new ImageIcon(getClass().getResource(ICON_COPY)));
+            btCopy.setToolTipText("Copier dans le presse-papier");
+            btCopy.addActionListener(new ActionListener() {
+
+                @Override
+                public void actionPerformed(ActionEvent e) {
+
+                    System.out.println(getTableValue());
+
+                    if (variable == null) {
+                        JOptionPane.showMessageDialog(null, "Il faut qu'une variable soit sélectionnée !", "Info", JOptionPane.INFORMATION_MESSAGE);
+                        return;
+                    }
+
+                    Clipboard clipboard = getToolkit().getSystemClipboard();
+                    StringSelection data = new StringSelection(getTableValue());
+                    clipboard.setContents(data, data);
+                }
+            });
+            add(btCopy);
+
+            final JToggleButton btInterpolation = new JToggleButton(null, new ImageIcon(getClass().getResource(ICON_MATH)));
+            btInterpolation.setToolTipText("Interpolation");
+            btInterpolation.addActionListener(new ActionListener() {
+
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    if (table == null) {
+                        return;
+                    }
+                    if (btInterpolation.isSelected()) {
+                        header.addMouseListener(new MyMouseListener());
+                        rowTable.addMouseListener(new MyMouseListener());
+                    } else {
+                        for (MouseListener listener : header.getMouseListeners()) {
+                            header.removeMouseListener(listener);
+                        }
+
+                        for (MouseListener listener : rowTable.getMouseListeners()) {
+                            rowTable.removeMouseListener(listener);
+                        }
+                    }
+                }
+            });
+            add(btInterpolation);
+        }
     }
 
 }

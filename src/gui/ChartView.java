@@ -57,6 +57,7 @@ public final class ChartView extends ChartPanel implements Observable {
 
     private final CombinedDomainXYPlot parentPlot;
     private Stroke oldStrokePlot;
+    private Point2D popUpLocation;
 
     private static double xValue = Double.NaN;
 
@@ -66,7 +67,7 @@ public final class ChartView extends ChartPanel implements Observable {
 
         super(null, 680, 420, 300, 200, 1920, 1080, true, false, false, false, false, false);
 
-        setPopupMenu(createPopupMenu());
+        setPopupMenu(createChartMenu());
 
         parentPlot = new CombinedDomainXYPlot();
 
@@ -86,11 +87,11 @@ public final class ChartView extends ChartPanel implements Observable {
 
     public ChartView(JFreeChart serializedChart) {
 
-        super(serializedChart, 680, 420, 300, 200, 1920, 1080, true, true, false, false, true, false);
+        super(serializedChart, 680, 420, 300, 200, 1920, 1080, true, false, false, false, true, false);
 
         setLayout(new BorderLayout());
 
-        setPopupMenu(createPopupMenu());
+        setPopupMenu(createChartMenu());
 
         this.parentPlot = (CombinedDomainXYPlot) serializedChart.getXYPlot();
         @SuppressWarnings("unchecked")
@@ -126,6 +127,9 @@ public final class ChartView extends ChartPanel implements Observable {
         @Override
         public void mouseReleased(MouseEvent e) {
             setDomainZoomable(true);
+            if (getPopupMenu().isVisible()) {
+                popUpLocation = translateScreenToJava2D(e.getPoint());
+            }
         }
 
         @Override
@@ -343,7 +347,7 @@ public final class ChartView extends ChartPanel implements Observable {
         }
     }
 
-    private final JPopupMenu createPopupMenu() {
+    private final JPopupMenu createChartMenu() {
 
         final String ICON_PROPERTIES = "/icon_editPlot_16.png";
 
@@ -446,13 +450,20 @@ public final class ChartView extends ChartPanel implements Observable {
 
         String command = event.getActionCommand();
 
+        XYPlot plot = parentPlot.findSubplot(getChartRenderingInfo().getPlotInfo(), popUpLocation);
+
+        if (plot == null) {
+            return;
+        }
+
         switch (command) {
         case "PROPERTIES":
             if (getDatasetType() > 0) {
-                DialogProperties propertiesPanel = new DialogProperties(parentPlot);
+
+                DialogProperties propertiesPanel = new DialogProperties(plot);
                 int res = JOptionPane.showConfirmDialog(this, propertiesPanel, "Propri\u00e9t\u00e9s", 2, -1);
                 if (res == JOptionPane.OK_OPTION) {
-                    propertiesPanel.updatePlot(this);
+                    propertiesPanel.updatePlot(this, plot);
                 }
             }
 

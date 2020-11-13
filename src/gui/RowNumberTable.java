@@ -18,9 +18,9 @@ import javax.swing.JViewport;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import javax.swing.event.TableModelEvent;
-import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
+import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 
 /*
@@ -155,11 +155,12 @@ public class RowNumberTable extends JTable implements ChangeListener, PropertyCh
     /*
      * Attempt to mimic the table header renderer
      */
-    private static class RowNumberRenderer extends DefaultTableCellRenderer {
+    private static class RowNumberRenderer extends JLabel implements TableCellRenderer {
         private static final long serialVersionUID = 1L;
 
         public RowNumberRenderer() {
             setHorizontalAlignment(JLabel.CENTER);
+            setOpaque(true);
         }
 
         public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {

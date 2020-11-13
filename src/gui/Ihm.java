@@ -456,7 +456,7 @@ public final class Ihm extends JFrame {
             @Override
             public void actionPerformed(ActionEvent arg0) {
 
-                CalTable table = addTableWindow();
+                addTableWindow();
 
             }
         });
@@ -486,6 +486,9 @@ public final class Ihm extends JFrame {
                     ValueAxis domainAxis = chartView.getPlot().getDomainAxis();
                     ChartView otherChart;
                     for (int i = 0; i < tabbedPane.getTabCount(); i++) {
+                        if (!(tabbedPane.getComponentAt(i) instanceof ChartView)) {
+                            continue;
+                        }
                         otherChart = (ChartView) tabbedPane.getComponentAt(i);
                         if (i == idxWindow || !log.getTime().getName().equals(otherChart.getPlot().getDomainAxis().getLabel())) {
                             continue;
@@ -497,6 +500,9 @@ public final class Ihm extends JFrame {
                     Measure time = log.getTime();
                     Range xAxisRange;
                     for (int i = 0; i < tabbedPane.getTabCount(); i++) {
+                        if (!(tabbedPane.getComponentAt(i) instanceof ChartView)) {
+                            continue;
+                        }
                         chartView = (ChartView) tabbedPane.getComponentAt(i);
                         if (!log.getTime().getName().equals(chartView.getPlot().getDomainAxis().getLabel())) {
                             continue;
@@ -1035,7 +1041,10 @@ public final class Ihm extends JFrame {
             if (log != null) {
                 for (Measure formule : list) {
                     log.getMeasures().add(formule);
-                    listModel.addElement(formule);
+                    int idx = listModel.indexOf(formule);
+                    if (idx < 0) {
+                        listModel.addElement(formule);
+                    }
                 }
             }
 

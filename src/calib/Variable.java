@@ -28,6 +28,19 @@ public final class Variable implements Comparable<Variable> {
         return name;
     }
 
+    public String getType() {
+        if (dimX * dimY == 1) {
+            return "scalaire";
+        }
+        if (dimY == 2) {
+            return "courbe";
+        }
+        if (dimY > 2) {
+            return "carto";
+        }
+        return "inconnu";
+    }
+
     @Override
     public String toString() {
         return this.name;
@@ -170,35 +183,37 @@ public final class Variable implements Comparable<Variable> {
 
     }
 
-    public final void print() {
-        System.out.print("\n" + this.name);
+    public final String toTxtTab() {
+        StringBuilder sb = new StringBuilder();
+        sb.append((this.name));
         if (dimX * dimY == 1) {
-            System.out.print("=" + values[0].toString());
-            System.out.print("\n");
+            sb.append("\n" + values[0].toString());
+            return sb.toString();
         }
         if (dimY == 2) {
-            System.out.print("=\n");
+            sb.append("\n");
             for (int i = 0; i < dimX; i++) {
-                System.out.print(getValue(0, i) + "\t");
+                sb.append(getValue(0, i) + "\t");
             }
-            System.out.print("\n");
+            sb.append("\n");
             for (int i = 0; i < dimX; i++) {
-                System.out.print(getValue(1, i) + "\t");
+                sb.append(getValue(1, i) + "\t");
             }
-            System.out.print("\n");
+            return sb.toString();
         }
 
         if (dimY > 2) {
-            System.out.print("=\n");
+            sb.append("\n");
 
             for (int row = 0; row < dimY; row++) {
                 for (int col = 0; col < dimX; col++) {
-                    System.out.print(getValue(row, col) + "\t");
+                    sb.append(getValue(row, col) + "\t");
                 }
-                System.out.print("\n");
+                sb.append("\n");
             }
-
+            return sb.toString();
         }
+        return "";
     }
 
     public final void printInfo() {
@@ -285,6 +300,26 @@ public final class Variable implements Comparable<Variable> {
         }
 
         return floatValues;
+    }
+
+    public final double[][] toDouble2D() {
+
+        double[][] doubleValues = new double[dimY][dimX];
+
+        for (short y = 0; y < dimY; y++) {
+            for (short x = 0; x < dimX; x++) {
+
+                if (getValue(y, x) instanceof Number) {
+                    doubleValues[y][x] = Double.parseDouble(getValue(y, x).toString());
+                } else {
+                    if (x * y != 0) {
+                        doubleValues[y][x] = Double.NaN;
+                    }
+                }
+            }
+        }
+
+        return doubleValues;
     }
 
 }
