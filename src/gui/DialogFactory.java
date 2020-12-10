@@ -6,15 +6,21 @@ package gui;
 import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Shape;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
 import java.awt.geom.Ellipse2D;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JColorChooser;
+import javax.swing.JComboBox;
 import javax.swing.JDialog;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -22,6 +28,7 @@ import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.table.DefaultTableModel;
 
+import org.jfree.chart.axis.ValueAxis;
 import org.jfree.chart.plot.CombinedDomainXYPlot;
 import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.renderer.xy.XYItemRenderer;
@@ -40,12 +47,15 @@ final class DialogProperties extends JPanel implements ActionListener
     private static final long serialVersionUID = 1L;
 
     private final DefaultTableModel model;
-    JTextField rangeTxt;
-    JButton btBackgroundColor;
-    JColorChooser colorChooser;
-    JDialog dialog;
+    private JTextField rangeX;
+    private JTextField rangeY;
+    private JButton btBackgroundColor;
+    private JColorChooser colorChooser;
+    private JDialog dialog;
+    private final JComboBox<String> axisList;
+    private Map<String, String> axisRange;
 
-    public DialogProperties(XYPlot xyPlot) {
+    public DialogProperties(final XYPlot xyPlot) {
 
         super(new BorderLayout());
         JPanel panel = new JPanel();
@@ -76,55 +86,101 @@ final class DialogProperties extends JPanel implements ActionListener
             }
         };
 
-        btBackgroundColor = new JButton("                               ");
+        JPanel panelBackground = new JPanel(new BorderLayout());
+        panelBackground.setBorder(BorderFactory.createTitledBorder("Couleur de fond"));
+        btBackgroundColor = new JButton(" ");
         btBackgroundColor.setActionCommand("edit");
         colorChooser = new JColorChooser();
-        dialog = JColorChooser.createDialog(btBackgroundColor, "Pick a Color", true, colorChooser, this, null);
+        dialog = JColorChooser.createDialog(btBackgroundColor, "Choix de couleur", true, colorChooser, this, null);
         btBackgroundColor.addActionListener(this);
 
         btBackgroundColor.setBackground((Color) xyPlot.getBackgroundPaint());
         btBackgroundColor.setContentAreaFilled(false);
         btBackgroundColor.setOpaque(true);
-        btBackgroundColor.setBorder(BorderFactory.createMatteBorder(2, 5, 2, 5, panel.getBackground()));
-        panel.add(btBackgroundColor);
+        btBackgroundColor.setBorder(BorderFactory.createEtchedBorder());
+        panelBackground.add(btBackgroundColor, BorderLayout.CENTER);
+        panel.add(panelBackground);
 
-        rangeTxt = new JTextField();
-        rangeTxt.setBorder(BorderFactory.createTitledBorder("Plage Y"));
-        panel.add(rangeTxt);
+        JPanel panelRangeX = new JPanel(new BorderLayout());
+        panelRangeX.setBorder(BorderFactory.createTitledBorder("Plage X"));
+        rangeX = new JTextField();
+        panelRangeX.add(rangeX, BorderLayout.CENTER);
+        panel.add(panelRangeX);
 
-        JTable table = new JTable(model);
+        JPanel panelRangeY = new JPanel(new BorderLayout());
+        panelRangeY.setBorder(BorderFactory.createTitledBorder("Plage Y"));
+
+        axisList = new JComboBox<String>();
+        ValueAxis axis;
+        axisRange = new HashMap<String, String>(xyPlot.getRangeAxisCount());
+        for (int i = 0; i < xyPlot.getRangeAxisCount(); i++) {
+            axis = xyPlot.getRangeAxis(i);
+            axisList.addItem(axis.getLabel());
+            Range yRange = axis.getRange();
+            String txtYRange = yRange.getLowerBound() + ";" + yRange.getUpperBound();
+            axisRange.put(axis.getLabel(), txtYRange);
+        }
+        axisList.addItemListener(new ItemListener() {
+
+            @Override
+            public void itemStateChanged(ItemEvent e) {
+                if (e.getStateChange() == ItemEvent.DESELECTED) {
+                    axisRange.put(e.getItem().toString(), rangeY.getText());
+                } else {
+                    rangeY.setText(axisRange.get(axisList.getSelectedItem()));
+                }
+            }
+        });
+        panelRangeY.add(axisList, BorderLayout.NORTH);
+        rangeY = new JTextField();
+        panelRangeY.add(rangeY, BorderLayout.CENTER);
+        panel.add(panelRangeY);
+
+        JTable table = new JTable(model) {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public Dimension getPreferredScrollableViewportSize() {
+                return new Dimension(super.getPreferredSize().width, getRowHeight() * getRowCount());
+            }
+        };
         table.setRowSelectionAllowed(false);
-
         table.setDefaultRenderer(Color.class, new ColorRenderer(true));
-
         table.setDefaultEditor(Color.class, new ColorEditor());
 
         panel.add(new JScrollPane(table));
-
         add(panel, BorderLayout.CENTER);
 
         Comparable<?> key;
         XYItemRenderer renderer;
-        Range yRange;
 
-        int nbSerie = xyPlot.getSeriesCount();
+        Range xRange = xyPlot.getDomainAxis().getRange();
+        String txtXRange = xRange.getLowerBound() + ";" + xRange.getUpperBound();
+        rangeX.setText(txtXRange);
 
-        yRange = xyPlot.getRangeAxis().getRange();
+        Range yRange = xyPlot.getRangeAxis().getRange();
         String txtYRange = yRange.getLowerBound() + ";" + yRange.getUpperBound();
-
-        rangeTxt.setText(txtYRange);
+        rangeY.setText(txtYRange);
 
         renderer = xyPlot.getRenderer();
 
         if (renderer instanceof XYLineAndShapeRenderer) {
-            for (int nSerie = 0; nSerie < nbSerie; nSerie++) {
 
-                key = xyPlot.getDataset().getSeriesKey(nSerie);
+            for (int nDataset = 0; nDataset < xyPlot.getDatasetCount(); nDataset++) {
 
-                model.addRow(new Object[] { key, (Color) renderer.getSeriesPaint(nSerie),
-                        ((BasicStroke) renderer.getSeriesStroke(nSerie)).getLineWidth(), Boolean.FALSE });
+                int nbSerie = xyPlot.getDataset(nDataset).getSeriesCount();
+                renderer = xyPlot.getRenderer(nDataset);
 
+                for (int nSerie = 0; nSerie < nbSerie; nSerie++) {
+
+                    key = xyPlot.getDataset(nDataset).getSeriesKey(nSerie);
+
+                    model.addRow(new Object[] { key, (Color) renderer.getSeriesPaint(nSerie),
+                            ((BasicStroke) renderer.getSeriesStroke(nSerie)).getLineWidth(), Boolean.FALSE });
+
+                }
             }
+
         } else {
 
             key = xyPlot.getDataset().getSeriesKey(0);
@@ -142,18 +198,34 @@ final class DialogProperties extends JPanel implements ActionListener
         CombinedDomainXYPlot combinedplot = chartView.getPlot();
         String serieName;
 
-        String[] splitRange = rangeTxt.getText().split(";");
+        String[] splitRange = rangeX.getText().split(";");
         if (splitRange.length == 2) {
             try {
                 double lowerBound = Double.parseDouble(splitRange[0]);
                 double upperBound = Double.parseDouble(splitRange[1]);
                 Range newRange = new Range(lowerBound, upperBound);
-                if (!xyPlot.getRangeAxis().getRange().equals(newRange)) {
-                    xyPlot.getRangeAxis().setRange(newRange);
+                if (!xyPlot.getDomainAxis().getRange().equals(newRange)) {
+                    xyPlot.getDomainAxis().setRange(newRange);
                 }
-
             } catch (NumberFormatException e) {
+            }
+        }
 
+        axisList.setSelectedIndex(-1);
+
+        for (int i = 0; i < xyPlot.getRangeAxisCount(); i++) {
+            ValueAxis axis = xyPlot.getRangeAxis(i);
+            splitRange = axisRange.get(axis.getLabel()).split(";");
+            if (splitRange.length == 2) {
+                try {
+                    double lowerBound = Double.parseDouble(splitRange[0]);
+                    double upperBound = Double.parseDouble(splitRange[1]);
+                    Range newRange = new Range(lowerBound, upperBound);
+                    if (!axis.getRange().equals(newRange)) {
+                        axis.setRange(newRange);
+                    }
+                } catch (NumberFormatException e) {
+                }
             }
         }
 
@@ -175,24 +247,37 @@ final class DialogProperties extends JPanel implements ActionListener
 
                 if (delete) {
                     combinedplot.remove(xyPlot);
+                    combinedplot.getDomainAxis().setLabel(null);
+                    chartView.getChart().clearSubtitles();
                 }
-
+                return;
             }
 
-            int idxSerie = ((XYSeriesCollection) xyPlot.getDataset()).getSeriesIndex(serieName);
+            int idxSerie = -1;
+            XYItemRenderer renderer = null;
+            XYSeriesCollection dataset = null;
 
-            if (idxSerie > -1) {
+            for (int nDataset = 0; nDataset < xyPlot.getDatasetCount(); nDataset++) {
+                idxSerie = ((XYSeriesCollection) xyPlot.getDataset(nDataset)).getSeriesIndex(serieName);
+                if (idxSerie > -1) {
+                    renderer = xyPlot.getRenderer(nDataset);
+                    dataset = (XYSeriesCollection) xyPlot.getDataset(nDataset);
+                    break;
+                }
+            }
+
+            if (idxSerie > -1 && renderer != null) {
 
                 color = (Color) model.getValueAt(i, 1);
                 float widthLine = (float) model.getValueAt(i, 2);
-                xyPlot.getRenderer().setSeriesPaint(idxSerie, color);
-                xyPlot.getRenderer().setSeriesStroke(idxSerie, new BasicStroke(widthLine));
+                renderer.setSeriesPaint(idxSerie, color);
+                renderer.setSeriesStroke(idxSerie, new BasicStroke(widthLine));
 
                 if (delete) {
-                    if (((XYSeriesCollection) xyPlot.getDataset()).getSeriesCount() == 1) {
+                    if (xyPlot.getDatasetCount() == 1 && dataset.getSeriesCount() == 1) {
                         combinedplot.remove(xyPlot);
                     } else {
-                        ((XYSeriesCollection) xyPlot.getDataset()).removeSeries(idxSerie);
+                        dataset.removeSeries(idxSerie);
                     }
                     chartView.updateObservateur("data", serieName);
                 }

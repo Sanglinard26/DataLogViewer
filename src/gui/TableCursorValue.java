@@ -109,13 +109,7 @@ final class DataValueModel extends AbstractTableModel {
             labels.set(row, aValue.toString());
             fireTableDataChanged();
         case 1:
-            double value;
-            try {
-                value = Double.parseDouble(aValue.toString());
-            } catch (NumberFormatException nfe) {
-                value = Double.NaN;
-            }
-            values.set(row, value);
+            values.set(row, (Double) aValue);
             fireTableDataChanged();
         default:
             return;
@@ -131,15 +125,10 @@ final class DataValueModel extends AbstractTableModel {
     public final void changeList(Set<String> newLabels) {
         this.labels.clear();
         this.values.clear();
-        for(String label : newLabels)
-        {
-        	this.labels.add(label);
+        for (String label : newLabels) {
+            this.labels.add(label);
             this.values.add(Double.NaN);
         }
-        //for (int i = 0; i < newLabels.size(); i++) {
-            //this.labels.add(newLabels.get(i));
-            //this.values.add(Double.NaN);
-        //}
         fireTableDataChanged();
     }
 

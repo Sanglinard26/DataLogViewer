@@ -45,4 +45,47 @@ public abstract class Utilitaire {
         }
         return defautPath;
     }
+
+    public static final Object getStorageObject(Object o) {
+
+        Double doubleValue;
+
+        try {
+            doubleValue = Double.parseDouble(o.toString().replace(",", "."));
+            int i = doubleValue.intValue();
+            if (doubleValue - i != 0) {
+                return doubleValue;
+            } else if (i <= Byte.MAX_VALUE && i >= Byte.MIN_VALUE) {
+                return (byte) i;
+            } else if (i <= Short.MAX_VALUE && i >= Short.MIN_VALUE) {
+                return (short) i;
+            } else {
+                return i;
+            }
+        } catch (Exception e) {
+            return o;
+        }
+    }
+
+    public static final Number getNumberObject(Object o) {
+
+        Double doubleValue;
+
+        try {
+            doubleValue = Double.parseDouble(o.toString().replace(",", "."));
+            int i = doubleValue.intValue();
+            if (doubleValue - i != 0) {
+                return doubleValue;
+            } else if (i <= Byte.MAX_VALUE && i >= Byte.MIN_VALUE) {
+                return (byte) i;
+            } else if (i <= Short.MAX_VALUE && i >= Short.MIN_VALUE) {
+                return (short) i;
+            } else {
+                return i;
+            }
+        } catch (Exception e) {
+            return Double.NaN;
+        }
+    }
+
 }

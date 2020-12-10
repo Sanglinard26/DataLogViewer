@@ -60,7 +60,7 @@ public final class Formula extends Measure {
     private final void renameVariables() {
         // char � = 101
         int charDec = 97;
-        Pattern pattern = Pattern.compile("\\<(.*?)\\>");
+        Pattern pattern = Pattern.compile("\\#(.*?)\\#");
         final Matcher regexMatcher = pattern.matcher(literalExpression);
 
         String matchedMeasure;
@@ -73,7 +73,7 @@ public final class Formula extends Measure {
             variables.put((char) charDec++, matchedMeasure);
         }
 
-        internExpression = literalExpression.replaceAll("<", "").replaceAll(">", "");
+        internExpression = literalExpression.replaceAll("#", "");
 
         for (Entry<Character, String> entry : variables.entrySet()) {
             internExpression = internExpression.replace(entry.getValue(), entry.getKey().toString());
@@ -103,7 +103,7 @@ public final class Formula extends Measure {
                     if (measures[j].getData().isEmpty()) {
                         break;
                     }
-                    arg.setArgumentValue(measures[j].getData().get(i));
+                    arg.setArgumentValue(measures[j].getData().get(i).doubleValue());
                 }
                 double res = expression.calculate();
                 this.data.add(res);
@@ -131,6 +131,33 @@ public final class Formula extends Measure {
         this.literalExpression = expression;
 
         build();
+    }
+
+    public class FIR {
+        private int length;
+        private double[] delayLine;
+        private double[] impulseResponse;
+        private int count = 0;
+
+        FIR(double[] coefs) {
+            length = coefs.length;
+            impulseResponse = coefs;
+            delayLine = new double[length];
+        }
+
+        double getOutputSample(double inputSample) {
+            delayLine[count] = inputSample;
+            double result = 0.0;
+            int index = count;
+            for (int i = 0; i < length; i++) {
+                result += impulseResponse[i] * delayLine[index--];
+                if (index < 0)
+                    index = length - 1;
+            }
+            if (++count >= length)
+                count = 0;
+            return result;
+        }
     }
 
 }

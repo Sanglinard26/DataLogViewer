@@ -12,6 +12,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import utils.Utilitaire;
+
 public final class Log {
 
     private String fnr;
@@ -20,6 +22,7 @@ public final class Log {
     private int nbPoints = 0;
     private String typeFile = "Unknown";
     private String timeName = "";
+    private float timeResol;
 
     public Log(File file) {
         if (file != null) {
@@ -29,14 +32,14 @@ public final class Log {
 
             switch (extension) {
             case "txt":
-                parseTxt(file);
                 typeFile = "PcsLab";
                 timeName = "Time_ms";
+                parseTxt(file);
                 break;
             case "msl":
-                parseMsl(file);
                 typeFile = "MegaSquirt";
                 timeName = "Time";
+                parseMsl(file);
                 break;
             default:
                 typeFile = "Unknown";
@@ -83,18 +86,11 @@ public final class Log {
 
                             parsedValue = splitTab[idxCol];
 
-                            if (parsedValue.indexOf(",") > -1) {
-                                parsedValue = splitTab[idxCol].replace(',', '.');
-                            }
+                            Number value = Utilitaire.getNumberObject(parsedValue.trim());
+                            this.datas.get(idxCol).getData().add(value);
+                            this.datas.get(idxCol).setMin(value);
+                            this.datas.get(idxCol).setMax(value);
 
-                            try {
-                                double value = Double.parseDouble(parsedValue.trim());
-                                this.datas.get(idxCol).getData().add(value);
-                                this.datas.get(idxCol).setMin(value);
-                                this.datas.get(idxCol).setMax(value);
-                            } catch (NumberFormatException e) {
-                                this.datas.get(idxCol).getData().add(Double.NaN);
-                            }
                         }
                     } else {
                         System.out.println("Erreur ligne : " + cntLine);
@@ -108,6 +104,8 @@ public final class Log {
             for (Measure measure : this.datas) {
                 this.nbPoints = Math.max(this.nbPoints, measure.getData().size());
             }
+
+            calcTimeResol();
 
         } catch (FileNotFoundException e) {
             e.printStackTrace();
@@ -183,11 +181,22 @@ public final class Log {
                 this.nbPoints = Math.max(this.nbPoints, measure.getData().size());
             }
 
+            calcTimeResol();
+
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public final float getTimeResol() {
+        return timeResol;
+    }
+
+    private final void calcTimeResol() {
+        Measure time = getTime();
+        this.timeResol = (float) (time.getMax() / (time.getData().size() - 1));
     }
 
     public final List<Measure> getMeasures() {

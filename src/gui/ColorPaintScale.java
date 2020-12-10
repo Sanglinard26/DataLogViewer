@@ -1,100 +1,104 @@
 package gui;
 
-
 import java.awt.Color;
 import java.awt.Paint;
 import java.io.Serializable;
+
 import org.jfree.chart.HashUtilities;
 import org.jfree.chart.renderer.PaintScale;
 import org.jfree.util.PublicCloneable;
 
 public class ColorPaintScale implements PaintScale, PublicCloneable, Serializable {
 
-	private static final long serialVersionUID = 1L;
-	
-	private double lowerBound;
-	private double upperBound;
-	private int alpha;
+    private static final long serialVersionUID = 1L;
 
-	public ColorPaintScale() {
-		this(0.0D, 1.0D);
-	}
+    private double lowerBound;
+    private double upperBound;
+    private int alpha;
 
-	public ColorPaintScale(double lowerBound, double upperBound) {
-		this(lowerBound, upperBound, 255);
-	}
+    public ColorPaintScale() {
+        this(0.0D, 1.0D);
+    }
 
-	public ColorPaintScale(double lowerBound, double upperBound, int alpha) {
-		if (lowerBound >= upperBound) {
-			throw new IllegalArgumentException("Requires lowerBound < upperBound.");
-		}
+    public ColorPaintScale(double lowerBound, double upperBound) {
+        this(lowerBound, upperBound, 255);
+    }
 
-		if ((alpha < 0) || (alpha > 255)) {
-			throw new IllegalArgumentException("Requires alpha in the range 0 to 255.");
-		}
+    public ColorPaintScale(double lowerBound, double upperBound, int alpha) {
+        if (lowerBound >= upperBound) {
+            throw new IllegalArgumentException("Requires lowerBound < upperBound.");
+        }
 
-		this.lowerBound = lowerBound;
-		this.upperBound = upperBound;
-		this.alpha = alpha;
-	}
+        if ((alpha < 0) || (alpha > 255)) {
+            throw new IllegalArgumentException("Requires alpha in the range 0 to 255.");
+        }
 
-	public double getLowerBound() {
-		return this.lowerBound;
-	}
+        this.lowerBound = lowerBound;
+        this.upperBound = upperBound;
+        this.alpha = alpha;
+    }
 
-	public double getUpperBound() {
-		return this.upperBound;
-	}
-	
-	public void setBounds(double lowerValue, double upperValue)
-	{
-		this.lowerBound = lowerValue;
-		this.upperBound = upperValue;
-	}
+    public double getLowerBound() {
+        return this.lowerBound;
+    }
 
-	public int getAlpha() {
-		return this.alpha;
-	}
+    public double getUpperBound() {
+        return this.upperBound;
+    }
 
-	public Paint getPaint(double value) {
-		double v = Math.max(value, this.lowerBound);
-		v = Math.min(v, this.upperBound);
-		float g = (float) ((v - this.lowerBound) / (this.upperBound - this.lowerBound));
+    public void setBounds(double lowerValue, double upperValue) {
+        this.lowerBound = lowerValue;
+        this.upperBound = upperValue;
+    }
 
-		return Color.getHSBColor(norm(1-g), 1, 1);
-	}
-	
-	private float norm(float g) {
-		return (0 + g * (0.66f));
-	}
+    public int getAlpha() {
+        return this.alpha;
+    }
 
-	public boolean equals(Object obj) {
-		if (obj == this) {
-			return true;
-		}
-		if (!(obj instanceof ColorPaintScale)) {
-			return false;
-		}
-		ColorPaintScale that = (ColorPaintScale) obj;
-		if (this.lowerBound != that.lowerBound) {
-			return false;
-		}
-		if (this.upperBound != that.upperBound) {
-			return false;
-		}
+    public Paint getPaint(double value) {
+        double v = Math.max(value, this.lowerBound);
+        v = Math.min(v, this.upperBound);
+        float g = (float) ((v - this.lowerBound) / (this.upperBound - this.lowerBound));
 
-		return (this.alpha == that.alpha);
-	}
+        return Color.getHSBColor(norm(1 - g), 1, 1);
+    }
 
-	public int hashCode() {
-		int hash = 7;
-		hash = HashUtilities.hashCode(hash, this.lowerBound);
-		hash = HashUtilities.hashCode(hash, this.upperBound);
-		hash = 43 * hash + this.alpha;
-		return hash;
-	}
+    private float norm(float g) {
+        return (0 + g * (0.66f));
+    }
 
-	public Object clone() throws CloneNotSupportedException {
-		return super.clone();
-	}
+    public boolean equals(Object obj) {
+        if (obj == this) {
+            return true;
+        }
+        if (!(obj instanceof ColorPaintScale)) {
+            return false;
+        }
+        ColorPaintScale that = (ColorPaintScale) obj;
+        if (this.lowerBound != that.lowerBound) {
+            return false;
+        }
+        if (this.upperBound != that.upperBound) {
+            return false;
+        }
+
+        return (this.alpha == that.alpha);
+    }
+
+    public int hashCode() {
+        int hash = 7;
+        hash = HashUtilities.hashCode(hash, this.lowerBound);
+        hash = HashUtilities.hashCode(hash, this.upperBound);
+        hash = 43 * hash + this.alpha;
+        return hash;
+    }
+
+    public Object clone() throws CloneNotSupportedException {
+        return super.clone();
+    }
+
+    @Override
+    public String toString() {
+        return this.lowerBound + ";" + this.upperBound;
+    }
 }

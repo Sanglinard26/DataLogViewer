@@ -10,9 +10,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 
 import javax.swing.JDialog;
-import javax.swing.JEditorPane;
 import javax.swing.JFrame;
 import javax.swing.JScrollPane;
+import javax.swing.JTextPane;
 
 public final class DialNotice extends JDialog {
 
@@ -20,7 +20,7 @@ public final class DialNotice extends JDialog {
     private static final String FENETRE_ICON = "/icon_manual_16.png";
     private static final String NOTICE = "/notice.txt";
 
-    private final JEditorPane txtNotice = new JEditorPane();
+    private final JTextPane txtNotice = new JTextPane();
 
     public DialNotice(JFrame ihm) {
         super(ihm, true);
@@ -34,7 +34,7 @@ public final class DialNotice extends JDialog {
 
         InputStream is = getClass().getResourceAsStream(NOTICE);
 
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(is))) {
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(is, "utf-8"))) {
             while ((line = br.readLine()) != null) {
                 content.append(line + "\n");
             }

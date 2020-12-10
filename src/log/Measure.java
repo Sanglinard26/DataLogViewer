@@ -12,14 +12,14 @@ public class Measure implements Comparable<Measure>, Serializable {
     private static final long serialVersionUID = 1L;
     protected String name;
     protected String unit;
-    protected List<Double> data;
+    protected List<Number> data;
     protected double min = Double.POSITIVE_INFINITY;
     protected double max = Double.NEGATIVE_INFINITY;
 
     public Measure(String name) {
         this.name = name;
         this.unit = "";
-        this.data = new ArrayList<Double>();
+        this.data = new ArrayList<Number>();
     }
 
     public final String getName() {
@@ -46,34 +46,30 @@ public class Measure implements Comparable<Measure>, Serializable {
         return max;
     }
 
-    public void setMax(double value) {
-        if (Double.isNaN(value)) {
+    public void setMax(Number value) {
+        if (Double.isNaN(value.doubleValue())) {
             return;
         }
-        this.max = Math.max(max, value);
+        this.max = Math.max(max, value.doubleValue());
     }
 
-    public void setMin(double value) {
-        if (Double.isNaN(value)) {
+    public void setMin(Number value) {
+        if (Double.isNaN(value.doubleValue())) {
             return;
         }
-        this.min = Math.min(min, value);
+        this.min = Math.min(min, value.doubleValue());
     }
 
-    public final List<Double> getData() {
+    public final List<Number> getData() {
         return this.data;
     }
 
-    public final double[] getDouleValue() {
+    public final double[] getDoubleValue() {
         final double[] result = new double[data.size()];
         for (int i = 0; i < data.size(); i++) {
             result[i] = data.get(i).doubleValue();
         }
         return result;
-    }
-
-    public final void setData(List<Double> data) {
-        this.data = data;
     }
 
     public final void clearData() {
@@ -94,6 +90,9 @@ public class Measure implements Comparable<Measure>, Serializable {
 
     @Override
     public boolean equals(Object name) {
+        if (name == null) {
+            return false;
+        }
         return this.name.equals(name.toString());
     }
 

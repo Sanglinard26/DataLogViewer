@@ -1,5 +1,7 @@
 package gui;
 
+import java.awt.Color;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -7,12 +9,16 @@ import java.awt.Insets;
 import java.awt.event.ActionEvent;
 
 import javax.swing.AbstractAction;
+import javax.swing.BorderFactory;
+import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JOptionPane;
+import javax.swing.JScrollPane;
+import javax.swing.SwingConstants;
 
 import log.Formula;
 import log.Measure;
@@ -23,7 +29,7 @@ public final class DialManageFormula extends JDialog {
 
     public DialManageFormula(final Ihm ihm) {
 
-        super(ihm, "Edition de formule", false);
+        super(ihm, "Gestion des formules", false);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
 
         final GridBagConstraints gbc = new GridBagConstraints();
@@ -46,6 +52,7 @@ public final class DialManageFormula extends JDialog {
             listModel.addElement(form);
         }
         final JList<Measure> listFormula = new JList<Measure>(listModel);
+        listFormula.setCellRenderer(new ListRenderer());
         gbc.fill = GridBagConstraints.BOTH;
         gbc.gridx = 0;
         gbc.gridy = 1;
@@ -55,7 +62,7 @@ public final class DialManageFormula extends JDialog {
         gbc.weighty = 1;
         gbc.insets = new Insets(5, 5, 0, 0);
         gbc.anchor = GridBagConstraints.CENTER;
-        add(listFormula, gbc);
+        add(new JScrollPane(listFormula), gbc);
 
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.gridx = 1;
@@ -95,7 +102,7 @@ public final class DialManageFormula extends JDialog {
 
             @Override
             public void actionPerformed(ActionEvent arg0) {
-                new DialNewFormula(ihm, ((Formula)listFormula.getSelectedValue()));
+                new DialNewFormula(ihm, ((Formula) listFormula.getSelectedValue()));
             }
         }), gbc);
 
@@ -118,10 +125,26 @@ public final class DialManageFormula extends JDialog {
             }
         }), gbc);
 
-        setMinimumSize(new Dimension(400, 400));
-        setLocationRelativeTo(null);
+        setMinimumSize(new Dimension(300, 400));
+        setLocationRelativeTo(ihm);
         setResizable(true);
         setVisible(true);
+    }
+
+    private final class ListRenderer extends DefaultListCellRenderer {
+
+        private static final long serialVersionUID = 1L;
+
+        public ListRenderer() {
+            setHorizontalAlignment(SwingConstants.CENTER);
+        }
+
+        @Override
+        public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+            super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+            setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
+            return this;
+        }
     }
 
 }

@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 import calib.MdbData.VariableInfo;
+import utils.Utilitaire;
 
 public final class Variable implements Comparable<Variable> {
 
@@ -20,6 +21,9 @@ public final class Variable implements Comparable<Variable> {
 
     public Variable(List<String> data, MdbData mdbData) {
         this.name = data.get(0).substring(1, data.get(0).length() - 1);
+        if (this.name.equals("Avance allumage bangbang")) {
+            int i = 0;
+        }
         this.infos = mdbData.getInfos().get(this.name);
         build(data);
     }
@@ -88,7 +92,7 @@ public final class Variable implements Comparable<Variable> {
                 case COLONNES:
                     dimX = 1;
                     dimY = 1;
-                    values = new Object[] { getStorageObject(splitEgale[1].replace(SEMICOLON, "")) };
+                    values = new Object[] { Utilitaire.getStorageObject(splitEgale[1].replace(SEMICOLON, "")) };
                     break;
                 case BKPTCOL:
                     if (bkptcol != null) {
@@ -97,16 +101,15 @@ public final class Variable implements Comparable<Variable> {
                     bkptcol = new ArrayList<Object>();
                     for (String s : splitEgale[1].split(SEMICOLON)) {
                         if (!s.isEmpty()) {
-                            bkptcol.add(getStorageObject(s));
+                            bkptcol.add(Utilitaire.getStorageObject(s));
                         }
                     }
-
                     break;
                 case LIGNE:
                     line = new ArrayList<Object>();
                     for (String s : splitEgale[1].split(SEMICOLON)) {
                         if (!s.isEmpty()) {
-                            line.add(getStorageObject(s));
+                            line.add(Utilitaire.getStorageObject(s));
                         }
                     }
                     break;
@@ -117,7 +120,7 @@ public final class Variable implements Comparable<Variable> {
                     bkptlign = new ArrayList<Object>();
                     for (String s : splitEgale[1].split(SEMICOLON)) {
                         if (!s.isEmpty()) {
-                            bkptlign.add(getStorageObject(s));
+                            bkptlign.add(Utilitaire.getStorageObject(s));
                         }
                     }
                     break;
@@ -126,7 +129,7 @@ public final class Variable implements Comparable<Variable> {
                     if (mapValues == null) {
                         mapValues = new LinkedHashMap<Object, Object>();
                     }
-                    mapValues.put(getStorageObject(splitEgale[0].replace("ligne", "")), splitEgale[1]);
+                    mapValues.put(Utilitaire.getStorageObject(splitEgale[0].replace("ligne", "")), splitEgale[1]);
 
                     break;
                 }
@@ -163,7 +166,7 @@ public final class Variable implements Comparable<Variable> {
                 if (ligne != null) {
                     splitSemiColon = ligne.toString().split(SEMICOLON);
                     for (int j = 0; j < dimX - 1; j++) {
-                        setValue(getStorageObject(splitSemiColon[j]), i + 1, j + 1);
+                        setValue(Utilitaire.getStorageObject(splitSemiColon[j]), i + 1, j + 1);
                     }
                 }
             }
@@ -223,27 +226,6 @@ public final class Variable implements Comparable<Variable> {
     @Override
     public int compareTo(Variable var) {
         return this.name.compareToIgnoreCase(var.getName());
-    }
-
-    private final Object getStorageObject(Object o) {
-
-        Double doubleValue;
-
-        try {
-            doubleValue = Double.parseDouble(o.toString().replace(",", "."));
-            int i = doubleValue.intValue();
-            if (doubleValue - i != 0) {
-                return doubleValue;
-            } else if (i <= Byte.MAX_VALUE && i >= Byte.MIN_VALUE) {
-                return (byte) i;
-            } else if (i <= Short.MAX_VALUE && i >= Short.MIN_VALUE) {
-                return (short) i;
-            } else {
-                return i;
-            }
-        } catch (Exception e) {
-            return o;
-        }
     }
 
     public final float[] getXAxis() {

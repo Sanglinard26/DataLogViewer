@@ -19,7 +19,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.util.BitSet;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -52,6 +56,8 @@ import javax.swing.UIManager.LookAndFeelInfo;
 import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+import javax.swing.event.TableModelEvent;
+import javax.swing.event.TableModelListener;
 import javax.swing.filechooser.FileFilter;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
@@ -59,8 +65,8 @@ import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.NumberAxis;
 import org.jfree.chart.axis.ValueAxis;
 import org.jfree.chart.plot.CombinedDomainXYPlot;
+import org.jfree.chart.plot.IntervalMarker;
 import org.jfree.chart.plot.XYPlot;
-import org.jfree.chart.renderer.xy.XYShapeRenderer;
 import org.jfree.chart.title.PaintScaleLegend;
 import org.jfree.data.Range;
 import org.jfree.data.xy.DefaultXYDataset;
@@ -89,12 +95,16 @@ public final class Ihm extends JFrame {
     private JScrollPane scrollListVoie;
     private JScrollPane scrollTableCursorValues;
     private TableCursorValue tableCursorValues;
+    private PanelCondition panelCondition;
 
     private JLabel labelFnr;
     private JLabel labelLogName;
 
     private Log log;
     private Set<Measure> listFormula = new HashSet<Measure>();
+    private boolean axisSync = false;
+
+    private final Map<Integer, List<IntervalMarker>> listZone = new HashMap<Integer, List<IntervalMarker>>();
 
     public Ihm() {
         super("DataLogViewer");
@@ -121,6 +131,8 @@ public final class Ihm extends JFrame {
         final String ICON_EXIT = "/icon_exit_16.png";
         final String ICON_NEW = "/new_icon_16.png";
         final String ICON_NOTICE = "/icon_manual_16.png";
+        final String ICON_FORMULA = "/icon_formula_16.png";
+        final String ICON_MANAGE_FORMULA = "/icon_manageFormula_16.png";
 
         JMenuBar menuBar = new JMenuBar();
 
@@ -160,7 +172,22 @@ public final class Ihm extends JFrame {
                 });
                 final int reponse = fc.showOpenDialog(Ihm.this);
                 if (reponse == JFileChooser.APPROVE_OPTION) {
-                    openConfig(fc.getSelectedFile());
+
+                    File config = fc.getSelectedFile();
+
+                    if ("demo".equals(config.getName().toLowerCase())) {
+
+                        try {
+                            File tmp = File.createTempFile("config", null);
+                            tmp.deleteOnExit();
+                            Files.copy(getClass().getResourceAsStream("/config.cfg"), tmp.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                            openConfig(tmp);
+                            return;
+                        } catch (IOException e1) {
+                        }
+                    }
+
+                    openConfig(config);
                 }
 
             }
@@ -241,7 +268,7 @@ public final class Ihm extends JFrame {
         menu = new JMenu("Formules");
         menuBar.add(menu);
 
-        menuItem = new JMenuItem("Nouvelle");
+        menuItem = new JMenuItem("Nouvelle", new ImageIcon(getClass().getResource(ICON_FORMULA)));
         menuItem.addActionListener(new ActionListener() {
 
             @Override
@@ -251,7 +278,7 @@ public final class Ihm extends JFrame {
         });
         menu.add(menuItem);
 
-        menuItem = new JMenuItem("Gestionnaire");
+        menuItem = new JMenuItem("Gestionnaire", new ImageIcon(getClass().getResource(ICON_MANAGE_FORMULA)));
         menuItem.addActionListener(new ActionListener() {
 
             @Override
@@ -372,7 +399,21 @@ public final class Ihm extends JFrame {
                 });
                 final int reponse = fc.showOpenDialog(Ihm.this);
                 if (reponse == JFileChooser.APPROVE_OPTION) {
-                    openConfig(fc.getSelectedFile());
+                    File config = fc.getSelectedFile();
+
+                    if ("demo".equals(config.getName().toLowerCase())) {
+
+                        try {
+                            File tmp = File.createTempFile("config", null);
+                            tmp.deleteOnExit();
+                            Files.copy(getClass().getResourceAsStream("/config.cfg"), tmp.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                            openConfig(tmp);
+                            return;
+                        } catch (IOException e) {
+                        }
+                    }
+
+                    openConfig(config);
                 }
 
             }
@@ -461,7 +502,8 @@ public final class Ihm extends JFrame {
             }
         });
         btNewTable.setEnabled(true);
-        btNewTable.setToolTipText("Nouvelle table");
+        btNewTable.setToolTipText("Pas encore impl\u00e9ment\u00e9");
+        btNewTable.setEnabled(false);
         bar.add(btNewTable);
 
         final JToggleButton btSynchro = new JToggleButton(new ImageIcon(getClass().getResource(ICON_SHARE_AXIS)));
@@ -471,11 +513,13 @@ public final class Ihm extends JFrame {
             @Override
             public void actionPerformed(ActionEvent e) {
 
+                axisSync = btSynchro.isSelected();
+
                 if (log == null) {
                     return;
                 }
 
-                if (btSynchro.isSelected()) {
+                if (axisSync) {
                     final int idxWindow = tabbedPane.getSelectedIndex();
 
                     if (idxWindow < 0) {
@@ -556,7 +600,7 @@ public final class Ihm extends JFrame {
         gbc.gridx = 0;
         gbc.gridy = 1;
         gbc.gridwidth = 1;
-        gbc.gridheight = 1;
+        gbc.gridheight = 2;
         gbc.weightx = 15;
         gbc.weighty = 0;
         gbc.insets = new Insets(0, 5, 0, 0);
@@ -572,7 +616,7 @@ public final class Ihm extends JFrame {
         gbc.gridx = 1;
         gbc.gridy = 1;
         gbc.gridwidth = 1;
-        gbc.gridheight = 1;
+        gbc.gridheight = 2;
         gbc.weightx = 70;
         gbc.weighty = 1;
         gbc.insets = new Insets(0, 0, 0, 0);
@@ -588,16 +632,22 @@ public final class Ihm extends JFrame {
                     if (tabbedPane.getComponentAt(idx) instanceof ChartView) {
                         scrollListVoie.setVisible(true);
                         scrollTableCursorValues.setVisible(true);
+                        panelCondition.setVisible(true);
                         ChartView chartView = (ChartView) tabbedPane.getComponentAt(idx);
                         ((DataValueModel) tableCursorValues.getModel()).changeList(chartView.getMeasures());
                         chartView.updateTableValue();
+                        if (chartView.getDatasetType() < 2) {
+                            chartView.applyCondition(listZone.get(panelCondition.getTableCondition().getActiveCondition()));
+                        }
                     } else if (tabbedPane.getComponentAt(idx) instanceof MapView) {
                         scrollListVoie.setVisible(false);
                         scrollTableCursorValues.setVisible(false);
+                        panelCondition.setVisible(false);
                     }
                 } else {
                     scrollListVoie.setVisible(true);
                     scrollTableCursorValues.setVisible(true);
+                    panelCondition.setVisible(true);
                     ((DataValueModel) tableCursorValues.getModel()).changeList(Collections.<String> emptySet());
                 }
             }
@@ -611,16 +661,67 @@ public final class Ihm extends JFrame {
         gbc.gridwidth = 1;
         gbc.gridheight = 1;
         gbc.weightx = 15;
-        gbc.weighty = 1;
+        gbc.weighty = 60;
         gbc.insets = new Insets(0, 0, 0, 5);
         gbc.anchor = GridBagConstraints.FIRST_LINE_START;
         scrollTableCursorValues = new JScrollPane(tableCursorValues);
         root.add(scrollTableCursorValues, gbc);
 
-        labelFnr = new JLabel("Fournisseur du log : ");
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.gridx = 0;
+        panelCondition = new PanelCondition();
+        panelCondition.getTableCondition().getModel().addTableModelListener(new TableModelListener() {
+
+            @Override
+            public void tableChanged(TableModelEvent e) {
+                if (e.getType() == TableModelEvent.UPDATE) {
+
+                    final int row = e.getFirstRow();
+                    final Condition condition = (Condition) panelCondition.getTableCondition().getModel().getValueAt(row, 1);
+
+                    int idx = tabbedPane.getSelectedIndex();
+                    if (idx > -1) {
+                        if (tabbedPane.getComponentAt(idx) instanceof ChartView) {
+                            final ChartView chartView = (ChartView) tabbedPane.getComponentAt(idx);
+
+                            if (chartView.getDatasetType() < 2) {
+
+                                Thread thread = new Thread(new Runnable() {
+
+                                    @Override
+                                    public void run() {
+                                        BitSet bitCondition = condition.apply(log);
+
+                                        if (condition.isActive()) {
+                                            listZone.put(row, chartView.applyCondition(condition.isActive(), bitCondition, condition.getColor()));
+                                            panelCondition.setListBoxAnnotation(listZone.get(row));
+                                        } else {
+                                            listZone.remove(row);
+                                            chartView.removeCondition();
+                                        }
+                                    }
+                                });
+                                thread.start();
+                            }
+                        }
+                    }
+                }
+
+            }
+        });
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.gridx = 3;
         gbc.gridy = 2;
+        gbc.gridwidth = 1;
+        gbc.gridheight = 1;
+        gbc.weightx = 15;
+        gbc.weighty = 40;
+        gbc.insets = new Insets(0, 0, 0, 5);
+        gbc.anchor = GridBagConstraints.FIRST_LINE_START;
+        root.add(panelCondition, gbc);
+
+        labelFnr = new JLabel("Fournisseur du log : ");
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.gridx = 0;
+        gbc.gridy = 3;
         gbc.gridwidth = 3;
         gbc.gridheight = 1;
         gbc.weightx = 1;
@@ -630,9 +731,9 @@ public final class Ihm extends JFrame {
         root.add(labelFnr, gbc);
 
         labelLogName = new JLabel("Nom de l'acquisition : ");
-        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.fill = GridBagConstraints.BOTH;
         gbc.gridx = 0;
-        gbc.gridy = 3;
+        gbc.gridy = 4;
         gbc.gridwidth = 3;
         gbc.gridheight = 1;
         gbc.weightx = 1;
@@ -683,6 +784,10 @@ public final class Ihm extends JFrame {
                     ((Formula) formule).calculate(log);
                     listModel.addElement(formule);
                 }
+
+                // Test condition
+                panelCondition.getTableCondition().updateLog(log);
+                //
 
                 labelFnr.setText("<html>Fournisseur du log : " + "<b>" + log.getFnr());
                 labelLogName.setText("<html>Nom de l'acquisition : " + "<b>" + log.getName());
@@ -737,6 +842,12 @@ public final class Ihm extends JFrame {
         tabbedPane.setTabComponentAt(tabbedPane.getTabCount() - 1, new ButtonTabComponent(tabbedPane));
         tabbedPane.setSelectedIndex(tabbedPane.getTabCount() - 1);
 
+        if (axisSync && tabbedPane.getTabCount() > 1) {
+            ChartView refChartView = (ChartView) tabbedPane.getComponentAt(tabbedPane.getTabCount() - 2);
+            ValueAxis domainAxis = refChartView.getPlot().getDomainAxis();
+            chartView.getPlot().setDomainAxis(domainAxis);
+        }
+
         return chartView;
     }
 
@@ -755,6 +866,9 @@ public final class Ihm extends JFrame {
 
             if (doImport) {
                 ChartView chartView = (ChartView) support.getComponent();
+                if (chartView.getDatasetType() > 1) {
+                    return false;
+                }
                 chartView.highlightPlot(support.getDropLocation());
             }
 
@@ -773,14 +887,21 @@ public final class Ihm extends JFrame {
                 }
 
                 ChartView chartView = (ChartView) support.getComponent();
-                chartView.addMeasure(support.getDropLocation().getDropPoint(), listModel.get(idxMeasure));
-                ((DataValueModel) tableCursorValues.getModel()).addElement(measureName);
+                final CombinedDomainXYPlot combinedDomainXYPlot = chartView.getPlot();
+                final XYPlot plot = combinedDomainXYPlot.findSubplot(chartView.getChartRenderingInfo().getPlotInfo(),
+                        support.getDropLocation().getDropPoint());
 
-                return true;
+                DialAddMeasure dialAddMeasure = new DialAddMeasure(plot, measureName);
+
+                int res = JOptionPane.showConfirmDialog(Ihm.this, dialAddMeasure, "Ajout mesure", 2, -1);
+
+                if (res == JOptionPane.OK_OPTION) {
+                    chartView.addMeasure(plot, log.getTime(), listModel.get(idxMeasure), dialAddMeasure.getAxisName());
+                    ((DataValueModel) tableCursorValues.getModel()).addElement(measureName);
+                    return true;
+                }
             } catch (UnsupportedFlavorException e) {
-                e.printStackTrace();
             } catch (IOException e) {
-                e.printStackTrace();
             }
 
             return false;
@@ -796,7 +917,9 @@ public final class Ihm extends JFrame {
         if (!listModel.contains(newMeasure)) {
             listModel.addElement(newMeasure);
             listFormula.add(newMeasure);
-            log.getMeasures().add(newMeasure);
+            if (log != null) {
+                log.getMeasures().add(newMeasure);
+            }
         }
     }
 
@@ -828,7 +951,7 @@ public final class Ihm extends JFrame {
 
     public final void plotFromDialog(String xLabel, String yLabel, String zLabel) {
         if (log == null) {
-            JOptionPane.showMessageDialog(this, "Il faut d'abord ouvrir un log", "INFO", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Il faut d'abord ouvrir un log!", "INFO", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
 
@@ -881,7 +1004,7 @@ public final class Ihm extends JFrame {
             return;
         }
 
-        final List<Double> temps = log.getTime().getData();
+        final List<Number> temps = log.getTime().getData();
         final int nbPoint = temps.size();
 
         for (int n = 0; n < nbTab; n++) {
@@ -889,78 +1012,66 @@ public final class Ihm extends JFrame {
                 chartView = (ChartView) tabbedPane.getComponentAt(n);
                 for (Object plot : chartView.getPlot().getSubplots()) {
                     xyPlot = (XYPlot) plot;
-                    int nbSerie = xyPlot.getSeriesCount();
 
-                    for (int nSerie = 0; nSerie < nbSerie; nSerie++) {
+                    for (int nDataset = 0; nDataset < xyPlot.getDatasetCount(); nDataset++) {
 
-                        if (xyPlot.getDataset() instanceof XYSeriesCollection) {
-                            serie = ((XYSeriesCollection) xyPlot.getDataset()).getSeries(nSerie);
+                        int nbSerie = xyPlot.getDataset(nDataset).getSeriesCount();
 
-                            serie.clear();
+                        for (int nSerie = 0; nSerie < nbSerie; nSerie++) {
 
-                            key = serie.getKey();
+                            if (xyPlot.getDataset() instanceof XYSeriesCollection) {
 
-                            measure = pickMeasureFromList(key.toString());
+                                serie = ((XYSeriesCollection) xyPlot.getDataset(nDataset)).getSeries(nSerie);
 
-                            final int sizeData = measure.getData().size();
+                                serie.clear();
 
-                            for (int n1 = 0; n1 < nbPoint; n1++) {
+                                key = serie.getKey();
 
-                                if (n1 < sizeData) {
-                                    serie.add(temps.get(n1), measure.getData().get(n1), false);
+                                measure = pickMeasureFromList(key.toString());
+
+                                final int sizeData = measure.getData().size();
+
+                                for (int n1 = 0; n1 < nbPoint; n1++) {
+
+                                    if (n1 < sizeData) {
+                                        serie.add(temps.get(n1), measure.getData().get(n1), false);
+                                    }
                                 }
-                            }
 
-                            serie.fireSeriesChanged();
-                            xyPlot.configureRangeAxes();
-                        } else if (xyPlot.getDataset() instanceof DefaultXYZDataset) {
-                            Comparable<?> serieKey = ((DefaultXYZDataset) xyPlot.getDataset()).getSeriesKey(nSerie);
+                                serie.fireSeriesChanged();
+                                xyPlot.configureRangeAxes();
+                            } else if (xyPlot.getDataset() instanceof DefaultXYZDataset) {
+                                Comparable<?> serieKey = ((DefaultXYZDataset) xyPlot.getDataset()).getSeriesKey(nSerie);
 
-                            String xLabel = xyPlot.getDomainAxis().getLabel();
-                            String yLabel = xyPlot.getRangeAxis().getLabel();
-                            String zLabel = ((PaintScaleLegend) chartView.getChart().getSubtitle(0)).getAxis().getLabel();
+                                String xLabel = xyPlot.getDomainAxis().getLabel();
+                                String yLabel = xyPlot.getRangeAxis().getLabel();
+                                String zLabel = ((PaintScaleLegend) chartView.getChart().getSubtitle(0)).getAxis().getLabel();
 
-                            Measure xMeasure = pickMeasureFromList(xLabel);
-                            Measure yMeasure = pickMeasureFromList(yLabel);
-                            Measure zMeasure = pickMeasureFromList(zLabel);
+                                Measure xMeasure = pickMeasureFromList(xLabel);
+                                Measure yMeasure = pickMeasureFromList(yLabel);
+                                Measure zMeasure = pickMeasureFromList(zLabel);
 
-                            XYShapeRenderer renderer = (XYShapeRenderer) xyPlot.getRenderer();
-                            ColorPaintScale scale = ((ColorPaintScale) renderer.getPaintScale());
-
-                            double delta = zMeasure.getMax() - zMeasure.getMin();
-                            double min;
-                            double max;
-
-                            if (delta == 0) {
-                                double offset = Math.abs(zMeasure.getMax() / 100);
-                                min = zMeasure.getMin() - offset;
-                                max = zMeasure.getMax() + offset;
+                                ((DefaultXYZDataset) xyPlot.getDataset()).addSeries(serieKey,
+                                        new double[][] { xMeasure.getDoubleValue(), yMeasure.getDoubleValue(), zMeasure.getDoubleValue() });
                             } else {
-                                min = zMeasure.getMin();
-                                max = zMeasure.getMax();
+                                Comparable<?> serieKey = ((DefaultXYDataset) xyPlot.getDataset()).getSeriesKey(nSerie);
+
+                                String xLabel = xyPlot.getDomainAxis().getLabel();
+                                String yLabel = xyPlot.getRangeAxis().getLabel();
+
+                                Measure xMeasure = pickMeasureFromList(xLabel);
+                                Measure yMeasure = pickMeasureFromList(yLabel);
+
+                                ((DefaultXYDataset) xyPlot.getDataset()).addSeries(serieKey,
+                                        new double[][] { xMeasure.getDoubleValue(), yMeasure.getDoubleValue() });
+
                             }
-
-                            scale.setBounds(min, max);
-                            ((PaintScaleLegend) chartView.getChart().getSubtitle(0)).getAxis().setRange(scale.getLowerBound(), scale.getUpperBound());
-
-                            ((DefaultXYZDataset) xyPlot.getDataset()).addSeries(serieKey,
-                                    new double[][] { xMeasure.getDouleValue(), yMeasure.getDouleValue(), zMeasure.getDouleValue() });
-                        } else {
-                            Comparable<?> serieKey = ((DefaultXYDataset) xyPlot.getDataset()).getSeriesKey(nSerie);
-
-                            String xLabel = xyPlot.getDomainAxis().getLabel();
-                            String yLabel = xyPlot.getRangeAxis().getLabel();
-
-                            Measure xMeasure = pickMeasureFromList(xLabel);
-                            Measure yMeasure = pickMeasureFromList(yLabel);
-
-                            ((DefaultXYDataset) xyPlot.getDataset()).addSeries(serieKey,
-                                    new double[][] { xMeasure.getDouleValue(), yMeasure.getDouleValue() });
 
                         }
-
                     }
+
                 }
+                chartView.getPlot().getDomainAxis().setAutoRange(true);
                 chartView.getPlot().configureDomainAxes();
             }
         }
@@ -1006,6 +1117,7 @@ public final class Ihm extends JFrame {
             }
             oos.writeObject(listFormula);
             oos.flush();
+
         } catch (FileNotFoundException e1) {
             e1.printStackTrace();
         } catch (IOException e1) {
