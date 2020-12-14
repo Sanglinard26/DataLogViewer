@@ -46,6 +46,10 @@ public abstract class Utilitaire {
         return defautPath;
     }
 
+    public static final int countChar(String text, String aChar) {
+        return text.length() - text.replace(aChar, "").length();
+    }
+
     public static final Object getStorageObject(Object o) {
 
         Double doubleValue;

@@ -118,17 +118,17 @@ public final class MapView extends JPanel {
 
         boolean chartVisible = false;
 
-        if (variable.getDimX() * variable.getDimY() < 1) {
-            return;
-        }
+        switch (variable.getType()) {
 
-        switch (variable.getDimY()) {
-        case 1:
-            break;
-        case 2:
+        case COURBE:
             float[][] zValuesOrigin = variable.getZvalues();
 
             int length = zValuesOrigin[0].length;
+
+            if (length == 0) {
+                return;
+            }
+
             float[][] zValuesNew = new float[2][length];
 
             zValuesNew[0] = Arrays.copyOf(zValuesOrigin[0], length);
@@ -138,11 +138,16 @@ public final class MapView extends JPanel {
             jSurface.setXLabel("X");
             chartVisible = true;
             break;
-        default:
+
+        case MAP:
             surfaceChart.getArraySurfaceModel().setValues(variable.getXAxis(), variable.getYAxis(), variable.getZvalues());
             jSurface.setXLabel("X");
             jSurface.setYLabel("Y");
             chartVisible = true;
+
+            break;
+
+        default:
             break;
         }
 

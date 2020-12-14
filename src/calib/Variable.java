@@ -14,6 +14,7 @@ import utils.Utilitaire;
 public final class Variable implements Comparable<Variable> {
 
     private final String name;
+    private Type type;
     private int dimX;
     private int dimY;
     private Object[] values;
@@ -21,9 +22,6 @@ public final class Variable implements Comparable<Variable> {
 
     public Variable(List<String> data, MdbData mdbData) {
         this.name = data.get(0).substring(1, data.get(0).length() - 1);
-        if (this.name.equals("Avance allumage bangbang")) {
-            int i = 0;
-        }
         this.infos = mdbData.getInfos().get(this.name);
         build(data);
     }
@@ -32,17 +30,8 @@ public final class Variable implements Comparable<Variable> {
         return name;
     }
 
-    public String getType() {
-        if (dimX * dimY == 1) {
-            return "scalaire";
-        }
-        if (dimY == 2) {
-            return "courbe";
-        }
-        if (dimY > 2) {
-            return "carto";
-        }
-        return "inconnu";
+    public Type getType() {
+        return type != null ? type : Type.UNKNOWN;
     }
 
     @Override
@@ -90,9 +79,26 @@ public final class Variable implements Comparable<Variable> {
             if (splitEgale.length > 1) {
                 switch (splitEgale[0]) {
                 case COLONNES:
-                    dimX = 1;
+                    int nbSemiColon = Utilitaire.countChar(splitEgale[1], SEMICOLON);
+                    dimX = nbSemiColon;
+
+                    if (dimX == 1) {
+                        type = Type.SCALAIRE;
+                    } else {
+                        type = Type.ARRAY;
+                    }
+
                     dimY = 1;
-                    values = new Object[] { Utilitaire.getStorageObject(splitEgale[1].replace(SEMICOLON, "")) };
+                    values = new Object[dimX];
+
+                    int cnt = 0;
+                    for (String s : splitEgale[1].split(SEMICOLON)) {
+                        if (!s.isEmpty()) {
+                            values[cnt] = Utilitaire.getStorageObject(s);
+                        }
+                        cnt++;
+                    }
+
                     break;
                 case BKPTCOL:
                     if (bkptcol != null) {
@@ -140,6 +146,7 @@ public final class Variable implements Comparable<Variable> {
         if (bkptcol != null && line != null && mapValues == null) {
             dimX = bkptcol.size();
             dimY = 2;
+            type = Type.COURBE;
             values = new Object[dimX * dimY];
             for (int i = 0; i < dimX; i++) {
                 setValue(bkptcol.get(i), 0, i);
@@ -148,6 +155,9 @@ public final class Variable implements Comparable<Variable> {
         } else if (mapValues != null && bkptcol != null && bkptlign != null) {
             dimX = bkptcol.size() + 1;
             dimY = bkptlign.size() + 1;
+
+            type = Type.MAP;
+
             values = new Object[dimX * dimY];
 
             setValue("Y \\ X", 0, 0);
@@ -172,51 +182,27 @@ public final class Variable implements Comparable<Variable> {
             }
 
         } else if (mapValues != null && bkptcol == null && bkptlign == null) {
-            StringBuilder sb = new StringBuilder();
 
-            dimX = 1;
-            dimY = 1;
+            dimX = Utilitaire.countChar(mapValues.get(new Byte("1")).toString(), SEMICOLON);
+            dimY = mapValues.size();
 
+            type = Type.TEXT;
+
+            values = new Object[dimX * dimY];
+
+            int y = 0;
             for (Object s : mapValues.values()) {
-                sb.append(s.toString().replace(";", ""));
-            }
-            values = new Object[] { sb.toString() };
-
-        }
-
-    }
-
-    public final String toTxtTab() {
-        StringBuilder sb = new StringBuilder();
-        sb.append((this.name));
-        if (dimX * dimY == 1) {
-            sb.append("\n" + values[0].toString());
-            return sb.toString();
-        }
-        if (dimY == 2) {
-            sb.append("\n");
-            for (int i = 0; i < dimX; i++) {
-                sb.append(getValue(0, i) + "\t");
-            }
-            sb.append("\n");
-            for (int i = 0; i < dimX; i++) {
-                sb.append(getValue(1, i) + "\t");
-            }
-            return sb.toString();
-        }
-
-        if (dimY > 2) {
-            sb.append("\n");
-
-            for (int row = 0; row < dimY; row++) {
-                for (int col = 0; col < dimX; col++) {
-                    sb.append(getValue(row, col) + "\t");
+                int x = 0;
+                for (String s_ : s.toString().split(SEMICOLON)) {
+                    if (!s_.isEmpty()) {
+                        setValue(Utilitaire.getStorageObject(s_), y, x);
+                    }
+                    x++;
                 }
-                sb.append("\n");
+                y++;
             }
-            return sb.toString();
         }
-        return "";
+
     }
 
     public final void printInfo() {

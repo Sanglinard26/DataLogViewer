@@ -127,18 +127,33 @@ public final class MapCal {
 
                 writeCell(sheetValues, 0, row, variableName, arial10format);
 
+                int col;
+
                 switch (var.getType()) {
-                case "scalaire":
+                case SCALAIRE:
 
                     row += 1;
                     writeCell(sheetValues, 0, row, var.getValue(0, 0), borderFormat);
                     row += 2;
                     break;
 
-                case "courbe":
+                case ARRAY:
+
+                    col = 0;
+                    row += 1;
+                    for (short x = 0; x < var.getDimX(); x++) {
+                        writeCell(sheetValues, col, row, var.getValue(0, x), borderFormat);
+                        col += 1;
+                    }
+
+                    row += 2;
+
+                    break;
+
+                case COURBE:
 
                     for (byte y = 0; y < 2; y++) {
-                        int col = 0;
+                        col = 0;
                         row += 1;
                         for (short x = 0; x < var.getDimX(); x++) {
                             if (y == 0) {
@@ -152,10 +167,10 @@ public final class MapCal {
                     row += 2;
                     break;
 
-                case "carto":
+                case MAP:
 
                     for (short y = 0; y < var.getDimY(); y++) {
-                        int col = 0;
+                        col = 0;
                         row += 1;
                         for (short x = 0; x < var.getDimX(); x++) {
                             if (y == 0 | x == 0) {
@@ -163,6 +178,19 @@ public final class MapCal {
                             } else {
                                 writeCell(sheetValues, col, row, var.getValue(y, x), borderFormat);
                             }
+                            col += 1;
+                        }
+                    }
+                    row += 2;
+                    break;
+
+                case TEXT:
+
+                    for (short y = 0; y < var.getDimY(); y++) {
+                        col = 0;
+                        row += 1;
+                        for (short x = 0; x < var.getDimX(); x++) {
+                            writeCell(sheetValues, col, row, var.getValue(y, x), borderFormat);
                             col += 1;
                         }
                     }
@@ -202,7 +230,11 @@ public final class MapCal {
         if (value instanceof Number) {
             sht.addCell(new Number(col, row, Double.parseDouble(value.toString()), format));
         } else {
-            sht.addCell(new Label(col, row, value.toString(), format));
+            if (value != null) {
+                sht.addCell(new Label(col, row, value.toString(), format));
+            } else {
+                sht.addCell(new Label(col, row, "", format));
+            }
         }
 
     }

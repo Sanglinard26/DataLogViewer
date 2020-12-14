@@ -17,6 +17,7 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
+import java.math.BigDecimal;
 import java.util.Arrays;
 
 import javax.swing.BorderFactory;
@@ -40,6 +41,7 @@ import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
 
+import calib.Type;
 import calib.Variable;
 import utils.Interpolation;
 
@@ -72,16 +74,20 @@ public class CalTable extends JPanel {
 
         int nbRow = variable.getDimY();
         int nbCol = variable.getDimX();
-        switch (nbRow) {
-        case 1:
-            // nothin
-            break;
-        case 2:
+
+        switch (variable.getType()) {
+
+        case COURBE:
             nbRow--;
             break;
-        default:
+
+        case MAP:
             nbRow--;
             nbCol--;
+            break;
+
+        default:
+
             break;
         }
 
@@ -162,6 +168,7 @@ public class CalTable extends JPanel {
     }
 
     public final void calcZvalue() {
+        // FIXME Utiliser les valeurs de la variable comme référence et non ceux de la table
 
         final double[][] datasTable = getTableDoubleValue();
         double result = Double.NaN;
@@ -171,11 +178,14 @@ public class CalTable extends JPanel {
             if (variable.getDimY() > 2) {
                 for (int x = 1; x < variable.getDimX(); x++) {
                     result = Interpolation.interpLinear2D(variable.toDouble2D(), datasTable[0][x], datasTable[row + 1][0]);
-                    int diff = Double.compare(result, Double.parseDouble(table.getValueAt(row, x - 1).toString()));
+
+                    BigDecimal bd = BigDecimal.valueOf(result);
+                    BigDecimal bdOrigine = BigDecimal.valueOf(Double.parseDouble(table.getValueAt(row, x - 1).toString()));
+                    int diff = bd.compareTo(bdOrigine);
                     if (diff > 0) {
-                        System.out.println("augmente");
+                        System.out.println(x + "," + row + " augmente de " + diff);
                     } else if (diff < 0) {
-                        System.out.println("diminue");
+                        System.out.println(x + "," + row + " diminue de " + diff);
                     } else {
                         System.out.println("égale");
                     }
@@ -186,11 +196,15 @@ public class CalTable extends JPanel {
             if (variable.getDimY() == 2) {
                 for (int x = 0; x < variable.getDimX(); x++) {
                     result = Interpolation.interpLinear1D(variable.toDouble2D(), datasTable[0][x]);
-                    int diff = Double.compare(result, Double.parseDouble(table.getValueAt(0, x).toString()));
+
+                    BigDecimal bd = BigDecimal.valueOf(result);
+                    BigDecimal bdOrigine = BigDecimal.valueOf(Double.parseDouble(table.getValueAt(0, x).toString()));
+                    int diff = bd.compareTo(bdOrigine);
+
                     if (diff > 0) {
-                        System.out.println("augmente");
+                        System.out.println(x + "," + row + " augmente de " + diff);
                     } else if (diff < 0) {
-                        System.out.println("diminue");
+                        System.out.println(x + "," + row + " diminue de " + diff);
                     } else {
                         System.out.println("égale");
                     }
@@ -266,11 +280,14 @@ public class CalTable extends JPanel {
     public final void populate(Variable variable) {
 
         String value;
+        Object oValue;
         if (variable.getDimX() * variable.getDimY() == 1) {
             table.setTableHeader(null);
             scrollPane.setRowHeaderView(null);
 
-            value = variable.getValue(0, 0).toString();
+            oValue = variable.getValue(0, 0);
+
+            value = oValue != null ? oValue.toString() : "";
 
             table.setValueAt(value, 0, 0);
 
@@ -287,22 +304,52 @@ public class CalTable extends JPanel {
                 table.getColumnModel().getColumn(col).setHeaderValue(xValue);
                 table.setValueAt(value, 0, col);
             }
+        } else if (variable.getDimX() * variable.getDimY() == variable.getDimX()) {
+
+            table.setTableHeader(null);
+            scrollPane.setRowHeaderView(null);
+
+            for (int col = 0; col < variable.getDimX(); col++) {
+                oValue = variable.getValue(0, col);
+
+                value = oValue != null ? oValue.toString() : "";
+
+                table.setValueAt(value, 0, col);
+            }
         } else {
 
-            String xValue;
-            String yValue;
+            if ("Y \\ X".equals(variable.getValue(0, 0).toString())) {
+                String xValue;
+                String yValue;
 
-            for (int row = 1; row < variable.getDimY(); row++) {
-                for (int col = 1; col < variable.getDimX(); col++) {
-                    xValue = variable.getValue(0, col).toString();
-                    yValue = variable.getValue(row, 0).toString();
-                    value = variable.getValue(row, col).toString();
+                for (int row = 1; row < variable.getDimY(); row++) {
+                    for (int col = 1; col < variable.getDimX(); col++) {
+                        xValue = variable.getValue(0, col).toString();
+                        yValue = variable.getValue(row, 0).toString();
+                        value = variable.getValue(row, col).toString();
 
-                    table.getColumnModel().getColumn(col - 1).setHeaderValue(xValue);
-                    rowTable.setValueAt(yValue, row - 1, 0);
-                    table.setValueAt(value, row - 1, col - 1);
+                        table.getColumnModel().getColumn(col - 1).setHeaderValue(xValue);
+                        rowTable.setValueAt(yValue, row - 1, 0);
+                        table.setValueAt(value, row - 1, col - 1);
+                    }
+                }
+            } else {
+
+                table.setTableHeader(null);
+                scrollPane.setRowHeaderView(null);
+
+                for (int row = 0; row < variable.getDimY() - 1; row++) {
+                    for (int col = 0; col < variable.getDimX() - 1; col++) {
+
+                        oValue = variable.getValue(row, col);
+
+                        value = oValue != null ? oValue.toString() : "";
+
+                        table.setValueAt(value, row, col);
+                    }
                 }
             }
+
         }
         adjustCells();
 
@@ -392,8 +439,21 @@ public class CalTable extends JPanel {
         final int nbCol = columnModel.getColumnCount();
         final int nbRow = table.getRowCount();
 
-        final int startCol = nbRow > 1 ? -1 : 0;
-        final int startRow = nbCol > 1 ? -1 : 0;
+        int startCol;
+        int startRow;
+
+        Type typeVar = variable.getType();
+
+        if (typeVar.compareTo(Type.COURBE) == 0) {
+            startCol = 0;
+            startRow = 1;
+        } else if (typeVar.compareTo(Type.MAP) == 0) {
+            startCol = -1;
+            startRow = -1;
+        } else {
+            startCol = 0;
+            startRow = 0;
+        }
 
         StringBuilder sb = new StringBuilder();
 
@@ -442,8 +502,6 @@ public class CalTable extends JPanel {
 
                 @Override
                 public void actionPerformed(ActionEvent e) {
-
-                    System.out.println(getTableValue());
 
                     if (variable == null) {
                         JOptionPane.showMessageDialog(null, "Il faut qu'une variable soit sélectionnée !", "Info", JOptionPane.INFORMATION_MESSAGE);

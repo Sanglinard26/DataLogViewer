@@ -515,18 +515,21 @@ public final class Ihm extends JFrame {
 
                 axisSync = btSynchro.isSelected();
 
-                if (log == null) {
+                final int idxWindow = tabbedPane.getSelectedIndex();
+
+                if (idxWindow < 0 || log == null) {
+                    btSynchro.setSelected(false);
                     return;
                 }
 
                 if (axisSync) {
-                    final int idxWindow = tabbedPane.getSelectedIndex();
-
-                    if (idxWindow < 0) {
-                        return;
-                    }
 
                     ChartView chartView = (ChartView) tabbedPane.getComponentAt(idxWindow);
+                    if (chartView.getDatasetType() > 1) {
+                        btSynchro.setSelected(false);
+                        JOptionPane.showMessageDialog(null, "Fonctionne pour les graphiques=f(temps).", "INFO", JOptionPane.INFORMATION_MESSAGE);
+                        return;
+                    }
                     ValueAxis domainAxis = chartView.getPlot().getDomainAxis();
                     ChartView otherChart;
                     for (int i = 0; i < tabbedPane.getTabCount(); i++) {
@@ -534,7 +537,7 @@ public final class Ihm extends JFrame {
                             continue;
                         }
                         otherChart = (ChartView) tabbedPane.getComponentAt(i);
-                        if (i == idxWindow || !log.getTime().getName().equals(otherChart.getPlot().getDomainAxis().getLabel())) {
+                        if (i == idxWindow || otherChart.getDatasetType() > 1) {
                             continue;
                         }
                         otherChart.getPlot().setDomainAxis(domainAxis);
@@ -548,7 +551,7 @@ public final class Ihm extends JFrame {
                             continue;
                         }
                         chartView = (ChartView) tabbedPane.getComponentAt(i);
-                        if (!log.getTime().getName().equals(chartView.getPlot().getDomainAxis().getLabel())) {
+                        if (chartView.getDatasetType() > 1) {
                             continue;
                         }
                         xAxisRange = chartView.getPlot().getDomainAxis().getRange();
