@@ -22,6 +22,7 @@ public final class MdbData {
     private static final String SOUSTYPE = "Soustype";
     private static final String VARCOL = "Varcol";
     private static final String VARLIGNE = "Varligne";
+    private static final String TYPEVAR = "TypeVariable";
 
     private final String name;
     private Map<String, VariableInfo> infos;
@@ -60,8 +61,8 @@ public final class MdbData {
         HashMap<String, VariableInfo> listInfos = new HashMap<String, VariableInfo>(tableCartos.getRowCount());
 
         for (Row row : tableCartos) {
-            listInfos.put(row.getString(NOMCARTO),
-                    new VariableInfo(row.getString(TYPENAME), row.getString(SOUSTYPE), row.getString(VARCOL), row.getString(VARLIGNE)));
+            listInfos.put(row.getString(NOMCARTO), new VariableInfo(row.getString(TYPENAME), row.getString(SOUSTYPE), row.getString(VARCOL),
+                    row.getString(VARLIGNE), row.getByte(TYPEVAR)));
         }
 
         return listInfos;
@@ -73,12 +74,14 @@ public final class MdbData {
         private String sousType;
         private String varCol;
         private String varLigne;
+        private byte typeVar;
 
-        public VariableInfo(String typeName, String sousType, String varCol, String varLigne) {
+        public VariableInfo(String typeName, String sousType, String varCol, String varLigne, byte typeVar) {
             this.typeName = typeName;
             this.sousType = sousType;
             this.varCol = varCol;
             this.varLigne = varLigne;
+            this.typeVar = typeVar;
         }
 
         public String getTypeName() {
@@ -95,6 +98,10 @@ public final class MdbData {
 
         public String getVarLigne() {
             return varLigne;
+        }
+
+        public byte getTypeVar() {
+            return typeVar;
         }
 
         @Override

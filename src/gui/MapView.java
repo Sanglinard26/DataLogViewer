@@ -40,6 +40,7 @@ public final class MapView extends JPanel {
 
     private static final long serialVersionUID = 1L;
 
+    private final MapCal mapCal;
     private final JList<Variable> listVariable;
     private CalTable dataTable;
     private SurfaceChart surfaceChart;
@@ -49,6 +50,8 @@ public final class MapView extends JPanel {
 
         super();
         setLayout(new GridBagLayout());
+
+        this.mapCal = mapCal;
 
         final GridBagConstraints gbc = new GridBagConstraints();
 
@@ -172,6 +175,35 @@ public final class MapView extends JPanel {
                 menuExport.addSeparator();
                 menuItem = new JMenuItem("Toutes les variables", new ImageIcon(getClass().getResource(ICON_EXCEL)));
                 menuItem.addActionListener(new ExportListener());
+                menuExport.add(menuItem);
+
+                menuExport.addSeparator();
+                menuItem = new JMenuItem("Convertir en Cdfx");
+                menuItem.addActionListener(new ActionListener() {
+
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+
+                        final JFileChooser fileChooser = new JFileChooser();
+                        fileChooser.setDialogTitle("Enregistement du fichier");
+                        fileChooser.setFileFilter(new FileNameExtensionFilter("Fichier Cdfx", "cdfx"));
+                        fileChooser.setSelectedFile(new File(mapCal.getName() + ".cdfx"));
+                        final int rep = fileChooser.showSaveDialog(null);
+
+                        List<Variable> listToExport = new ArrayList<Variable>();
+
+                        for (int i = 0; i < listVariable.getModel().getSize(); i++) {
+                            listToExport.add(listVariable.getModel().getElementAt(i));
+                        }
+
+                        boolean result = MapCal.toCdfx(listToExport, fileChooser.getSelectedFile());
+
+                        if (result) {
+                            JOptionPane.showMessageDialog(null, "Conversion termin\u00e9e !");
+                        }
+
+                    }
+                });
                 menuExport.add(menuItem);
 
                 menu.add(menuExport);

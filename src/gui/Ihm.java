@@ -507,7 +507,7 @@ public final class Ihm extends JFrame {
         bar.add(btNewTable);
 
         final JToggleButton btSynchro = new JToggleButton(new ImageIcon(getClass().getResource(ICON_SHARE_AXIS)));
-        btSynchro.setToolTipText("Synchroniser les axes des abcisses");
+        btSynchro.setToolTipText("Synchroniser les axes des abscisses");
         btSynchro.addActionListener(new ActionListener() {
 
             @Override

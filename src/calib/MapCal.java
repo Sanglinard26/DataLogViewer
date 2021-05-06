@@ -7,8 +7,27 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
+import java.util.TimeZone;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+
+import org.w3c.dom.DOMImplementation;
+import org.w3c.dom.Document;
+import org.w3c.dom.DocumentType;
+import org.w3c.dom.Element;
 
 import jxl.Workbook;
 import jxl.format.Alignment;
@@ -30,6 +49,8 @@ public final class MapCal {
     private final String name;
     private final List<Variable> listVariable;
     private MdbData mdbData;
+
+    private Map<String, Object[]> modifiedVariable;
 
     public MapCal(File mapFile) {
         this.name = mapFile.getName().replace(".map", "");
@@ -79,6 +100,336 @@ public final class MapCal {
 
     public List<Variable> getListVariable() {
         return listVariable;
+    }
+
+    public static final boolean toCdfx(List<Variable> listVariable, final File file) {
+
+        DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder docBuilder;
+        try {
+            docBuilder = dbFactory.newDocumentBuilder();
+
+            Document doc = docBuilder.newDocument();
+            doc.setXmlStandalone(true);
+
+            DOMImplementation domImpl = doc.getImplementation();
+            DocumentType doctype = domImpl.createDocumentType("MSRSW", "-//ASAM//DTD CALIBRATION DATA FORMAT:V2.1:LAI:IAI:XML //EN",
+                    "cdf_v2.1.0.sl.dtd");
+            doc.appendChild(doctype);
+
+            Element racine = doc.createElement("MSRSW");
+            racine.setAttribute("CREATOR-VERSION", "V1.0");
+            racine.setAttribute("CREATOR", "DataLogViewer");
+            doc.appendChild(racine);
+
+            Element shortName = doc.createElement("SHORT-NAME");
+            shortName.appendChild(doc.createTextNode("TEST_CDFX"));
+            racine.appendChild(shortName);
+
+            Element category = doc.createElement("CATEGORY");
+            category.appendChild(doc.createTextNode("CDF21"));
+            racine.appendChild(category);
+
+            // <SW-SYSTEMS>
+            Element swSystems = doc.createElement("SW-SYSTEMS");
+            racine.appendChild(swSystems);
+
+            Element swSystem = doc.createElement("SW-SYSTEM");
+            swSystems.appendChild(swSystem);
+
+            shortName = doc.createElement("SHORT-NAME");
+            shortName.appendChild(doc.createTextNode("BGM_ECU"));
+            swSystem.appendChild(shortName);
+
+            // <SW-INSTANCE-SPEC>
+            Element swInstanceSpec = doc.createElement("SW-INSTANCE-SPEC");
+            swSystem.appendChild(swInstanceSpec);
+
+            // <SW-INSTANCE-TREE>
+            Element swInstanceTree = doc.createElement("SW-INSTANCE-TREE");
+            swInstanceSpec.appendChild(swInstanceTree);
+
+            shortName = doc.createElement("SHORT-NAME");
+            shortName.appendChild(doc.createTextNode("..."));
+            swInstanceTree.appendChild(shortName);
+
+            category = doc.createElement("CATEGORY");
+            category.appendChild(doc.createTextNode("NO_VCD"));
+            swInstanceTree.appendChild(category);
+
+            // Input
+            Date date = new Date(System.currentTimeMillis());
+
+            // Conversion
+            SimpleDateFormat sdf;
+            sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+            String text = sdf.format(date);
+
+            for (Variable var : listVariable) {
+                if (var.getType().compareTo(Type.SCALAIRE) == 0 || var.getType().compareTo(Type.COURBE) == 0 || var.getType().compareTo(Type.MAP) == 0
+                        || var.getType().compareTo(Type.ARRAY) == 0 || var.getType().compareTo(Type.TEXT) == 0) {
+                    createSwInstance(doc, swInstanceTree, var, text);
+                }
+
+            }
+
+            TransformerFactory transformerFactory = TransformerFactory.newInstance();
+            Transformer transformer = transformerFactory.newTransformer();
+            transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+            transformer.setOutputProperty(OutputKeys.METHOD, "xml");
+            transformer.setOutputProperty(OutputKeys.DOCTYPE_PUBLIC, doctype.getPublicId());
+            transformer.setOutputProperty(OutputKeys.DOCTYPE_SYSTEM, doctype.getSystemId());
+            DOMSource source = new DOMSource(doc);
+            StreamResult resultat = new StreamResult(file);
+
+            transformer.transform(source, resultat);
+
+            return true;
+
+        } catch (ParserConfigurationException | TransformerException e) {
+            e.printStackTrace();
+        }
+
+        return false;
+    }
+
+    private static final void createSwInstance(Document doc, Element parent, Variable var, String sDate) {
+        /*
+         * <SW-INSTANCE>
+         * <SHORT-NAME>CDF20.ARRAY.ELEMENT[0]</SHORT-NAME>
+         * <CATEGORY>VALUE</CATEGORY>
+         * <SW-FEATURE-REF>Vectors</SW-FEATURE-REF>
+         * <SW-VALUE-CONT>
+         * <UNIT-DISPLAY-NAME xml:space="preserve"></UNIT-DISPLAY-NAME>
+         * <SW-VALUES-PHYS>
+         * <V>5.0000</V>
+         * </SW-VALUES-PHYS>
+         * </SW-VALUE-CONT>
+         * </SW-INSTANCE>
+         */
+
+        Element swInstance = doc.createElement("SW-INSTANCE");
+        parent.appendChild(swInstance);
+
+        Element shortName = doc.createElement("SHORT-NAME");
+        shortName.appendChild(doc.createTextNode(var.getName()));
+        swInstance.appendChild(shortName);
+
+        Element category = doc.createElement("CATEGORY");
+        category.appendChild(doc.createTextNode(var.getType().getName()));
+        swInstance.appendChild(category);
+
+        Element swFeatureRef = doc.createElement("SW-FEATURE-REF");
+        swFeatureRef.appendChild(doc.createTextNode("..."));
+        swInstance.appendChild(swFeatureRef);
+
+        Element swValueCont = doc.createElement("SW-VALUE-CONT");
+        swInstance.appendChild(swValueCont);
+
+        Element unitDisplayName = doc.createElement("UNIT-DISPLAY-NAME");
+        unitDisplayName.setAttribute("xml:space", "preserve");
+        unitDisplayName.appendChild(doc.createTextNode("-"));
+        swValueCont.appendChild(unitDisplayName);
+
+        if (var.getType().compareTo(Type.ARRAY) == 0 || var.getType().compareTo(Type.TEXT) == 0) {
+            Element swArraySize = doc.createElement("SW-ARRAYSIZE");
+            swValueCont.appendChild(swArraySize);
+            Element v = doc.createElement("V");
+            v.appendChild(doc.createTextNode(String.valueOf(var.getDimX())));
+            swArraySize.appendChild(v);
+            v = doc.createElement("V");
+            v.appendChild(doc.createTextNode(String.valueOf(var.getDimY())));
+            swArraySize.appendChild(v);
+        }
+
+        Element swValuePhys = doc.createElement("SW-VALUES-PHYS");
+        swValueCont.appendChild(swValuePhys);
+
+        Element swAxisConts;
+        Element swAxisCont;
+
+        String value;
+        Element label;
+        Element vg;
+        Element valueNode;
+
+        switch (var.getType()) {
+        case SCALAIRE:
+            value = var.getValue(0, 0) != null ? var.getValue(0, 0).toString() : "0";
+            valueNode = doc.createElement("V");
+            valueNode.appendChild(doc.createTextNode(value));
+            swValuePhys.appendChild(valueNode);
+            break;
+        case COURBE:
+
+            for (short x = 0; x < var.getDimX(); x++) {
+                value = var.getValue(1, x) != null ? var.getValue(1, x).toString() : "0";
+                if (!var.isTextValue()) {
+                    valueNode = doc.createElement("V");
+                } else {
+                    valueNode = doc.createElement("VT");
+                }
+                valueNode.appendChild(doc.createTextNode(value));
+                swValuePhys.appendChild(valueNode);
+            }
+
+            // <SW-AXIS-CONTS>
+            swAxisConts = doc.createElement("SW-AXIS-CONTS");
+            swInstance.appendChild(swAxisConts);
+
+            // <SW-AXIS-CONT>
+            swAxisCont = doc.createElement("SW-AXIS-CONT");
+            swAxisConts.appendChild(swAxisCont);
+
+            category = doc.createElement("CATEGORY");
+            category.appendChild(doc.createTextNode("STD_AXIS"));
+            swAxisCont.appendChild(category);
+
+            swValuePhys = doc.createElement("SW-VALUES-PHYS");
+            swAxisCont.appendChild(swValuePhys);
+
+            for (short x = 0; x < var.getDimX(); x++) {
+                value = var.getValue(0, x) != null ? var.getValue(0, x).toString() : "0";
+                valueNode = doc.createElement("V");
+                valueNode.appendChild(doc.createTextNode(value));
+                swValuePhys.appendChild(valueNode);
+            }
+
+            break;
+        case MAP:
+
+            // <VG> Par ligne
+            // <LABEL> Par ligne
+            // <V>
+
+            for (short y = 1; y < var.getDimY(); y++) {
+                vg = doc.createElement("VG");
+                swValuePhys.appendChild(vg);
+
+                for (short x = 0; x < var.getDimX(); x++) {
+
+                    value = var.getValue(y, x) != null ? var.getValue(y, x).toString() : "0";
+
+                    // System.out.println(value);
+
+                    if (x == 0) {
+                        label = doc.createElement("LABEL");
+                        label.appendChild(doc.createTextNode(value));
+                        vg.appendChild(label);
+                    } else {
+                        valueNode = doc.createElement("V");
+                        valueNode.appendChild(doc.createTextNode(value));
+                        vg.appendChild(valueNode);
+                    }
+
+                }
+            }
+
+            swAxisConts = doc.createElement("SW-AXIS-CONTS");
+            swInstance.appendChild(swAxisConts);
+
+            // Axe X
+            swAxisCont = doc.createElement("SW-AXIS-CONT");
+            swAxisConts.appendChild(swAxisCont);
+
+            category = doc.createElement("CATEGORY");
+            category.appendChild(doc.createTextNode("STD_AXIS"));
+            swAxisCont.appendChild(category);
+
+            swValuePhys = doc.createElement("SW-VALUES-PHYS");
+            swAxisCont.appendChild(swValuePhys);
+
+            for (short x = 1; x < var.getDimX(); x++) {
+                value = var.getValue(0, x) != null ? var.getValue(0, x).toString() : "0";
+                valueNode = doc.createElement("V");
+                valueNode.appendChild(doc.createTextNode(value));
+                swValuePhys.appendChild(valueNode);
+            }
+
+            // Axe Y
+            swAxisCont = doc.createElement("SW-AXIS-CONT");
+            swAxisConts.appendChild(swAxisCont);
+
+            category = doc.createElement("CATEGORY");
+            category.appendChild(doc.createTextNode("STD_AXIS"));
+            swAxisCont.appendChild(category);
+
+            swValuePhys = doc.createElement("SW-VALUES-PHYS");
+            swAxisCont.appendChild(swValuePhys);
+
+            for (short y = 1; y < var.getDimY(); y++) {
+                value = var.getValue(y, 0) != null ? var.getValue(y, 0).toString() : "0";
+                valueNode = doc.createElement("V");
+                valueNode.appendChild(doc.createTextNode(value));
+                swValuePhys.appendChild(valueNode);
+            }
+
+            break;
+        case ARRAY:
+
+            for (short x = 0; x < var.getDimX(); x++) {
+                value = var.getValue(0, x) != null ? var.getValue(0, x).toString() : "0";
+                if (!var.isTextValue()) {
+                    valueNode = doc.createElement("V");
+                } else {
+                    valueNode = doc.createElement("VT");
+                }
+                valueNode.appendChild(doc.createTextNode(value));
+                swValuePhys.appendChild(valueNode);
+            }
+
+            break;
+        case TEXT:
+
+            for (short y = 0; y < var.getDimY(); y++) {
+                vg = doc.createElement("VG");
+                swValuePhys.appendChild(vg);
+
+                for (short x = 0; x < var.getDimX(); x++) {
+
+                    value = var.getValue(y, x) != null ? var.getValue(y, x).toString() : " ";
+
+                    valueNode = doc.createElement("VT");
+                    valueNode.appendChild(doc.createTextNode(value));
+                    vg.appendChild(valueNode);
+
+                }
+            }
+
+            break;
+
+        default:
+            break;
+        }
+
+        // SW-CS-HISTORY
+        Element swCsHistory = doc.createElement("SW-CS-HISTORY");
+        swInstance.appendChild(swCsHistory);
+
+        // CS-ENTRY
+        Element swCsEntry = doc.createElement("CS-ENTRY");
+        swCsHistory.appendChild(swCsEntry);
+
+        Element state = doc.createElement("STATE");
+        swCsEntry.appendChild(state);
+        state.appendChild(doc.createTextNode("---"));
+
+        Element date = doc.createElement("DATE");
+        swCsEntry.appendChild(date);
+        date.appendChild(doc.createTextNode(sDate));
+
+        Element user = doc.createElement("CSUS");
+        swCsEntry.appendChild(user);
+        user.appendChild(doc.createTextNode("User"));
+
+        Element remark = doc.createElement("REMARK");
+        swCsEntry.appendChild(remark);
+
+        Element com = doc.createElement("P");
+        remark.appendChild(com);
+        com.appendChild(doc.createTextNode("Commentaire pour " + var.getName()));
+
     }
 
     public static final boolean toExcel(List<Variable> listVariable, final File file) {

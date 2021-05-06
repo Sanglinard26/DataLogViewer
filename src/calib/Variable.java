@@ -23,6 +23,9 @@ public final class Variable implements Comparable<Variable> {
     public Variable(List<String> data, MdbData mdbData) {
         this.name = data.get(0).substring(1, data.get(0).length() - 1);
         this.infos = mdbData.getInfos().get(this.name);
+
+        // System.out.println(this.name);
+
         build(data);
     }
 
@@ -37,6 +40,10 @@ public final class Variable implements Comparable<Variable> {
     @Override
     public String toString() {
         return this.name;
+    }
+
+    public boolean isTextValue() {
+        return this.infos != null ? this.infos.getTypeVar() == 1 : false;
     }
 
     public int getDimX() {
@@ -176,7 +183,11 @@ public final class Variable implements Comparable<Variable> {
                 if (ligne != null) {
                     splitSemiColon = ligne.toString().split(SEMICOLON);
                     for (int j = 0; j < dimX - 1; j++) {
-                        setValue(Utilitaire.getStorageObject(splitSemiColon[j]), i + 1, j + 1);
+                        if (splitSemiColon.length > 0) {
+                            setValue(Utilitaire.getStorageObject(splitSemiColon[j]), i + 1, j + 1);
+                        } else {
+                            setValue(Utilitaire.getStorageObject(Float.NaN), i + 1, j + 1);
+                        }
                     }
                 }
             }
@@ -193,12 +204,21 @@ public final class Variable implements Comparable<Variable> {
             int y = 0;
             for (Object s : mapValues.values()) {
                 int x = 0;
-                for (String s_ : s.toString().split(SEMICOLON)) {
-                    if (!s_.isEmpty()) {
-                        setValue(Utilitaire.getStorageObject(s_), y, x);
+                splitSemiColon = s.toString().split(SEMICOLON);
+
+                if (splitSemiColon.length > 0) {
+                    for (String s_ : splitSemiColon) {
+                        if (!s_.isEmpty()) {
+                            setValue(Utilitaire.getStorageObject(s_), y, x);
+                        }
+                        x++;
                     }
-                    x++;
+                } else {
+                    for (int j = 0; j < dimX; j++) {
+                        setValue(Utilitaire.getStorageObject(""), y, j);
+                    }
                 }
+
                 y++;
             }
         }

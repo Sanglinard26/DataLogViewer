@@ -5,6 +5,16 @@ package calib;
 
 public enum Type {
 
-    SCALAIRE, COURBE, MAP, ARRAY, TEXT, UNKNOWN
+    SCALAIRE("VALUE"), COURBE("CURVE"), MAP("MAP"), ARRAY("VAL_BLK"), TEXT("VAL_BLK"), UNKNOWN("UNKNOWN");
+
+    String name;
+
+    private Type(String name) {
+        this.name = name;
+    }
+
+    public String getName() {
+        return name;
+    }
 
 }

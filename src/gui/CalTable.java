@@ -36,6 +36,8 @@ import javax.swing.SwingConstants;
 import javax.swing.border.MatteBorder;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
+import javax.swing.event.TableModelEvent;
+import javax.swing.event.TableModelListener;
 import javax.swing.table.JTableHeader;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
@@ -93,6 +95,17 @@ public class CalTable extends JPanel {
 
         table = new JTable(nbRow, nbCol);
 
+        table.getModel().addTableModelListener(new TableModelListener() {
+
+            @Override
+            public void tableChanged(TableModelEvent e) {
+                if (e.getType() == TableModelEvent.UPDATE) {
+
+                }
+
+            }
+        });
+
         table.setTableHeader(new CustomTableHeader(table));
         header = table.getTableHeader();
         header.setDefaultRenderer(new SimpleHeaderRenderer());
@@ -119,6 +132,8 @@ public class CalTable extends JPanel {
         scrollPane.setRowHeaderView(rowTable);
 
         populate(variable);
+
+        adjustCells();
 
         add(scrollPane, BorderLayout.CENTER);
 
@@ -168,47 +183,49 @@ public class CalTable extends JPanel {
     }
 
     public final void calcZvalue() {
-        // FIXME Utiliser les valeurs de la variable comme référence et non ceux de la table
 
         final double[][] datasTable = getTableDoubleValue();
+        final double[][] datasRef = variable.toDouble2D();
         double result = Double.NaN;
+        BigDecimal bd;
+        BigDecimal bdOrigine;
+        BigDecimal bdOldValTable;
 
         for (int row = 0; row < table.getRowCount(); row++) {
 
             if (variable.getDimY() > 2) {
                 for (int x = 1; x < variable.getDimX(); x++) {
-                    result = Interpolation.interpLinear2D(variable.toDouble2D(), datasTable[0][x], datasTable[row + 1][0]);
+                    result = Interpolation.interpLinear2D(datasRef, datasTable[0][x], datasTable[row + 1][0]);
 
-                    BigDecimal bd = BigDecimal.valueOf(result);
-                    BigDecimal bdOrigine = BigDecimal.valueOf(Double.parseDouble(table.getValueAt(row, x - 1).toString()));
+                    bd = BigDecimal.valueOf(result);
+                    bdOrigine = BigDecimal.valueOf(datasRef[row + 1][x]);
+                    bdOldValTable = BigDecimal.valueOf(datasTable[row + 1][x]);
                     int diff = bd.compareTo(bdOrigine);
-                    if (diff > 0) {
-                        System.out.println(x + "," + row + " augmente de " + diff);
-                    } else if (diff < 0) {
-                        System.out.println(x + "," + row + " diminue de " + diff);
-                    } else {
-                        System.out.println("égale");
+
+                    TableCellRenderer cellRenderer = table.getCellRenderer(row, x - 1);
+                    Component c = cellRenderer.getTableCellRendererComponent(table, bdOldValTable, false, false, row, x - 1);
+
+                    if (bd.compareTo(bdOldValTable) != 0) {
+                        table.setValueAt(result, row, x - 1);
                     }
-                    table.setValueAt(result, row, x - 1);
                 }
             }
 
             if (variable.getDimY() == 2) {
                 for (int x = 0; x < variable.getDimX(); x++) {
-                    result = Interpolation.interpLinear1D(variable.toDouble2D(), datasTable[0][x]);
+                    result = Interpolation.interpLinear1D(datasRef, datasTable[0][x]);
 
-                    BigDecimal bd = BigDecimal.valueOf(result);
-                    BigDecimal bdOrigine = BigDecimal.valueOf(Double.parseDouble(table.getValueAt(0, x).toString()));
+                    bd = BigDecimal.valueOf(result);
+                    bdOrigine = BigDecimal.valueOf(datasRef[1][x]);
+                    bdOldValTable = BigDecimal.valueOf(datasTable[1][x]);
                     int diff = bd.compareTo(bdOrigine);
 
-                    if (diff > 0) {
-                        System.out.println(x + "," + row + " augmente de " + diff);
-                    } else if (diff < 0) {
-                        System.out.println(x + "," + row + " diminue de " + diff);
-                    } else {
-                        System.out.println("égale");
+                    TableCellRenderer cellRenderer = table.getCellRenderer(0, x);
+                    Component c = cellRenderer.getTableCellRendererComponent(table, bdOldValTable, false, false, 0, x);
+
+                    if (bd.compareTo(bdOldValTable) != 0) {
+                        table.setValueAt(result, 0, x);
                     }
-                    table.setValueAt(result, 0, x);
                 }
             }
         }
@@ -351,7 +368,6 @@ public class CalTable extends JPanel {
             }
 
         }
-        adjustCells();
 
     }
 
@@ -446,7 +462,7 @@ public class CalTable extends JPanel {
 
         if (typeVar.compareTo(Type.COURBE) == 0) {
             startCol = 0;
-            startRow = 1;
+            startRow = -1;
         } else if (typeVar.compareTo(Type.MAP) == 0) {
             startCol = -1;
             startRow = -1;
@@ -488,8 +504,8 @@ public class CalTable extends JPanel {
         private static final long serialVersionUID = 1L;
 
         final String ICON_COPY = "/icon_copy_24.png";
-
         final String ICON_MATH = "/icon_math_24.png";
+        final String ICON_RESET = "/icon_backRef_24.png";
 
         public BarControl() {
             super();
@@ -539,6 +555,22 @@ public class CalTable extends JPanel {
                 }
             });
             add(btInterpolation);
+
+            final JButton btReset = new JButton(new ImageIcon(getClass().getResource(ICON_RESET)));
+            btReset.setToolTipText("Retour aux valeurs de base");
+            btReset.addActionListener(new ActionListener() {
+
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    if (table == null) {
+                        return;
+                    }
+
+                    populate(variable);
+
+                }
+            });
+            add(btReset);
         }
     }
 
