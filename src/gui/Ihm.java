@@ -347,7 +347,6 @@ public final class Ihm extends JFrame {
             @Override
             public void actionPerformed(ActionEvent e) {
                 new DialNotice(Ihm.this);
-
             }
         });
         menu.add(menuItem);

@@ -46,6 +46,7 @@ import javax.swing.table.TableColumnModel;
 import calib.Type;
 import calib.Variable;
 import utils.Interpolation;
+import utils.Utilitaire;
 
 public class CalTable extends JPanel {
 
@@ -61,6 +62,7 @@ public class CalTable extends JPanel {
     private JTextField text;
     private TableColumn column;
     private int rowBrkPt;
+    private int columnBrkPt;
 
     public CalTable(Variable variable) {
         super(new BorderLayout(0, 0));
@@ -101,6 +103,35 @@ public class CalTable extends JPanel {
             public void tableChanged(TableModelEvent e) {
                 if (e.getType() == TableModelEvent.UPDATE) {
 
+                    int row = e.getFirstRow();
+                    int col = e.getColumn();
+
+                    int offsetRow = 0;
+                    int offsetCol = 0;
+
+                    switch (CalTable.this.variable.getType()) {
+
+                    case COURBE:
+                        offsetRow = 1;
+                        break;
+                    case MAP:
+                        offsetRow = 1;
+                        offsetCol = 1;
+                        break;
+                    default:
+                        break;
+                    }
+
+                    // Object refValue = CalTable.this.variable.getValue(false, row + offsetRow, col + offsetCol);
+                    Object actValue = Utilitaire.getStorageObject(table.getValueAt(row, col));
+
+                    if (actValue != null) {
+                        if (!(actValue instanceof String) && !CalTable.this.variable.checkResolution(actValue)) {
+                            System.out.println(actValue + " => nOK avec la résolution");
+                        }
+                        CalTable.this.variable.saveNewValue(row + offsetRow, col + offsetCol, actValue);
+                        CalTable.this.variable.notifyObservers();
+                    }
                 }
 
             }
@@ -140,11 +171,11 @@ public class CalTable extends JPanel {
     }
 
     private void editColumnAt(Point p) {
-        int columnIndex = header.columnAtPoint(p);
+        columnBrkPt = header.columnAtPoint(p);
 
-        if (columnIndex != -1) {
-            column = header.getColumnModel().getColumn(columnIndex);
-            Rectangle columnRectangle = header.getHeaderRect(columnIndex);
+        if (columnBrkPt != -1) {
+            column = header.getColumnModel().getColumn(columnBrkPt);
+            Rectangle columnRectangle = header.getHeaderRect(columnBrkPt);
 
             text.setText(column.getHeaderValue().toString());
             renamePopup.setPreferredSize(new Dimension(columnRectangle.width, columnRectangle.height - 1));
@@ -170,11 +201,22 @@ public class CalTable extends JPanel {
     }
 
     private void changeBreakPoint() {
+
+        int offsetRow = 0;
+        int offsetCol = 0;
+
+        if (rowTable.getRowCount() > 1) {
+            offsetRow = 1;
+            offsetCol = 1;
+        }
+
         if (column != null) {
+            CalTable.this.variable.saveNewValue(0, columnBrkPt + offsetCol, text.getText());
             column.setHeaderValue(text.getText());
             header.repaint();
         } else {
             if (rowBrkPt != -1) {
+                CalTable.this.variable.saveNewValue(rowBrkPt + offsetRow, 0, text.getText());
                 rowTable.setValueAt(text.getText(), rowBrkPt, 0);
             }
         }
@@ -185,7 +227,7 @@ public class CalTable extends JPanel {
     public final void calcZvalue() {
 
         final double[][] datasTable = getTableDoubleValue();
-        final double[][] datasRef = variable.toDouble2D();
+        final double[][] datasRef = variable.toDouble2D(false);
         double result = Double.NaN;
         BigDecimal bd;
         BigDecimal bdOrigine;
@@ -298,11 +340,14 @@ public class CalTable extends JPanel {
 
         String value;
         Object oValue;
+
+        boolean modifiedVar = variable.isModified();
+
         if (variable.getDimX() * variable.getDimY() == 1) {
             table.setTableHeader(null);
             scrollPane.setRowHeaderView(null);
 
-            oValue = variable.getValue(0, 0);
+            oValue = variable.getValue(modifiedVar, 0, 0);
 
             value = oValue != null ? oValue.toString() : "";
 
@@ -315,8 +360,8 @@ public class CalTable extends JPanel {
             String xValue;
 
             for (int col = 0; col < variable.getDimX(); col++) {
-                xValue = variable.getValue(0, col).toString();
-                value = variable.getValue(1, col).toString();
+                xValue = variable.getValue(modifiedVar, 0, col).toString();
+                value = variable.getValue(modifiedVar, 1, col).toString();
 
                 table.getColumnModel().getColumn(col).setHeaderValue(xValue);
                 table.setValueAt(value, 0, col);
@@ -327,7 +372,7 @@ public class CalTable extends JPanel {
             scrollPane.setRowHeaderView(null);
 
             for (int col = 0; col < variable.getDimX(); col++) {
-                oValue = variable.getValue(0, col);
+                oValue = variable.getValue(modifiedVar, 0, col);
 
                 value = oValue != null ? oValue.toString() : "";
 
@@ -335,15 +380,15 @@ public class CalTable extends JPanel {
             }
         } else {
 
-            if ("Y \\ X".equals(variable.getValue(0, 0).toString())) {
+            if ("Y \\ X".equals(variable.getValue(modifiedVar, 0, 0).toString())) {
                 String xValue;
                 String yValue;
 
                 for (int row = 1; row < variable.getDimY(); row++) {
                     for (int col = 1; col < variable.getDimX(); col++) {
-                        xValue = variable.getValue(0, col).toString();
-                        yValue = variable.getValue(row, 0).toString();
-                        value = variable.getValue(row, col).toString();
+                        xValue = variable.getValue(modifiedVar, 0, col).toString();
+                        yValue = variable.getValue(modifiedVar, row, 0).toString();
+                        value = variable.getValue(modifiedVar, row, col).toString();
 
                         table.getColumnModel().getColumn(col - 1).setHeaderValue(xValue);
                         rowTable.setValueAt(yValue, row - 1, 0);
@@ -358,7 +403,7 @@ public class CalTable extends JPanel {
                 for (int row = 0; row < variable.getDimY() - 1; row++) {
                     for (int col = 0; col < variable.getDimX() - 1; col++) {
 
-                        oValue = variable.getValue(row, col);
+                        oValue = variable.getValue(modifiedVar, row, col);
 
                         value = oValue != null ? oValue.toString() : "";
 
@@ -565,7 +610,7 @@ public class CalTable extends JPanel {
                     if (table == null) {
                         return;
                     }
-
+                    variable.backToRefValue();
                     populate(variable);
 
                 }

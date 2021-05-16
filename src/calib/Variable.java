@@ -4,20 +4,23 @@
 package calib;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Observable;
 
 import calib.MdbData.VariableInfo;
 import utils.Utilitaire;
 
-public final class Variable implements Comparable<Variable> {
+public final class Variable extends Observable implements Comparable<Variable> {
 
     private final String name;
     private Type type;
     private int dimX;
     private int dimY;
     private Object[] values;
+    private Object[] newValues;
     private VariableInfo infos;
 
     public Variable(List<String> data, MdbData mdbData) {
@@ -46,6 +49,10 @@ public final class Variable implements Comparable<Variable> {
         return this.infos != null ? this.infos.getTypeVar() == 1 : false;
     }
 
+    public boolean isModified() {
+        return newValues != null;
+    }
+
     public int getDimX() {
         return dimX;
     }
@@ -54,14 +61,60 @@ public final class Variable implements Comparable<Variable> {
         return dimY;
     }
 
-    public Object getValue(int... coord) {
-        int idx = coord[1] + dimX * coord[0];
-        return this.values[idx];
+    public final double getResolution() {
+        return this.infos != null ? 1 / this.infos.getFactor() : 1 / 32768;
     }
 
-    public void setValue(Object value, int... coord) {
+    public final boolean checkResolution(Object value) {
+        double div = (Double.parseDouble(value.toString())) / getResolution();
+        int rnd = (int) ((Double.parseDouble(value.toString())) / getResolution());
+        double res = div - rnd;
+        // return div - rnd == 0;
+        return true;
+    }
+
+    public boolean checkDim() {
+
+        if (infos != null) {
+            switch (this.type) {
+            case SCALAIRE:
+                return this.dimX == infos.getNbBkPtCol();
+            case ARRAY:
+                return this.dimX == infos.getNbBkPtCol();
+            case COURBE:
+                return this.dimX == infos.getNbBkPtCol() && this.dimY == infos.getNbBkPtRow() + 2;
+            case MAP:
+                return this.dimX - 1 == infos.getNbBkPtCol() && this.dimY - 1 == infos.getNbBkPtRow();
+            case TEXT:
+                return this.dimX == infos.getNbBkPtCol() && this.dimY == infos.getNbBkPtRow();
+            default:
+                break;
+            }
+        }
+
+        return true;
+    }
+
+    public Object getValue(boolean modifiedVar, int... coord) {
         int idx = coord[1] + dimX * coord[0];
-        this.values[idx] = value;
+        if (!modifiedVar) {
+            return this.values[idx];
+        }
+        return this.newValues[idx];
+    }
+
+    public void setValue(boolean newVal, Object value, int... coord) {
+        int idx = coord[1] + dimX * coord[0];
+        if (!newVal) {
+            this.values[idx] = value;
+        } else {
+            this.newValues[idx] = value;
+        }
+
+    }
+
+    public void backToRefValue() {
+        this.newValues = null;
     }
 
     private final void build(List<String> data) {
@@ -104,6 +157,10 @@ public final class Variable implements Comparable<Variable> {
                             values[cnt] = Utilitaire.getStorageObject(s);
                         }
                         cnt++;
+                    }
+
+                    if (cnt == 0) {
+                        Arrays.fill(values, Double.NaN);
                     }
 
                     break;
@@ -152,13 +209,29 @@ public final class Variable implements Comparable<Variable> {
 
         if (bkptcol != null && line != null && mapValues == null) {
             dimX = bkptcol.size();
-            dimY = 2;
-            type = Type.COURBE;
-            values = new Object[dimX * dimY];
-            for (int i = 0; i < dimX; i++) {
-                setValue(bkptcol.get(i), 0, i);
-                setValue(line.get(i), 1, i);
+            if (dimX > 0) {
+                dimY = 2;
+                type = Type.COURBE;
+                values = new Object[dimX * dimY];
+                for (int i = 0; i < dimX; i++) {
+                    setValue(false, bkptcol.get(i), 0, i);
+                    setValue(false, line.get(i), 1, i);
+                }
+            } else { // Cas d'une carto vide
+
+                if (this.infos != null) {
+                    dimX = this.infos.getNbBkPtCol() + 1;
+                    dimY = this.infos.getNbBkPtRow() + 1;
+                } else {
+                    dimX = 3;
+                    dimY = 3;
+                }
+
+                type = Type.MAP;
+                values = new Object[dimX * dimY];
+                Arrays.fill(values, Double.NaN);
             }
+
         } else if (mapValues != null && bkptcol != null && bkptlign != null) {
             dimX = bkptcol.size() + 1;
             dimY = bkptlign.size() + 1;
@@ -167,26 +240,26 @@ public final class Variable implements Comparable<Variable> {
 
             values = new Object[dimX * dimY];
 
-            setValue("Y \\ X", 0, 0);
+            setValue(false, "Y \\ X", 0, 0);
 
             for (int i = 1; i < dimX; i++) {
-                setValue(bkptcol.get(i - 1), 0, i);
+                setValue(false, bkptcol.get(i - 1), 0, i);
             }
 
             Object keyLigne;
             Object ligne;
             for (int i = 0; i < dimY - 1; i++) {
                 keyLigne = bkptlign.get(i);
-                setValue(keyLigne, i + 1, 0);
+                setValue(false, keyLigne, i + 1, 0);
 
                 ligne = mapValues.get(keyLigne);
                 if (ligne != null) {
                     splitSemiColon = ligne.toString().split(SEMICOLON);
                     for (int j = 0; j < dimX - 1; j++) {
                         if (splitSemiColon.length > 0) {
-                            setValue(Utilitaire.getStorageObject(splitSemiColon[j]), i + 1, j + 1);
+                            setValue(false, Utilitaire.getStorageObject(splitSemiColon[j]), i + 1, j + 1);
                         } else {
-                            setValue(Utilitaire.getStorageObject(Float.NaN), i + 1, j + 1);
+                            setValue(false, Utilitaire.getStorageObject(Float.NaN), i + 1, j + 1);
                         }
                     }
                 }
@@ -209,13 +282,13 @@ public final class Variable implements Comparable<Variable> {
                 if (splitSemiColon.length > 0) {
                     for (String s_ : splitSemiColon) {
                         if (!s_.isEmpty()) {
-                            setValue(Utilitaire.getStorageObject(s_), y, x);
+                            setValue(false, Utilitaire.getStorageObject(s_), y, x);
                         }
                         x++;
                     }
                 } else {
                     for (int j = 0; j < dimX; j++) {
-                        setValue(Utilitaire.getStorageObject(""), y, j);
+                        setValue(false, Utilitaire.getStorageObject(""), y, j);
                     }
                 }
 
@@ -223,6 +296,10 @@ public final class Variable implements Comparable<Variable> {
             }
         }
 
+    }
+
+    public final VariableInfo getInfos() {
+        return infos;
     }
 
     public final void printInfo() {
@@ -234,7 +311,15 @@ public final class Variable implements Comparable<Variable> {
         return this.name.compareToIgnoreCase(var.getName());
     }
 
-    public final float[] getXAxis() {
+    public final void saveNewValue(int y, int x, Object newValue) {
+        if (newValues == null) {
+            newValues = Arrays.copyOf(values, values.length);
+        }
+        setValue(true, newValue, y, x);
+        setChanged();
+    }
+
+    public final float[] getXAxis(boolean modifiedVar) {
 
         float[] xAxis;
 
@@ -242,29 +327,29 @@ public final class Variable implements Comparable<Variable> {
             xAxis = new float[dimX - 1];
 
             for (int x = 1; x < dimX; x++) {
-                xAxis[x - 1] = Float.parseFloat(getValue(0, x).toString());
+                xAxis[x - 1] = Float.parseFloat(getValue(modifiedVar, 0, x).toString());
             }
         } else {
             xAxis = new float[dimX];
 
             for (int x = 0; x < dimX; x++) {
-                xAxis[x] = Float.parseFloat(getValue(0, x).toString());
+                xAxis[x] = Float.parseFloat(getValue(modifiedVar, 0, x).toString());
             }
         }
 
         return xAxis;
     }
 
-    public final float[] getYAxis() {
+    public final float[] getYAxis(boolean modifiedVar) {
         float[] yAxis = new float[dimY - 1];
 
         for (int y = 1; y < dimY; y++) {
-            yAxis[y - 1] = Float.parseFloat(getValue(y, 0).toString());
+            yAxis[y - 1] = Float.parseFloat(getValue(modifiedVar, y, 0).toString());
         }
         return yAxis;
     }
 
-    public final float[][] getZvalues() {
+    public final float[][] getZvalues(boolean modifiedVar) {
 
         float[][] floatValues;
 
@@ -272,14 +357,14 @@ public final class Variable implements Comparable<Variable> {
             floatValues = new float[dimY - 1][dimX - 1];
             for (short y = 1; y < dimY; y++) {
                 for (short x = 1; x < dimX; x++) {
-                    floatValues[y - 1][x - 1] = Float.parseFloat(getValue(y, x).toString());
+                    floatValues[y - 1][x - 1] = Float.parseFloat(getValue(modifiedVar, y, x).toString());
                 }
             }
         } else {
             floatValues = new float[1][dimX];
             for (short x = 0; x < dimX; x++) {
                 try {
-                    floatValues[0][x] = Float.parseFloat(getValue(1, x).toString());
+                    floatValues[0][x] = Float.parseFloat(getValue(modifiedVar, 1, x).toString());
                 } catch (NumberFormatException e) {
                     floatValues[0][x] = Float.NaN;
                 }
@@ -290,15 +375,15 @@ public final class Variable implements Comparable<Variable> {
         return floatValues;
     }
 
-    public final double[][] toDouble2D() {
+    public final double[][] toDouble2D(boolean modifiedVar) {
 
         double[][] doubleValues = new double[dimY][dimX];
 
         for (short y = 0; y < dimY; y++) {
             for (short x = 0; x < dimX; x++) {
 
-                if (getValue(y, x) instanceof Number) {
-                    doubleValues[y][x] = Double.parseDouble(getValue(y, x).toString());
+                if (getValue(modifiedVar, y, x) instanceof Number) {
+                    doubleValues[y][x] = Double.parseDouble(getValue(modifiedVar, y, x).toString());
                 } else {
                     if (x * y != 0) {
                         doubleValues[y][x] = Double.NaN;

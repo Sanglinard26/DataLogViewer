@@ -4,14 +4,16 @@
 package calib;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 import java.util.TimeZone;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -50,8 +52,6 @@ public final class MapCal {
     private final List<Variable> listVariable;
     private MdbData mdbData;
 
-    private Map<String, Object[]> modifiedVariable;
-
     public MapCal(File mapFile) {
         this.name = mapFile.getName().replace(".map", "");
         this.listVariable = new ArrayList<Variable>();
@@ -67,6 +67,8 @@ public final class MapCal {
             List<String> fileToList = Files.readAllLines(mapFile.toPath(), Charset.forName("ISO-8859-1"));
             String line;
 
+            Variable variable;
+
             for (int nLigne = 0; nLigne < fileToList.size(); nLigne++) {
                 line = fileToList.get(nLigne);
 
@@ -81,9 +83,17 @@ public final class MapCal {
 
                     } while (nLigne < fileToList.size());
 
-                    listVariable.add(new Variable(fileToList.subList(begin, nLigne), mdbData));
-                    nLigne--;
+                    variable = new Variable(fileToList.subList(begin, nLigne), mdbData);
 
+                    if (mdbData.getInfos().isEmpty() || variable.getInfos() != null) {
+                        listVariable.add(variable);
+                        if (!variable.checkDim())
+                            System.out.println(variable.getName() + " => CheckDim nOK");
+                    } else {
+                        System.out.println(variable.getName() + " => non présente dans le mdb");
+                    }
+
+                    nLigne--;
                 }
 
             }
@@ -254,9 +264,11 @@ public final class MapCal {
         Element vg;
         Element valueNode;
 
+        boolean modifiedVar = var.isModified();
+
         switch (var.getType()) {
         case SCALAIRE:
-            value = var.getValue(0, 0) != null ? var.getValue(0, 0).toString() : "0";
+            value = var.getValue(modifiedVar, 0, 0) != null ? var.getValue(modifiedVar, 0, 0).toString() : "0";
             valueNode = doc.createElement("V");
             valueNode.appendChild(doc.createTextNode(value));
             swValuePhys.appendChild(valueNode);
@@ -264,7 +276,7 @@ public final class MapCal {
         case COURBE:
 
             for (short x = 0; x < var.getDimX(); x++) {
-                value = var.getValue(1, x) != null ? var.getValue(1, x).toString() : "0";
+                value = var.getValue(modifiedVar, 1, x) != null ? var.getValue(modifiedVar, 1, x).toString() : "0";
                 if (!var.isTextValue()) {
                     valueNode = doc.createElement("V");
                 } else {
@@ -290,7 +302,7 @@ public final class MapCal {
             swAxisCont.appendChild(swValuePhys);
 
             for (short x = 0; x < var.getDimX(); x++) {
-                value = var.getValue(0, x) != null ? var.getValue(0, x).toString() : "0";
+                value = var.getValue(modifiedVar, 0, x) != null ? var.getValue(modifiedVar, 0, x).toString() : "0";
                 valueNode = doc.createElement("V");
                 valueNode.appendChild(doc.createTextNode(value));
                 swValuePhys.appendChild(valueNode);
@@ -309,7 +321,7 @@ public final class MapCal {
 
                 for (short x = 0; x < var.getDimX(); x++) {
 
-                    value = var.getValue(y, x) != null ? var.getValue(y, x).toString() : "0";
+                    value = var.getValue(modifiedVar, y, x) != null ? var.getValue(modifiedVar, y, x).toString() : "0";
 
                     // System.out.println(value);
 
@@ -341,7 +353,7 @@ public final class MapCal {
             swAxisCont.appendChild(swValuePhys);
 
             for (short x = 1; x < var.getDimX(); x++) {
-                value = var.getValue(0, x) != null ? var.getValue(0, x).toString() : "0";
+                value = var.getValue(modifiedVar, 0, x) != null ? var.getValue(modifiedVar, 0, x).toString() : "0";
                 valueNode = doc.createElement("V");
                 valueNode.appendChild(doc.createTextNode(value));
                 swValuePhys.appendChild(valueNode);
@@ -359,7 +371,7 @@ public final class MapCal {
             swAxisCont.appendChild(swValuePhys);
 
             for (short y = 1; y < var.getDimY(); y++) {
-                value = var.getValue(y, 0) != null ? var.getValue(y, 0).toString() : "0";
+                value = var.getValue(modifiedVar, y, 0) != null ? var.getValue(modifiedVar, y, 0).toString() : "0";
                 valueNode = doc.createElement("V");
                 valueNode.appendChild(doc.createTextNode(value));
                 swValuePhys.appendChild(valueNode);
@@ -369,7 +381,7 @@ public final class MapCal {
         case ARRAY:
 
             for (short x = 0; x < var.getDimX(); x++) {
-                value = var.getValue(0, x) != null ? var.getValue(0, x).toString() : "0";
+                value = var.getValue(modifiedVar, 0, x) != null ? var.getValue(modifiedVar, 0, x).toString() : "0";
                 if (!var.isTextValue()) {
                     valueNode = doc.createElement("V");
                 } else {
@@ -388,7 +400,7 @@ public final class MapCal {
 
                 for (short x = 0; x < var.getDimX(); x++) {
 
-                    value = var.getValue(y, x) != null ? var.getValue(y, x).toString() : " ";
+                    value = var.getValue(modifiedVar, y, x) != null ? var.getValue(modifiedVar, y, x).toString() : " ";
 
                     valueNode = doc.createElement("VT");
                     valueNode.appendChild(doc.createTextNode(value));
@@ -430,6 +442,140 @@ public final class MapCal {
         remark.appendChild(com);
         com.appendChild(doc.createTextNode("Commentaire pour " + var.getName()));
 
+    }
+
+    public static final boolean exportMap(List<Variable> listVariable, final File file) {
+
+        final String COLONNES = "colonnes";
+        final String BKPTCOL = "bkptcol";
+        final String LIGNE = "ligne";
+        final String BKPTLIGN = "bkptlign";
+        final String SEMICOLON = ";";
+        final String EGALE = "=";
+
+        try (PrintWriter pw = new PrintWriter(file, "ISO-8859-1")) {
+
+            String variableName;
+            Object value;
+
+            for (Variable var : listVariable) {
+
+                variableName = var.getName();
+                boolean modifiedVar = var.isModified();
+
+                pw.println("[" + variableName + "]");
+
+                switch (var.getType()) {
+                case SCALAIRE:
+
+                    value = var.getValue(modifiedVar, 0, 0);
+
+                    if (value == null || "NaN".equals(value.toString())) {
+                        value = "";
+                    }
+
+                    pw.println(COLONNES + EGALE + value + SEMICOLON);
+                    break;
+
+                case ARRAY:
+
+                    pw.print(COLONNES + EGALE);
+
+                    for (short x = 0; x < var.getDimX(); x++) {
+
+                        value = var.getValue(modifiedVar, 0, x);
+
+                        if (value == null || "NaN".equals(value.toString())) {
+                            value = "";
+                        }
+
+                        pw.print(value + SEMICOLON);
+                    }
+
+                    pw.println();
+
+                    break;
+
+                case COURBE:
+
+                    pw.print(BKPTCOL + EGALE);
+
+                    for (byte y = 0; y < 2; y++) {
+                        for (short x = 0; x < var.getDimX(); x++) {
+                            if (y == 1 && x == 0) {
+                                pw.print(LIGNE + EGALE);
+                            }
+
+                            value = var.getValue(modifiedVar, y, x);
+
+                            if (value == null || "NaN".equals(value.toString())) {
+                                value = "";
+                            }
+
+                            pw.print(value + SEMICOLON);
+                        }
+                        pw.println();
+                    }
+
+                    break;
+
+                case MAP:
+
+                    pw.print(BKPTCOL + EGALE);
+
+                    for (short x = 1; x < var.getDimX(); x++) {
+                        pw.print(var.getValue(modifiedVar, 0, x) + SEMICOLON);
+                    }
+                    pw.println();
+
+                    pw.print(BKPTLIGN + EGALE);
+
+                    for (short y = 1; y < var.getDimY(); y++) {
+                        pw.print(var.getValue(modifiedVar, y, 0) + SEMICOLON);
+                    }
+                    pw.println();
+
+                    for (short y = 1; y < var.getDimY(); y++) {
+                        for (short x = 0; x < var.getDimX(); x++) {
+                            if (x == 0) {
+                                pw.print(LIGNE + var.getValue(modifiedVar, y, x) + EGALE);
+                                continue;
+                            }
+                            pw.print(var.getValue(modifiedVar, y, x) + SEMICOLON);
+                        }
+                        pw.println();
+                    }
+                    break;
+
+                case TEXT:
+
+                    for (short y = 0; y < var.getDimY(); y++) {
+
+                        pw.print(LIGNE + (y + 1) + EGALE);
+
+                        for (short x = 0; x < var.getDimX(); x++) {
+
+                            value = var.getValue(modifiedVar, y, x);
+
+                            if (value == null) {
+                                value = "";
+                            }
+
+                            pw.print(value + SEMICOLON);
+                        }
+                        pw.println();
+                    }
+                    break;
+
+                default:
+                    break;
+                }
+            }
+        } catch (FileNotFoundException | UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
+
+        return true;
     }
 
     public static final boolean toExcel(List<Variable> listVariable, final File file) {
@@ -475,6 +621,7 @@ public final class MapCal {
             for (Variable var : listVariable) {
 
                 variableName = var.getName();
+                boolean modifiedVar = var.isModified();
 
                 writeCell(sheetValues, 0, row, variableName, arial10format);
 
@@ -484,7 +631,7 @@ public final class MapCal {
                 case SCALAIRE:
 
                     row += 1;
-                    writeCell(sheetValues, 0, row, var.getValue(0, 0), borderFormat);
+                    writeCell(sheetValues, 0, row, var.getValue(modifiedVar, 0, 0), borderFormat);
                     row += 2;
                     break;
 
@@ -493,7 +640,7 @@ public final class MapCal {
                     col = 0;
                     row += 1;
                     for (short x = 0; x < var.getDimX(); x++) {
-                        writeCell(sheetValues, col, row, var.getValue(0, x), borderFormat);
+                        writeCell(sheetValues, col, row, var.getValue(modifiedVar, 0, x), borderFormat);
                         col += 1;
                     }
 
@@ -508,9 +655,9 @@ public final class MapCal {
                         row += 1;
                         for (short x = 0; x < var.getDimX(); x++) {
                             if (y == 0) {
-                                writeCell(sheetValues, col, row, var.getValue(y, x), axisFormat);
+                                writeCell(sheetValues, col, row, var.getValue(modifiedVar, y, x), axisFormat);
                             } else {
-                                writeCell(sheetValues, col, row, var.getValue(y, x), borderFormat);
+                                writeCell(sheetValues, col, row, var.getValue(modifiedVar, y, x), borderFormat);
                             }
                             col += 1;
                         }
@@ -525,9 +672,9 @@ public final class MapCal {
                         row += 1;
                         for (short x = 0; x < var.getDimX(); x++) {
                             if (y == 0 | x == 0) {
-                                writeCell(sheetValues, col, row, var.getValue(y, x), axisFormat);
+                                writeCell(sheetValues, col, row, var.getValue(modifiedVar, y, x), axisFormat);
                             } else {
-                                writeCell(sheetValues, col, row, var.getValue(y, x), borderFormat);
+                                writeCell(sheetValues, col, row, var.getValue(modifiedVar, y, x), borderFormat);
                             }
                             col += 1;
                         }
@@ -541,7 +688,7 @@ public final class MapCal {
                         col = 0;
                         row += 1;
                         for (short x = 0; x < var.getDimX(); x++) {
-                            writeCell(sheetValues, col, row, var.getValue(y, x), borderFormat);
+                            writeCell(sheetValues, col, row, var.getValue(modifiedVar, y, x), borderFormat);
                             col += 1;
                         }
                     }

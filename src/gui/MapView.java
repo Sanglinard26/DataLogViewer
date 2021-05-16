@@ -17,6 +17,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Observable;
+import java.util.Observer;
 
 import javax.swing.ImageIcon;
 import javax.swing.JFileChooser;
@@ -36,7 +38,7 @@ import calib.MapCal;
 import calib.Variable;
 import net.ericaro.surfaceplotter.surface.JSurface;
 
-public final class MapView extends JPanel {
+public final class MapView extends JPanel implements Observer {
 
     private static final long serialVersionUID = 1L;
 
@@ -92,6 +94,8 @@ public final class MapView extends JPanel {
                 if (listVariable.getSelectedIndex() > -1 && !e.getValueIsAdjusting()) {
                     Variable variable = listVariable.getSelectedValue();
 
+                    variable.addObserver(MapView.this);
+
                     remove(dataTable);
                     dataTable = new CalTable(variable);
                     splitPane.setTopComponent(dataTable);
@@ -120,11 +124,12 @@ public final class MapView extends JPanel {
         JSurface jSurface = surfaceChart.getSurface();
 
         boolean chartVisible = false;
+        boolean modifiedVariable = variable.isModified();
 
         switch (variable.getType()) {
 
         case COURBE:
-            float[][] zValuesOrigin = variable.getZvalues();
+            float[][] zValuesOrigin = variable.getZvalues(modifiedVariable);
 
             int length = zValuesOrigin[0].length;
 
@@ -137,13 +142,14 @@ public final class MapView extends JPanel {
             zValuesNew[0] = Arrays.copyOf(zValuesOrigin[0], length);
             zValuesNew[1] = Arrays.copyOf(zValuesOrigin[0], length);
 
-            surfaceChart.getArraySurfaceModel().setValues(variable.getXAxis(), new float[] { 0, 1 }, zValuesNew);
+            surfaceChart.getArraySurfaceModel().setValues(variable.getXAxis(modifiedVariable), new float[] { 0, 1 }, zValuesNew);
             jSurface.setXLabel("X");
             chartVisible = true;
             break;
 
         case MAP:
-            surfaceChart.getArraySurfaceModel().setValues(variable.getXAxis(), variable.getYAxis(), variable.getZvalues());
+            surfaceChart.getArraySurfaceModel().setValues(variable.getXAxis(modifiedVariable), variable.getYAxis(modifiedVariable),
+                    variable.getZvalues(modifiedVariable));
             jSurface.setXLabel("X");
             jSurface.setYLabel("Y");
             chartVisible = true;
@@ -160,6 +166,8 @@ public final class MapView extends JPanel {
     private final class ListMouseListener extends MouseAdapter {
 
         final String ICON_EXCEL = "/icon_excel_24.png";
+        final String ICON_XML = "/icon_xml_24.png";
+        final String ICON_MAP = "/icon_exportMap_24.png";
 
         @Override
         public void mouseReleased(MouseEvent e) {
@@ -177,8 +185,10 @@ public final class MapView extends JPanel {
                 menuItem.addActionListener(new ExportListener());
                 menuExport.add(menuItem);
 
-                menuExport.addSeparator();
-                menuItem = new JMenuItem("Convertir en Cdfx");
+                menu.add(menuExport);
+                menu.addSeparator();
+
+                menuItem = new JMenuItem("Convertir en Cdfx", new ImageIcon(getClass().getResource(ICON_XML)));
                 menuItem.addActionListener(new ActionListener() {
 
                     @Override
@@ -190,23 +200,51 @@ public final class MapView extends JPanel {
                         fileChooser.setSelectedFile(new File(mapCal.getName() + ".cdfx"));
                         final int rep = fileChooser.showSaveDialog(null);
 
-                        List<Variable> listToExport = new ArrayList<Variable>();
+                        if (rep == JFileChooser.APPROVE_OPTION) {
+                            List<Variable> listToExport = new ArrayList<Variable>();
 
-                        for (int i = 0; i < listVariable.getModel().getSize(); i++) {
-                            listToExport.add(listVariable.getModel().getElementAt(i));
+                            for (int i = 0; i < listVariable.getModel().getSize(); i++) {
+                                listToExport.add(listVariable.getModel().getElementAt(i));
+                            }
+
+                            boolean result = MapCal.toCdfx(listToExport, fileChooser.getSelectedFile());
+
+                            if (result) {
+                                JOptionPane.showMessageDialog(null, "Conversion termin\u00e9e !");
+                            }
                         }
-
-                        boolean result = MapCal.toCdfx(listToExport, fileChooser.getSelectedFile());
-
-                        if (result) {
-                            JOptionPane.showMessageDialog(null, "Conversion termin\u00e9e !");
-                        }
-
                     }
                 });
-                menuExport.add(menuItem);
+                menu.add(menuItem);
 
-                menu.add(menuExport);
+                menuItem = new JMenuItem("Enregistrer fichier Map", new ImageIcon(getClass().getResource(ICON_MAP)));
+                menuItem.addActionListener(new ActionListener() {
+
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+
+                        final JFileChooser fileChooser = new JFileChooser();
+                        fileChooser.setDialogTitle("Enregistement du fichier");
+                        fileChooser.setFileFilter(new FileNameExtensionFilter("Fichier Map", "map"));
+                        fileChooser.setSelectedFile(new File(mapCal.getName() + "_new.map"));
+                        final int rep = fileChooser.showSaveDialog(null);
+
+                        if (rep == JFileChooser.APPROVE_OPTION) {
+                            List<Variable> listToExport = new ArrayList<Variable>();
+
+                            for (int i = 0; i < listVariable.getModel().getSize(); i++) {
+                                listToExport.add(listVariable.getModel().getElementAt(i));
+                            }
+
+                            boolean result = MapCal.exportMap(listToExport, fileChooser.getSelectedFile());
+
+                            if (result) {
+                                JOptionPane.showMessageDialog(null, "Sauvegarde termin\u00e9e !");
+                            }
+                        }
+                    }
+                });
+                menu.add(menuItem);
 
                 menu.show(e.getComponent(), e.getX(), e.getY());
             }
@@ -287,6 +325,13 @@ public final class MapView extends JPanel {
                     JOptionPane.showMessageDialog(null, "Export abandonne !");
                 }
             }
+        }
+    }
+
+    @Override
+    public void update(Observable object, Object arg) {
+        if (object instanceof Variable) {
+            updateChart((Variable) object);
         }
     }
 
