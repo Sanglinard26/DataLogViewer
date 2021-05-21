@@ -170,6 +170,10 @@ public class CalTable extends JPanel {
 
     }
 
+    public final JTable getTable() {
+        return table;
+    }
+
     private void editColumnAt(Point p) {
         columnBrkPt = header.columnAtPoint(p);
 
@@ -222,6 +226,10 @@ public class CalTable extends JPanel {
         }
         renamePopup.setVisible(false);
         calcZvalue();
+    }
+
+    public final void setValue(float newValue, int row, int col) {
+        table.setValueAt(newValue, row, col);
     }
 
     public final void calcZvalue() {
@@ -618,5 +626,4 @@ public class CalTable extends JPanel {
             add(btReset);
         }
     }
-
 }

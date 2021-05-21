@@ -7,7 +7,9 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.Map;
+import java.util.Vector;
 
 import com.healthmarketscience.jackcess.Database;
 import com.healthmarketscience.jackcess.DatabaseBuilder;
@@ -31,6 +33,7 @@ public final class MdbData {
 
     private final String name;
     private Map<String, VariableInfo> infos;
+    private Hashtable<String, Vector<String>> category;
 
     public MdbData(File mdbFile) {
         this.name = mdbFile.getName().replace(".mdb", "");
@@ -65,7 +68,24 @@ public final class MdbData {
 
         HashMap<String, VariableInfo> listInfos = new HashMap<String, VariableInfo>(tableCartos.getRowCount());
 
+        category = new Hashtable<>();
+
         for (Row row : tableCartos) {
+
+            String typeName = row.getString(TYPENAME);
+            String sousType = row.getString(SOUSTYPE);
+
+            Object v = category.get(typeName);
+
+            if (v == null) {
+                category.put(typeName, new Vector<String>());
+                v = category.get(typeName);
+            }
+
+            if (sousType != null && !((Vector<String>) v).contains(sousType)) {
+                ((Vector<String>) v).add(sousType);
+            }
+
             listInfos.put(row.getString(NOMCARTO),
                     new VariableInfo(row.getString(TYPENAME), row.getString(SOUSTYPE), row.getString(VARCOL), row.getString(VARLIGNE),
                             row.getShort(NBBKPTCOL), row.getShort(NBBKPTLGN), row.getInt(COLBKPTFACTOR), row.getDouble(ROWBKPTFACTOR),
@@ -75,7 +95,11 @@ public final class MdbData {
         return listInfos;
     }
 
-    protected class VariableInfo {
+    public final Hashtable<String, Vector<String>> getCategory() {
+        return this.category;
+    }
+
+    public class VariableInfo {
 
         private String typeName;
         private String sousType;
@@ -103,11 +127,11 @@ public final class MdbData {
         }
 
         public String getTypeName() {
-            return typeName;
+            return typeName != null ? typeName : "";
         }
 
         public String getSousType() {
-            return sousType;
+            return sousType != null ? sousType : "";
         }
 
         public String getVarCol() {

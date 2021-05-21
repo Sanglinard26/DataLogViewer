@@ -33,7 +33,7 @@ public final class SurfaceChart extends JPanel {
         addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent e) {
-                if (height == -1) { // init
+                if (height <= 0) { // init
                     height = getHeight();
                     arraySurfaceModel.getProjector().set2DScaling(height / 30);
                     surface.repaint();
@@ -43,7 +43,7 @@ public final class SurfaceChart extends JPanel {
 
                 arraySurfaceModel.getProjector().set2DScaling(arraySurfaceModel.getProjector().get2DScaling() * (newHeight / height));
                 surface.repaint();
-                height = newHeight;
+                height = Math.max(newHeight, 50);
             }
         });
 

@@ -87,10 +87,12 @@ public final class MapCal {
 
                     if (mdbData.getInfos().isEmpty() || variable.getInfos() != null) {
                         listVariable.add(variable);
-                        if (!variable.checkDim())
-                            System.out.println(variable.getName() + " => CheckDim nOK");
+                        if (!variable.checkDim()) {
+                            // System.out.println(variable.getName() + " => CheckDim nOK");
+                        }
+
                     } else {
-                        System.out.println(variable.getName() + " => non présente dans le mdb");
+                        // System.out.println(variable.getName() + " => non présente dans le mdb");
                     }
 
                     nLigne--;
@@ -106,6 +108,10 @@ public final class MapCal {
 
     public String getName() {
         return name;
+    }
+
+    public MdbData getMdbData() {
+        return mdbData;
     }
 
     public List<Variable> getListVariable() {

@@ -801,12 +801,33 @@ public final class Ihm extends JFrame {
         }
     }
 
+    private int checkPresence(Class<?> aClass) {
+        int nbTab = tabbedPane.getTabCount();
+
+        for (int i = 0; i < nbTab; i++) {
+            Class<?> theClass = tabbedPane.getComponentAt(i).getClass();
+            if (theClass.equals(aClass)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     private final void addMapWindow(MapCal mapCal) {
 
-        MapView mapView = new MapView(mapCal);
-        tabbedPane.addTab(mapCal.getName(), mapView);
-        tabbedPane.setTabComponentAt(tabbedPane.getTabCount() - 1, new ButtonTabComponent(tabbedPane));
-        tabbedPane.setSelectedIndex(tabbedPane.getTabCount() - 1);
+        MapView mapView;
+
+        int idxMapView = checkPresence(MapView.class);
+
+        if (idxMapView == -1) {
+            mapView = new MapView(mapCal);
+            tabbedPane.addTab("Calibration", mapView);
+            tabbedPane.setTabComponentAt(tabbedPane.getTabCount() - 1, new ButtonTabComponent(tabbedPane));
+            tabbedPane.setSelectedIndex(tabbedPane.getTabCount() - 1);
+        } else {
+            mapView = (MapView) tabbedPane.getComponentAt(idxMapView);
+            mapView.addCalToTree(mapCal);
+        }
 
     }
 
