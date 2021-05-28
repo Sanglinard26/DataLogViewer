@@ -6,6 +6,7 @@ package calib;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Map;
@@ -30,6 +31,9 @@ public final class MdbData {
     private static final String COLBKPTFACTOR = "ColBkptFactor"; // int
     private static final String ROWBKPTFACTOR = "RowBkptFactor"; // int
     private static final String FACTOR = "Factor"; // int
+    private static final String VAL_MAX = "Valeur_max"; //
+    private static final String VAL_MIN = "Valeur_mini"; //
+    private static final String DETAIL = "Détail"; //
 
     private final String name;
     private Map<String, VariableInfo> infos;
@@ -60,6 +64,7 @@ public final class MdbData {
         } catch (IOException e) {
             if (e instanceof FileNotFoundException) {
                 System.out.println("Fichier non trouve : " + mdbFile.getAbsolutePath());
+
             }
         }
     }
@@ -89,13 +94,20 @@ public final class MdbData {
             listInfos.put(row.getString(NOMCARTO),
                     new VariableInfo(row.getString(TYPENAME), row.getString(SOUSTYPE), row.getString(VARCOL), row.getString(VARLIGNE),
                             row.getShort(NBBKPTCOL), row.getShort(NBBKPTLGN), row.getInt(COLBKPTFACTOR), row.getDouble(ROWBKPTFACTOR),
-                            row.getDouble(FACTOR), row.getByte(TYPEVAR)));
+                            row.getDouble(FACTOR), row.getByte(TYPEVAR), row.getDouble(VAL_MAX), row.getDouble(VAL_MIN), row.getString(DETAIL)));
         }
 
         return listInfos;
     }
 
     public final Hashtable<String, Vector<String>> getCategory() {
+
+        if (this.category != null) {
+            for (Vector<String> v : this.category.values()) {
+                Collections.sort(v);
+            }
+        }
+
         return this.category;
     }
 
@@ -111,9 +123,12 @@ public final class MdbData {
         private double rowBkPtFactor;
         private double factor;
         private byte typeVar;
+        private double max;
+        private double min;
+        private String detail;
 
         public VariableInfo(String typeName, String sousType, String varCol, String varLigne, short nbBkPtCol, short nbBkPtRow, int colBkPtFactor,
-                double rowBkPtFactor, double factor, byte typeVar) {
+                double rowBkPtFactor, double factor, byte typeVar, double max, double min, String detail) {
             this.typeName = typeName;
             this.sousType = sousType;
             this.varCol = varCol;
@@ -124,6 +139,9 @@ public final class MdbData {
             this.rowBkPtFactor = rowBkPtFactor;
             this.factor = factor;
             this.typeVar = typeVar;
+            this.max = max;
+            this.min = min;
+            this.detail = detail;
         }
 
         public String getTypeName() {
@@ -164,6 +182,18 @@ public final class MdbData {
 
         public byte getTypeVar() {
             return typeVar;
+        }
+
+        public double getMax() {
+            return max;
+        }
+
+        public double getMin() {
+            return min;
+        }
+
+        public String getDetail() {
+            return detail;
         }
 
         @Override

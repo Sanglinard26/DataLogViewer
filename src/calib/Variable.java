@@ -61,8 +61,16 @@ public final class Variable extends Observable implements Comparable<Variable> {
         return dimY;
     }
 
+    public final double getMax() {
+        return this.infos != null ? this.infos.getMax() : Short.MAX_VALUE;
+    }
+
+    public final double getMin() {
+        return this.infos != null ? this.infos.getMin() : Short.MIN_VALUE;
+    }
+
     public final double getResolution() {
-        return this.infos != null ? 1 / this.infos.getFactor() : 1 / 32768;
+        return this.infos != null ? 1.0 / this.infos.getFactor() : 1.0 / 32768.0;
     }
 
     public final boolean checkResolution(Object value) {
@@ -311,11 +319,22 @@ public final class Variable extends Observable implements Comparable<Variable> {
         return this.name.compareToIgnoreCase(var.getName());
     }
 
+    public final Object saturateValue(Object value) {
+        if (value instanceof Number) {
+            double val = ((Number) value).doubleValue();
+            // double valWithResol = Utilitaire.applyResolution(val, getResolution());
+            Double saturatedVal = Math.max(Math.min(val, getMax()), getMin());
+            return saturatedVal;
+        }
+        return value;
+    }
+
     public final void saveNewValue(int y, int x, Object newValue) {
         if (newValues == null) {
             newValues = Arrays.copyOf(values, values.length);
         }
-        setValue(true, newValue, y, x);
+
+        setValue(true, saturateValue(newValue), y, x);
         setChanged();
     }
 

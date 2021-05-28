@@ -7,10 +7,7 @@ import javax.swing.JFileChooser;
 public abstract class Utilitaire {
 
     public final static String XML = "xml";
-    public final static String LAB = "lab";
     public final static String A2L = "a2l";
-    public final static String DCM = "dcm";
-    public final static String M = "m";
     public final static String CDFX = "cdfx";
 
     /*
@@ -90,6 +87,11 @@ public abstract class Utilitaire {
         } catch (Exception e) {
             return Double.NaN;
         }
+    }
+
+    public static final double applyResolution(double rawValue, double resol) {
+        double roundValue = Math.rint(rawValue / resol);
+        return roundValue * resol;
     }
 
 }

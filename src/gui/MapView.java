@@ -16,10 +16,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Observable;
 import java.util.Observer;
+import java.util.Vector;
 
 import javax.swing.ImageIcon;
 import javax.swing.JFileChooser;
@@ -49,7 +52,7 @@ public final class MapView extends JPanel implements Observer {
 
     private static final long serialVersionUID = 1L;
 
-    private final MapCal mapCal;
+    private final List<MapCal> listCal;
     private final JTree treeVariable;
     private CalTable dataTable;
     private LineChart lineChartX;
@@ -60,16 +63,14 @@ public final class MapView extends JPanel implements Observer {
 
     private MapChartView mapChartView;
 
-    DefaultTreeModel treeModel;
-
-    // private boolean moveInProgress = false;
+    private final DefaultTreeModel treeModel;
 
     public MapView(MapCal mapCal) {
 
         super();
         setLayout(new GridBagLayout());
 
-        this.mapCal = mapCal;
+        this.listCal = new ArrayList<MapCal>();
 
         final GridBagConstraints gbc = new GridBagConstraints();
 
@@ -136,10 +137,26 @@ public final class MapView extends JPanel implements Observer {
         treeVariable.addMouseListener(new TreeMouseListener());
 
         dataTable = new CalTable(null);
+
         splitPane.setTopComponent(dataTable);
 
         mapChartView = new MapChartView();
         splitPane.setBottomComponent(mapChartView);
+    }
+
+    private MapCal findSelectedCal() {
+        TreePath path = treeVariable.getSelectionPath();
+
+        if (path != null && path.getPath().length > 1) {
+            Object calNode = path.getPath()[1];
+            for (MapCal mapCal : listCal) {
+                if (mapCal.getName().equals(calNode.toString())) {
+                    return mapCal;
+                }
+            }
+        }
+
+        return null;
     }
 
     public void addCalToTree(MapCal cal) {
@@ -149,6 +166,31 @@ public final class MapView extends JPanel implements Observer {
         ((DefaultMutableTreeNode) treeVariable.getModel().getRoot()).add(nodeCal);
 
         DynamicUtilTreeNode.createChildren(nodeCal, cal.getMdbData().getCategory());
+
+        Vector<DefaultMutableTreeNode> v = new Vector<>();
+
+        @SuppressWarnings("unchecked")
+        Enumeration<DefaultMutableTreeNode> en = nodeCal.children();
+
+        while (en.hasMoreElements()) {
+            v.add(en.nextElement());
+        }
+
+        Collections.sort(v, new Comparator<DefaultMutableTreeNode>() {
+
+            @Override
+            public int compare(DefaultMutableTreeNode o1, DefaultMutableTreeNode o2) {
+                return o1.toString().compareToIgnoreCase(o2.toString());
+            }
+        });
+
+        nodeCal.removeAllChildren();
+
+        for (DefaultMutableTreeNode sortedNode : v) {
+            nodeCal.add(sortedNode);
+        }
+
+        v.clear();
 
         String typeName;
         String sousType;
@@ -172,11 +214,21 @@ public final class MapView extends JPanel implements Observer {
             }
         }
 
+        this.listCal.add(cal);
+
         treeModel.reload();
     }
 
     private final void removeCalFromTree(DefaultMutableTreeNode nodeCal) {
         ((DefaultMutableTreeNode) treeVariable.getModel().getRoot()).remove(nodeCal);
+
+        for (MapCal mapCal : listCal) {
+            if (mapCal.getName().equals(nodeCal.toString())) {
+                listCal.remove(mapCal);
+                break;
+            }
+        }
+
         treeModel.reload();
     }
 
@@ -234,7 +286,7 @@ public final class MapView extends JPanel implements Observer {
             jSurface.setXLabel("X");
             chartVisible.set(1);
 
-            this.lineChartY.changeSeries(createCurve(variable));
+            this.lineChartY.changeSeries(createCurve(variable), variable.getMin(), variable.getMax());
 
             break;
 
@@ -246,8 +298,8 @@ public final class MapView extends JPanel implements Observer {
 
             chartVisible.flip(0, 3);
 
-            this.lineChartX.changeSeries(createIsoX(variable));
-            this.lineChartY.changeSeries(createIsoY(variable));
+            this.lineChartX.changeSeries(createIsoX(variable), variable.getMin(), variable.getMax());
+            this.lineChartY.changeSeries(createIsoY(variable), variable.getMin(), variable.getMax());
 
             break;
 
@@ -314,7 +366,7 @@ public final class MapView extends JPanel implements Observer {
 
             final GridBagConstraints gbc = new GridBagConstraints();
 
-            lineChartX = new LineChart();
+            lineChartX = new LineChart('x');
             gbc.fill = GridBagConstraints.BOTH;
             gbc.gridx = 0;
             gbc.gridy = 0;
@@ -327,7 +379,7 @@ public final class MapView extends JPanel implements Observer {
             add(lineChartX, gbc);
             lineChartX.setVisible(false);
 
-            lineChartY = new LineChart();
+            lineChartY = new LineChart('y');
             gbc.fill = GridBagConstraints.BOTH;
             gbc.gridx = 0;
             gbc.gridy = 1;
@@ -361,13 +413,14 @@ public final class MapView extends JPanel implements Observer {
         final String ICON_EXCEL = "/icon_excel_24.png";
         final String ICON_XML = "/icon_xml_24.png";
         final String ICON_MAP = "/icon_exportMap_24.png";
+        final String ICON_DELETE = "/icon_del_24.png";
 
         @Override
         public void mouseReleased(MouseEvent e) {
 
             final TreePath treePath = treeVariable.getPathForLocation(e.getX(), e.getY());
 
-            if (treePath == null) {
+            if (treePath == null || treePath.getPath().length < 2) {
                 return;
             }
 
@@ -380,8 +433,8 @@ public final class MapView extends JPanel implements Observer {
                 final JMenu menuExport = new JMenu("Export Excel");
                 JMenuItem menuItem;
 
-                if (object.toString().equals(mapCal.getName())) {
-                    menuItem = new JMenuItem("Supprimer la calibration", new ImageIcon(getClass().getResource(ICON_XML)));
+                if (object.toString().equals(findSelectedCal().getName())) {
+                    menuItem = new JMenuItem("Supprimer la calibration", new ImageIcon(getClass().getResource(ICON_DELETE)));
                     menuItem.addActionListener(new ActionListener() {
 
                         @Override
@@ -412,6 +465,8 @@ public final class MapView extends JPanel implements Observer {
                     @Override
                     public void actionPerformed(ActionEvent e) {
 
+                        MapCal mapCal = findSelectedCal();
+
                         final JFileChooser fileChooser = new JFileChooser();
                         fileChooser.setDialogTitle("Enregistement du fichier");
                         fileChooser.setFileFilter(new FileNameExtensionFilter("Fichier Cdfx", "cdfx"));
@@ -440,6 +495,8 @@ public final class MapView extends JPanel implements Observer {
 
                     @Override
                     public void actionPerformed(ActionEvent e) {
+
+                        MapCal mapCal = findSelectedCal();
 
                         final JFileChooser fileChooser = new JFileChooser();
                         fileChooser.setDialogTitle("Enregistement du fichier");
@@ -477,6 +534,8 @@ public final class MapView extends JPanel implements Observer {
 
         @Override
         public void actionPerformed(ActionEvent e) {
+
+            MapCal mapCal = findSelectedCal();
 
             final JFileChooser fileChooser = new JFileChooser();
             fileChooser.setDialogTitle("Enregistement du fichier");

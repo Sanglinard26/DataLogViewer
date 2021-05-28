@@ -14,6 +14,8 @@ import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
@@ -97,6 +99,32 @@ public class CalTable extends JPanel {
 
         table = new JTable(nbRow, nbCol);
 
+        table.addKeyListener(new KeyAdapter() {
+
+            @Override
+            public void keyTyped(KeyEvent e) {
+                if (e.getKeyChar() == '=') {
+
+                    String res = JOptionPane.showInputDialog(CalTable.this, "Valeur :");
+
+                    int[] cols = table.getSelectedColumns();
+                    int[] rows = table.getSelectedRows();
+
+                    for (int col : cols) {
+                        for (int row : rows) {
+                            table.setValueAt(res, row, col);
+                            table.editCellAt(row, col);
+
+                        }
+                    }
+                    table.getCellEditor().stopCellEditing();
+                }
+            }
+
+        });
+
+        table.setDefaultEditor(Object.class, new SaturateValueEditor(variable.getMin(), variable.getMax(), variable.getResolution()));
+
         table.getModel().addTableModelListener(new TableModelListener() {
 
             @Override
@@ -122,13 +150,9 @@ public class CalTable extends JPanel {
                         break;
                     }
 
-                    // Object refValue = CalTable.this.variable.getValue(false, row + offsetRow, col + offsetCol);
                     Object actValue = Utilitaire.getStorageObject(table.getValueAt(row, col));
 
                     if (actValue != null) {
-                        if (!(actValue instanceof String) && !CalTable.this.variable.checkResolution(actValue)) {
-                            System.out.println(actValue + " => nOK avec la résolution");
-                        }
                         CalTable.this.variable.saveNewValue(row + offsetRow, col + offsetCol, actValue);
                         CalTable.this.variable.notifyObservers();
                     }
@@ -228,7 +252,9 @@ public class CalTable extends JPanel {
         calcZvalue();
     }
 
-    public final void setValue(float newValue, int row, int col) {
+    public final void setValue(double newValue, int row, int col) {
+
+        // double adjustedValue = Utilitaire.applyResolution(newValue, variable.getResolution());
         table.setValueAt(newValue, row, col);
     }
 

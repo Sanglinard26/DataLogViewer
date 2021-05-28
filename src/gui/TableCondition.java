@@ -13,6 +13,7 @@ import java.awt.datatransfer.StringSelection;
 import java.awt.datatransfer.Transferable;
 import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.event.ActionEvent;
+import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowFocusListener;
@@ -33,13 +34,10 @@ import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.DropMode;
 import javax.swing.JButton;
-import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JDialog;
-import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.TransferHandler;
@@ -52,32 +50,23 @@ public final class TableCondition extends JTable {
 
     private static final long serialVersionUID = 1L;
 
-    private JComboBox<String> cbMeasures;
-
     public TableCondition() {
         super(new ConditionModel());
-        cbMeasures = new JComboBox<String>();
-        cbMeasures.addItem("");
         setDefaultRenderer(Color.class, new ColorRenderer(true));
         setDefaultEditor(Color.class, new ColorEditor());
         setDropMode(DropMode.USE_SELECTION);
 
-        JPopupMenu menu = new JPopupMenu();
-        menu.add(new JMenuItem(new AbstractAction("Editer") {
-
-            private static final long serialVersionUID = 1L;
+        addMouseListener(new MouseAdapter() {
 
             @Override
-            public void actionPerformed(ActionEvent e) {
-                if (getSelectedRow() > -1) {
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
                     Condition condition = (Condition) getValueAt(getSelectedRow(), 1);
                     new InputCondition(TableCondition.this, condition);
                 }
-
             }
-        }));
 
-        setComponentPopupMenu(menu);
+        });
     }
 
     @Override
@@ -90,12 +79,6 @@ public final class TableCondition extends JTable {
             return ((Condition) getValueAt(rowIndex, colIndex)).getExpression();
         }
         return null;
-    }
-
-    public final void updateLog(Log log) {
-        for (Measure measure : log.getMeasures()) {
-            cbMeasures.addItem(measure.getName());
-        }
     }
 
     public final int getActiveCondition() {
@@ -117,6 +100,8 @@ public final class TableCondition extends JTable {
 final class InputCondition extends JDialog {
 
     private static final long serialVersionUID = 1L;
+
+    private final JTextArea conditionName;
     private final JTextArea conditionText;
 
     public InputCondition(final TableCondition table, final Condition condition) {
@@ -124,6 +109,12 @@ final class InputCondition extends JDialog {
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         setModal(false);
         JPanel panel = new JPanel(new BorderLayout());
+
+        conditionName = new JTextArea(1, 30);
+        conditionName.setText(condition.getName());
+        conditionName.setBorder(BorderFactory.createTitledBorder("Nom :"));
+        panel.add(conditionName, BorderLayout.NORTH);
+
         conditionText = new JTextArea(5, 60);
         conditionText.setText(condition.getExpression());
         conditionText.setBorder(BorderFactory.createTitledBorder("Expression :"));
@@ -180,6 +171,7 @@ final class InputCondition extends JDialog {
 
             @Override
             public void actionPerformed(ActionEvent e) {
+                condition.setName(conditionName.getText());
                 condition.setExpression(conditionText.getText());
                 table.getModel().fireTableCellUpdated(table.getSelectedRow(), 1);
                 dispose();
@@ -251,7 +243,7 @@ final class ConditionModel extends AbstractTableModel {
 
     @Override
     public boolean isCellEditable(int rowIndex, int columnIndex) {
-        return true;
+        return columnIndex != 1;
 
     }
 

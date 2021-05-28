@@ -53,10 +53,18 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
     private float finalMovePointY = Float.NaN;
 
     private CalTable dataTable;
+    private final char type; // x : IsoX, y : IsoY
 
-    public LineChart() {
+    private double zMin;
+    private double zMax;
+
+    private boolean onMove = false;
+
+    public LineChart(char type) {
 
         super(new BorderLayout());
+
+        this.type = type;
 
         dataset = new XYSeriesCollection(new XYSeries("vide"));
 
@@ -117,7 +125,14 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
         this.dataTable = table;
     }
 
-    public final void changeSeries(XYSeries[] series) {
+    public final void changeSeries(XYSeries[] series, double min, double max) {
+
+        this.zMin = min;
+        this.zMax = max;
+
+        if (onMove) {
+            return;
+        }
 
         listSeries.clearSelection();
         dataset.removeAllSeries();
@@ -187,6 +202,19 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
 
             setCursor(new Cursor(Cursor.HAND_CURSOR));
 
+            int itemIndex = xyItemEntity.getItem();
+
+            if (dataset.getSeriesCount() > 1) {
+
+                if (type == 'x') {
+                    this.dataTable.getTable().changeSelection(itemIndex, serieIndex, false, false);
+                } else {
+                    this.dataTable.getTable().changeSelection(serieIndex, itemIndex, false, false);
+                }
+
+            } else {
+                this.dataTable.getTable().changeSelection(0, itemIndex, false, false);
+            }
         }
 
     }
@@ -195,6 +223,8 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
     public void mouseDragged(MouseEvent e) {
 
         if (getCursor().getType() != Cursor.DEFAULT_CURSOR) {
+
+            onMove = true;
 
             setCursor(new Cursor(Cursor.N_RESIZE_CURSOR));
 
@@ -217,17 +247,21 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
 
             finalMovePointY = (float) xy.getRangeAxis().java2DToValue(p.getY(), dataArea, xy.getRangeAxisEdge());
 
+            if (finalMovePointY >= this.zMax) {
+                finalMovePointY = (float) this.zMax;
+            } else if (finalMovePointY <= this.zMin) {
+                finalMovePointY = (float) this.zMin;
+            }
+
             float difference = finalMovePointY - initialMovePointY;
 
-            float targetPoint = series.getY(itemIndex).floatValue() + difference;
+            double targetPoint = series.getY(itemIndex).floatValue() + difference;
 
-            series.updateByIndex(itemIndex, Float.valueOf(targetPoint));
+            series.updateByIndex(itemIndex, Double.valueOf(targetPoint));
 
             if (dataset.getSeriesCount() > 1) {
 
-                int nbCol = dataTable.getTable().getColumnCount();
-
-                if (dataset.getSeriesCount() == nbCol) {
+                if (type == 'x') {
                     dataTable.setValue(targetPoint, itemIndex, serieIndex);
                 } else {
                     dataTable.setValue(targetPoint, serieIndex, itemIndex);
@@ -236,6 +270,8 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
             } else {
                 dataTable.setValue(targetPoint, 0, itemIndex);
             }
+
+            onMove = false;
 
             initialMovePointY = finalMovePointY;
 
@@ -248,4 +284,5 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
         // TODO Auto-generated method stub
 
     }
+
 }

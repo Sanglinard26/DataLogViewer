@@ -327,6 +327,24 @@ public final class Ihm extends JFrame {
         subMenu.add(menuItem);
         menu.add(subMenu);
 
+        subMenu = new JMenu("Calibration");
+        menuItem = new JMenuItem(new AbstractAction("Chemin d'import") {
+
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                final String pathFolder = Utilitaire.getFolder("Choix du chemin", Preference.getPreference(Preference.KEY_CAL));
+                if (!Preference.KEY_CAL.equals(pathFolder)) {
+                    Preference.setPreference(Preference.KEY_CAL, pathFolder);
+                    ((JMenuItem) e.getSource()).setToolTipText(pathFolder);
+                }
+            }
+        });
+        menuItem.setToolTipText(Preference.getPreference(Preference.KEY_CAL));
+        subMenu.add(menuItem);
+        menu.add(subMenu);
+
         menu = new JMenu("?");
         menuBar.add(menu);
 
@@ -428,7 +446,7 @@ public final class Ihm extends JFrame {
             @Override
             public void actionPerformed(ActionEvent arg0) {
 
-                final JFileChooser fc = new JFileChooser();
+                final JFileChooser fc = new JFileChooser(Preference.getPreference(Preference.KEY_CAL));
                 fc.setMultiSelectionEnabled(false);
                 fc.setFileSelectionMode(JFileChooser.OPEN_DIALOG);
                 fc.setFileFilter(new FileFilter() {
@@ -787,10 +805,6 @@ public final class Ihm extends JFrame {
                     listModel.addElement(formule);
                 }
 
-                // Test condition
-                panelCondition.getTableCondition().updateLog(log);
-                //
-
                 labelFnr.setText("<html>Fournisseur du log : " + "<b>" + log.getFnr());
                 labelLogName.setText("<html>Nom de l'acquisition : " + "<b>" + log.getName());
 
@@ -814,6 +828,11 @@ public final class Ihm extends JFrame {
     }
 
     private final void addMapWindow(MapCal mapCal) {
+
+        if (mapCal.getMdbData().getInfos().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Fichier '" + mapCal.getMdbData().getName() + ".mdb' non trouv\u00e9."
+                    + "\nCertaines fonctionnalit\u00e9s seront impact\u00e9es.");
+        }
 
         MapView mapView;
 

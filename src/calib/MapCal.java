@@ -12,6 +12,7 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
@@ -115,6 +116,7 @@ public final class MapCal {
     }
 
     public List<Variable> getListVariable() {
+        Collections.sort(listVariable);
         return listVariable;
     }
 
