@@ -21,6 +21,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
@@ -60,6 +61,9 @@ import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.filechooser.FileFilter;
 import javax.swing.filechooser.FileNameExtensionFilter;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.NumberAxis;
@@ -73,11 +77,22 @@ import org.jfree.data.xy.DefaultXYDataset;
 import org.jfree.data.xy.DefaultXYZDataset;
 import org.jfree.data.xy.XYSeries;
 import org.jfree.data.xy.XYSeriesCollection;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
 import calib.MapCal;
+import dialog.DialAddMeasure;
+import dialog.DialManageFormula;
+import dialog.DialNewChart;
+import dialog.DialNewFormula;
+import dialog.DialNews;
+import dialog.DialNotice;
 import log.Formula;
 import log.Log;
 import log.Measure;
+import utils.ExportUtils;
 import utils.Preference;
 import utils.Utilitaire;
 
@@ -167,7 +182,7 @@ public final class Ihm extends JFrame {
                         if (f.isDirectory()) {
                             return true;
                         }
-                        return f.getName().toLowerCase().endsWith("cfg");
+                        return f.getName().toLowerCase().endsWith("cfg") || f.getName().toLowerCase().endsWith("xml");
                     }
                 });
                 final int reponse = fc.showOpenDialog(Ihm.this);
@@ -250,7 +265,7 @@ public final class Ihm extends JFrame {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                addChartWindow();
+                addChartWindow(null);
             }
         });
         menu.add(menuItem);
@@ -484,7 +499,7 @@ public final class Ihm extends JFrame {
             @Override
             public void actionPerformed(ActionEvent arg0) {
 
-                addChartWindow();
+                addChartWindow(null);
 
             }
         });
@@ -867,20 +882,25 @@ public final class Ihm extends JFrame {
         return table;
     }
 
-    private final ChartView addChartWindow() {
+    private final ChartView addChartWindow(String nameWindow) {
 
         ChartView chartView = new ChartView();
         chartView.addObservateur(tableCursorValues);
         chartView.setTransferHandler(new MeasureHandler());
-        String defaultName = "Fenetre_" + tabbedPane.getTabCount();
-        String windowName = JOptionPane.showInputDialog(Ihm.this, "Nom de la fenetre :", defaultName);
-        if (windowName == null) {
-            return null;
+        if (nameWindow == null) {
+            String defaultName = "Fenetre_" + tabbedPane.getTabCount();
+            String windowName = JOptionPane.showInputDialog(Ihm.this, "Nom de la fenetre :", defaultName);
+            if (windowName == null) {
+                return null;
+            }
+            if ("".equals(windowName)) {
+                windowName = defaultName;
+            }
+            tabbedPane.addTab(windowName, chartView);
+        } else {
+            tabbedPane.addTab(nameWindow, chartView);
         }
-        if ("".equals(windowName)) {
-            windowName = defaultName;
-        }
-        tabbedPane.addTab(windowName, chartView);
+
         tabbedPane.setTabComponentAt(tabbedPane.getTabCount() - 1, new ButtonTabComponent(tabbedPane));
         tabbedPane.setSelectedIndex(tabbedPane.getTabCount() - 1);
 
@@ -1003,10 +1023,10 @@ public final class Ihm extends JFrame {
         if (idxWindow > -1) {
             chartView = (ChartView) tabbedPane.getComponentAt(idxWindow);
             if (chartView.getPlot().getSubplots().size() > 0) {
-                chartView = addChartWindow();
+                chartView = addChartWindow(null);
             }
         } else {
-            chartView = addChartWindow();
+            chartView = addChartWindow(null);
         }
 
         if (chartView != null) {
@@ -1095,6 +1115,7 @@ public final class Ihm extends JFrame {
 
                                 ((DefaultXYZDataset) xyPlot.getDataset()).addSeries(serieKey,
                                         new double[][] { xMeasure.getDoubleValue(), yMeasure.getDoubleValue(), zMeasure.getDoubleValue() });
+
                             } else {
                                 Comparable<?> serieKey = ((DefaultXYDataset) xyPlot.getDataset()).getSeriesKey(nSerie);
 
@@ -1113,6 +1134,7 @@ public final class Ihm extends JFrame {
                     }
 
                 }
+                // chartView.getChart().fireChartChanged();
                 chartView.getPlot().getDomainAxis().setAutoRange(true);
                 chartView.getPlot().configureDomainAxes();
             }
@@ -1160,6 +1182,14 @@ public final class Ihm extends JFrame {
             oos.writeObject(listFormula);
             oos.flush();
 
+            List<Condition> conditions = this.panelCondition.getTableCondition().getModel().getConditions();
+            if (!conditions.isEmpty()) {
+                oos.writeObject(conditions);
+                oos.flush();
+            }
+
+            ExportUtils.ConfigToXml(listChart, listFormula, conditions);
+
         } catch (FileNotFoundException e1) {
             e1.printStackTrace();
         } catch (IOException e1) {
@@ -1176,50 +1206,206 @@ public final class Ihm extends JFrame {
     }
 
     private final void openConfig(File file) {
-        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
-            @SuppressWarnings("unchecked")
-            Map<String, JFreeChart> map = (LinkedHashMap<String, JFreeChart>) ois.readObject();
 
-            for (Entry<String, JFreeChart> entry : map.entrySet()) {
-                ChartView chartView = new ChartView(entry.getValue());
-                chartView.addObservateur(tableCursorValues);
-                chartView.setTransferHandler(new MeasureHandler());
-                tabbedPane.addTab(entry.getKey(), chartView);
-                tabbedPane.setTabComponentAt(tabbedPane.getTabCount() - 1, new ButtonTabComponent(tabbedPane));
-                tabbedPane.setSelectedIndex(tabbedPane.getTabCount() - 1);
-            }
+        if (file.getName().endsWith("cfg")) {
+            try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
+                @SuppressWarnings("unchecked")
+                Map<String, JFreeChart> charts = (LinkedHashMap<String, JFreeChart>) ois.readObject();
 
-            @SuppressWarnings("unchecked")
-            Set<Measure> list = (Set<Measure>) ois.readObject();
+                for (Entry<String, JFreeChart> entry : charts.entrySet()) {
+                    ChartView chartView = new ChartView(entry.getValue());
+                    chartView.addObservateur(tableCursorValues);
+                    chartView.setTransferHandler(new MeasureHandler());
+                    tabbedPane.addTab(entry.getKey(), chartView);
+                    tabbedPane.setTabComponentAt(tabbedPane.getTabCount() - 1, new ButtonTabComponent(tabbedPane));
+                    tabbedPane.setSelectedIndex(tabbedPane.getTabCount() - 1);
+                }
 
-            if (log != null) {
-                for (Measure formule : list) {
-                    log.getMeasures().add(formule);
-                    int idx = listModel.indexOf(formule);
-                    if (idx < 0) {
-                        listModel.addElement(formule);
+                @SuppressWarnings("unchecked")
+                Set<Measure> list = (Set<Measure>) ois.readObject();
+
+                if (log != null) {
+                    for (Measure formule : list) {
+                        log.getMeasures().add(formule);
+                        int idx = listModel.indexOf(formule);
+                        if (idx < 0) {
+                            listModel.addElement(formule);
+                        }
                     }
                 }
+
+                for (Measure formule : list) {
+                    ((Formula) formule).deserialize();
+                    ((Formula) formule).calculate(log);
+                    listFormula.add(formule);
+                }
+
+                @SuppressWarnings("unchecked")
+                List<Condition> conditions = (List<Condition>) ois.readObject();
+                panelCondition.getTableCondition().getModel().setConditions(conditions);
+
+            } catch (FileNotFoundException e) {
+            } catch (IOException e) {
+                System.out.println(e);
+            } catch (ClassNotFoundException e) {
+            } finally {
+                reloadLogData(log);
+            }
+        } else {
+
+            DocumentBuilder builder;
+            Document document = null;
+            DocumentBuilderFactory factory;
+            factory = DocumentBuilderFactory.newInstance();
+            factory.setIgnoringElementContentWhitespace(true);
+            factory.setValidating(false);
+
+            try {
+                builder = factory.newDocumentBuilder();
+                document = builder.parse(new File(file.toURI()));
+
+                final Element racine = document.getDocumentElement();
+
+                if (racine.getNodeName().equals("Configuration")) {
+
+                    NodeList listWindow = racine.getElementsByTagName("Window");
+                    int nbWindow = listWindow.getLength();
+
+                    for (int i = 0; i < nbWindow; i++) {
+                        Element window = (Element) listWindow.item(i);
+                        String nameWindow = window.getElementsByTagName("Name").item(0).getTextContent();
+                        int typeWindow = Integer.parseInt(window.getElementsByTagName("Type").item(0).getTextContent());
+                        ChartView chartView = addChartWindow(nameWindow);
+
+                        NodeList listPlot = window.getElementsByTagName("Plot");
+                        int nbPlot = listPlot.getLength();
+
+                        for (int j = 0; j < nbPlot; j++) {
+
+                            Element plot = (Element) listPlot.item(j);
+
+                            String bckGrndColor = plot.getElementsByTagName("Background").item(0).getTextContent();
+
+                            switch (typeWindow) {
+                            case 1:
+
+                                chartView.addPlot(new Measure("Time_ms"), bckGrndColor);
+
+                                NodeList listAxis = plot.getElementsByTagName("Axis");
+
+                                for (int k = 0; k < listAxis.getLength(); k++) {
+                                    Element axisNode = (Element) listAxis.item(k);
+                                    String nameAxis = axisNode.getElementsByTagName("Name").item(0).getTextContent();
+
+                                    NodeList listSeries = axisNode.getElementsByTagName("Serie");
+
+                                    // if (k == 0) {
+                                    // chartView.addPlot(new Measure("Time_ms"), new Measure(nameAxis));
+                                    // } else {
+                                    for (int l = 0; l < listSeries.getLength(); l++) {
+
+                                        Element serieNode = (Element) listSeries.item(l);
+                                        String nameSerie = serieNode.getElementsByTagName("Name").item(0).getTextContent();
+                                        String colorSerie = serieNode.getElementsByTagName("Color").item(0).getTextContent();
+                                        String widthSerie = serieNode.getElementsByTagName("Width").item(0).getTextContent();
+                                        chartView.addMeasure((XYPlot) chartView.getPlot().getSubplots().get(j), new Measure("Time_ms"),
+                                                new Measure(nameSerie), colorSerie, widthSerie, nameAxis);
+                                    }
+
+                                    // }
+
+                                }
+
+                                break;
+                            case 2:
+
+                                Element serie2D = (Element) plot.getElementsByTagName("Serie").item(0);
+
+                                String x = serie2D.getElementsByTagName("X").item(0).getTextContent();
+                                String y = serie2D.getElementsByTagName("Y").item(0).getTextContent();
+                                String colorSerie = serie2D.getElementsByTagName("Color").item(0).getTextContent();
+                                String shapeSize2D = serie2D.getElementsByTagName("Shape_size").item(0).getTextContent();
+
+                                chartView.add2DScatterPlot(new Measure(x), new Measure(y), bckGrndColor, shapeSize2D, colorSerie);
+
+                                break;
+                            case 3:
+
+                                Element serie3D = (Element) plot.getElementsByTagName("Serie").item(0);
+
+                                String x3D = serie3D.getElementsByTagName("X").item(0).getTextContent();
+                                String y3D = serie3D.getElementsByTagName("Y").item(0).getTextContent();
+                                String z3D = serie3D.getElementsByTagName("Z").item(0).getTextContent();
+
+                                String shapeSize3D = serie3D.getElementsByTagName("Shape_size").item(0).getTextContent();
+                                String zRange = plot.getElementsByTagName("Z_Range").item(0).getTextContent();
+
+                                chartView.add3DScatterPlot(new Measure(x3D), new Measure(y3D), new Measure(z3D), bckGrndColor, shapeSize3D, zRange);
+
+                                break;
+                            }
+                        }
+
+                    }
+
+                    NodeList listFormulas = racine.getElementsByTagName("Formula");
+                    int nbFormula = listFormulas.getLength();
+
+                    for (int i = 0; i < nbFormula; i++) {
+                        Element formula = (Element) listFormulas.item(i);
+                        String nameFormula = formula.getElementsByTagName("Name").item(0).getTextContent();
+                        String unitFormula = formula.getElementsByTagName("Unit").item(0).getTextContent();
+                        String expressionFormula = formula.getElementsByTagName("Expression").item(0).getTextContent();
+
+                        listFormula.add(new Formula(nameFormula, expressionFormula, log));
+                    }
+
+                    if (log != null) {
+                        for (Measure formule : listFormula) {
+                            log.getMeasures().add(formule);
+                            int idx = listModel.indexOf(formule);
+                            if (idx < 0) {
+                                listModel.addElement(formule);
+                            }
+                        }
+                    }
+
+                    NodeList listConditons = racine.getElementsByTagName("Condition");
+                    int nbCondition = listConditons.getLength();
+
+                    List<Condition> conditions = new ArrayList<>(nbCondition);
+
+                    for (int i = 0; i < nbCondition; i++) {
+                        Element condition = (Element) listConditons.item(i);
+                        String nameCondition = condition.getElementsByTagName("Name").item(0).getTextContent();
+                        String expressionCondition = condition.getElementsByTagName("Expression").item(0).getTextContent();
+                        String colorCondition = condition.getElementsByTagName("Color").item(0).getTextContent();
+
+                        conditions.add(new Condition(nameCondition, expressionCondition, Utilitaire.parseRGBColor(colorCondition, 70)));
+                    }
+
+                    panelCondition.getTableCondition().getModel().setConditions(conditions);
+
+                    document = null;
+
+                } else {
+
+                    return;
+                }
+
+            } catch (ParserConfigurationException | SAXException | IOException e) {
+                e.printStackTrace();
+            } finally {
+                reloadLogData(log);
             }
 
-            for (Measure formule : list) {
-                ((Formula) formule).deserialize();
-                ((Formula) formule).calculate(log);
-                listFormula.add(formule);
-            }
-
-            reloadLogData(log);
-
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
         }
+
     }
 
     public static void main(String[] args) {
+
+        // Conversion.AppIncToA2l(new File("c:\\user\\U354706\\Perso\\Clio\\soft\\applicatif_26072021_Cor.inc"));
 
         try {
 

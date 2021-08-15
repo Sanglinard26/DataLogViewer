@@ -21,6 +21,7 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.math.BigDecimal;
 import java.util.Arrays;
+import java.util.Vector;
 
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
@@ -40,6 +41,7 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
+import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
@@ -58,7 +60,7 @@ public class CalTable extends JPanel {
     private RowNumberTable rowTable;
     private BarControl control;
     private JScrollPane scrollPane;
-    private Variable variable;
+    private Variable selectedVariable;
     private JTableHeader header;
     private JPopupMenu renamePopup;
     private JTextField text;
@@ -76,7 +78,7 @@ public class CalTable extends JPanel {
             return;
         }
 
-        this.variable = variable;
+        this.selectedVariable = variable;
 
         int nbRow = variable.getDimY();
         int nbCol = variable.getDimX();
@@ -103,21 +105,68 @@ public class CalTable extends JPanel {
 
             @Override
             public void keyTyped(KeyEvent e) {
-                if (e.getKeyChar() == '=') {
 
-                    String res = JOptionPane.showInputDialog(CalTable.this, "Valeur :");
+                String res = null;
+                double val;
+                double actualVal;
 
-                    int[] cols = table.getSelectedColumns();
-                    int[] rows = table.getSelectedRows();
+                int[] cols = table.getSelectedColumns();
+                int[] rows = table.getSelectedRows();
+
+                switch (e.getKeyChar()) {
+                case '=':
+                    res = JOptionPane.showInputDialog(CalTable.this, "Valeur :");
+                    val = Utilitaire.getNumberObject(res).doubleValue();
 
                     for (int col : cols) {
                         for (int row : rows) {
-                            table.setValueAt(res, row, col);
+                            table.setValueAt(val, row, col);
                             table.editCellAt(row, col);
-
                         }
                     }
                     table.getCellEditor().stopCellEditing();
+                    break;
+                case '+':
+                    res = JOptionPane.showInputDialog(CalTable.this, "Ajouter :");
+                    val = Utilitaire.getNumberObject(res).doubleValue();
+
+                    for (int col : cols) {
+                        for (int row : rows) {
+                            actualVal = Utilitaire.getNumberObject(table.getValueAt(row, col)).doubleValue();
+                            table.setValueAt(actualVal + val, row, col);
+                            table.editCellAt(row, col);
+                        }
+                    }
+                    table.getCellEditor().stopCellEditing();
+                    break;
+                case '*':
+                    res = JOptionPane.showInputDialog(CalTable.this, "Multiplier par :");
+                    val = Utilitaire.getNumberObject(res).doubleValue();
+
+                    for (int col : cols) {
+                        for (int row : rows) {
+                            actualVal = Utilitaire.getNumberObject(table.getValueAt(row, col)).doubleValue();
+                            table.setValueAt(actualVal * val, row, col);
+                            table.editCellAt(row, col);
+                        }
+                    }
+                    table.getCellEditor().stopCellEditing();
+                    break;
+                case '/':
+                    res = JOptionPane.showInputDialog(CalTable.this, "Diviser par :");
+                    val = Utilitaire.getNumberObject(res).doubleValue();
+
+                    for (int col : cols) {
+                        for (int row : rows) {
+                            actualVal = Utilitaire.getNumberObject(table.getValueAt(row, col)).doubleValue();
+                            table.setValueAt(actualVal / val, row, col);
+                            table.editCellAt(row, col);
+                        }
+                    }
+                    table.getCellEditor().stopCellEditing();
+                    break;
+                default:
+                    break;
                 }
             }
 
@@ -134,10 +183,14 @@ public class CalTable extends JPanel {
                     int row = e.getFirstRow();
                     int col = e.getColumn();
 
+                    if (row < 0 || col < 0) {
+                        return;
+                    }
+
                     int offsetRow = 0;
                     int offsetCol = 0;
 
-                    switch (CalTable.this.variable.getType()) {
+                    switch (CalTable.this.selectedVariable.getType()) {
 
                     case COURBE:
                         offsetRow = 1;
@@ -153,8 +206,8 @@ public class CalTable extends JPanel {
                     Object actValue = Utilitaire.getStorageObject(table.getValueAt(row, col));
 
                     if (actValue != null) {
-                        CalTable.this.variable.saveNewValue(row + offsetRow, col + offsetCol, actValue);
-                        CalTable.this.variable.notifyObservers();
+                        CalTable.this.selectedVariable.saveNewValue(row + offsetRow, col + offsetCol, actValue);
+                        // CalTable.this.selectedVariable.notifyObservers();
                     }
                 }
 
@@ -239,12 +292,12 @@ public class CalTable extends JPanel {
         }
 
         if (column != null) {
-            CalTable.this.variable.saveNewValue(0, columnBrkPt + offsetCol, text.getText());
+            CalTable.this.selectedVariable.saveNewValue(0, columnBrkPt + offsetCol, text.getText());
             column.setHeaderValue(text.getText());
             header.repaint();
         } else {
             if (rowBrkPt != -1) {
-                CalTable.this.variable.saveNewValue(rowBrkPt + offsetRow, 0, text.getText());
+                CalTable.this.selectedVariable.saveNewValue(rowBrkPt + offsetRow, 0, text.getText());
                 rowTable.setValueAt(text.getText(), rowBrkPt, 0);
             }
         }
@@ -253,15 +306,13 @@ public class CalTable extends JPanel {
     }
 
     public final void setValue(double newValue, int row, int col) {
-
-        // double adjustedValue = Utilitaire.applyResolution(newValue, variable.getResolution());
         table.setValueAt(newValue, row, col);
     }
 
     public final void calcZvalue() {
 
         final double[][] datasTable = getTableDoubleValue();
-        final double[][] datasRef = variable.toDouble2D(false);
+        final double[][] datasRef = selectedVariable.toDouble2D(false);
         double result = Double.NaN;
         BigDecimal bd;
         BigDecimal bdOrigine;
@@ -269,8 +320,8 @@ public class CalTable extends JPanel {
 
         for (int row = 0; row < table.getRowCount(); row++) {
 
-            if (variable.getDimY() > 2) {
-                for (int x = 1; x < variable.getDimX(); x++) {
+            if (selectedVariable.getDimY() > 2) {
+                for (int x = 1; x < selectedVariable.getDimX(); x++) {
                     result = Interpolation.interpLinear2D(datasRef, datasTable[0][x], datasTable[row + 1][0]);
 
                     bd = BigDecimal.valueOf(result);
@@ -287,8 +338,8 @@ public class CalTable extends JPanel {
                 }
             }
 
-            if (variable.getDimY() == 2) {
-                for (int x = 0; x < variable.getDimX(); x++) {
+            if (selectedVariable.getDimY() == 2) {
+                for (int x = 0; x < selectedVariable.getDimX(); x++) {
                     result = Interpolation.interpLinear1D(datasRef, datasTable[0][x]);
 
                     bd = BigDecimal.valueOf(result);
@@ -377,6 +428,8 @@ public class CalTable extends JPanel {
 
         boolean modifiedVar = variable.isModified();
 
+        Vector<Vector> dataVector = ((DefaultTableModel) table.getModel()).getDataVector();
+
         if (variable.getDimX() * variable.getDimY() == 1) {
             table.setTableHeader(null);
             scrollPane.setRowHeaderView(null);
@@ -385,7 +438,8 @@ public class CalTable extends JPanel {
 
             value = oValue != null ? oValue.toString() : "";
 
-            table.setValueAt(value, 0, 0);
+            // table.setValueAt(value, 0, 0);
+            dataVector.get(0).set(0, value);
 
         } else if (variable.getDimY() == 2) {
 
@@ -398,7 +452,8 @@ public class CalTable extends JPanel {
                 value = variable.getValue(modifiedVar, 1, col).toString();
 
                 table.getColumnModel().getColumn(col).setHeaderValue(xValue);
-                table.setValueAt(value, 0, col);
+                // table.setValueAt(value, 0, col);
+                dataVector.get(0).set(col, value);
             }
         } else if (variable.getDimX() * variable.getDimY() == variable.getDimX()) {
 
@@ -410,7 +465,8 @@ public class CalTable extends JPanel {
 
                 value = oValue != null ? oValue.toString() : "";
 
-                table.setValueAt(value, 0, col);
+                // table.setValueAt(value, 0, col);
+                dataVector.get(0).set(col, value);
             }
         } else {
 
@@ -426,7 +482,8 @@ public class CalTable extends JPanel {
 
                         table.getColumnModel().getColumn(col - 1).setHeaderValue(xValue);
                         rowTable.setValueAt(yValue, row - 1, 0);
-                        table.setValueAt(value, row - 1, col - 1);
+                        // table.setValueAt(value, row - 1, col - 1);
+                        dataVector.get(row - 1).set(col - 1, value);
                     }
                 }
             } else {
@@ -441,13 +498,14 @@ public class CalTable extends JPanel {
 
                         value = oValue != null ? oValue.toString() : "";
 
-                        table.setValueAt(value, row, col);
+                        // table.setValueAt(value, row, col);
+                        dataVector.get(row).set(col, value);
                     }
                 }
             }
 
         }
-
+        ((DefaultTableModel) table.getModel()).fireTableDataChanged();
     }
 
     private final void adjustCells() {
@@ -502,11 +560,11 @@ public class CalTable extends JPanel {
             return new double[][] { { Double.parseDouble(table.getValueAt(0, 0).toString()) } };
         }
 
-        double[][] doubleValues = new double[variable.getDimY()][variable.getDimX()];
+        double[][] doubleValues = new double[selectedVariable.getDimY()][selectedVariable.getDimX()];
 
         doubleValues[0][0] = Double.NaN;
 
-        if (variable.getDimY() > 2) {
+        if (selectedVariable.getDimY() > 2) {
             for (int col = 0; col < nbCol; col++) {
                 doubleValues[0][col + 1] = Double.parseDouble(columnModel.getColumn(col).getHeaderValue().toString());
             }
@@ -537,7 +595,7 @@ public class CalTable extends JPanel {
         int startCol;
         int startRow;
 
-        Type typeVar = variable.getType();
+        Type typeVar = selectedVariable.getType();
 
         if (typeVar.compareTo(Type.COURBE) == 0) {
             startCol = 0;
@@ -598,7 +656,7 @@ public class CalTable extends JPanel {
                 @Override
                 public void actionPerformed(ActionEvent e) {
 
-                    if (variable == null) {
+                    if (selectedVariable == null) {
                         JOptionPane.showMessageDialog(null, "Il faut qu'une variable soit sélectionnée !", "Info", JOptionPane.INFORMATION_MESSAGE);
                         return;
                     }
@@ -644,8 +702,8 @@ public class CalTable extends JPanel {
                     if (table == null) {
                         return;
                     }
-                    variable.backToRefValue();
-                    populate(variable);
+                    selectedVariable.backToRefValue();
+                    populate(selectedVariable);
 
                 }
             });

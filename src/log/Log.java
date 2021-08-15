@@ -75,9 +75,13 @@ public final class Log {
                 case 1:
                     this.datas = new ArrayList<Measure>(splitTab.length);
 
-                    for (String nameMeasure : splitTab) {
-                        this.datas.add(new Measure(nameMeasure));
+                    for (int idxCol = 0; idxCol < splitTab.length; idxCol++) {
+                        if (idxCol == 0) {
+                            this.timeName = splitTab[idxCol];
+                        }
+                        this.datas.add(new Measure(splitTab[idxCol]));
                     }
+
                     break;
                 default:
 

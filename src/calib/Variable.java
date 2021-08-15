@@ -50,7 +50,22 @@ public final class Variable extends Observable implements Comparable<Variable> {
     }
 
     public boolean isModified() {
-        return newValues != null;
+
+        if (this.newValues != null) {
+            for (short y = 0; y < dimY; y++) {
+                for (short x = 0; x < dimX; x++) {
+                    try {
+                        if (Double.parseDouble(getValue(false, y, x).toString()) != Double.parseDouble(getValue(true, y, x).toString())) {
+                            return true;
+                        }
+                    } catch (NumberFormatException nfe) {
+
+                    }
+
+                }
+            }
+        }
+        return false;
     }
 
     public int getDimX() {
@@ -123,6 +138,8 @@ public final class Variable extends Observable implements Comparable<Variable> {
 
     public void backToRefValue() {
         this.newValues = null;
+        setChanged();
+        notifyObservers();
     }
 
     private final void build(List<String> data) {
@@ -336,6 +353,7 @@ public final class Variable extends Observable implements Comparable<Variable> {
 
         setValue(true, saturateValue(newValue), y, x);
         setChanged();
+        notifyObservers();
     }
 
     public final float[] getXAxis(boolean modifiedVar) {

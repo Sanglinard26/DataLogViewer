@@ -1,4 +1,4 @@
-package gui;
+package dialog;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -35,6 +35,7 @@ import org.jfree.chart.JFreeChart;
 import org.jfree.data.xy.XYSeries;
 import org.jfree.data.xy.XYSeriesCollection;
 
+import gui.Ihm;
 import log.Formula;
 import log.Measure;
 

@@ -1,4 +1,4 @@
-package gui;
+package dialog;
 
 import java.awt.Color;
 import java.awt.Component;
@@ -20,6 +20,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JScrollPane;
 import javax.swing.SwingConstants;
 
+import gui.Ihm;
 import log.Formula;
 import log.Measure;
 

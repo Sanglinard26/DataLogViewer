@@ -1,4 +1,4 @@
-package gui;
+package dialog;
 
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -14,6 +14,8 @@ import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JTextField;
+
+import gui.Ihm;
 
 public final class DialNewChart extends JDialog {
 

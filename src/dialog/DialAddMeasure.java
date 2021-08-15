@@ -1,7 +1,7 @@
 /*
  * Creation : 15 nov. 2020
  */
-package gui;
+package dialog;
 
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;

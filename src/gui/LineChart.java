@@ -58,6 +58,8 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
     private double zMin;
     private double zMax;
 
+    private final JScrollPane sp;
+
     private boolean onMove = false;
 
     public LineChart(char type) {
@@ -114,7 +116,7 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
             }
         });
 
-        JScrollPane sp = new JScrollPane(listSeries);
+        sp = new JScrollPane(listSeries);
         sp.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
 
         add(sp, BorderLayout.WEST);
@@ -152,6 +154,11 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
         }
 
         listSeries.setListData(series);
+        if (series.length > 1) {
+            sp.setVisible(true);
+        } else {
+            sp.setVisible(false);
+        }
     }
 
     @Override

@@ -5,10 +5,12 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Cursor;
+import java.awt.Shape;
 import java.awt.Stroke;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.geom.Ellipse2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
@@ -54,9 +56,11 @@ import org.jfree.data.xy.XYZDataset;
 import org.jfree.ui.Layer;
 import org.jfree.ui.RectangleEdge;
 
+import dialog.DialogProperties;
 import log.Measure;
 import observer.Observable;
 import observer.Observateur;
+import utils.Utilitaire;
 
 public final class ChartView extends ChartPanel implements Observable {
 
@@ -339,6 +343,34 @@ public final class ChartView extends ChartPanel implements Observable {
         }
     }
 
+    public final XYPlot addPlot(Measure time, String backGroundColor) {
+
+        final XYSeriesCollection collections = new XYSeriesCollection();
+        final NumberAxis yAxis = new NumberAxis();
+        final XYItemRenderer renderer = new XYLineAndShapeRenderer(true, false);
+        renderer.setSeriesStroke(0, new BasicStroke(1.5f));
+        final XYPlot plot = new XYPlot(collections, null, yAxis, renderer);
+
+        if (parentPlot.getSubplots().size() == 0) {
+
+            if (parentPlot.getDomainAxis().getLabel() == null) {
+                parentPlot.setDomainAxis(new NumberAxis(time.getName()));
+            }
+
+            xValue = Double.NaN;
+
+            marker = new ValueMarker(xValue, Color.BLUE, new BasicStroke(1.5f));
+        }
+
+        plot.setBackgroundPaint(Utilitaire.parseRGBColor(backGroundColor, 255));
+
+        plot.addDomainMarker(0, marker, Layer.FOREGROUND);
+
+        parentPlot.add(plot, 1);
+
+        return plot;
+    }
+
     public final void addPlot(Measure time, Measure measure) {
 
         final XYSeries series = new XYSeries(measure.getName());
@@ -357,7 +389,12 @@ public final class ChartView extends ChartPanel implements Observable {
             if (parentPlot.getDomainAxis().getLabel() == null) {
                 parentPlot.setDomainAxis(new NumberAxis(time.getName()));
             }
-            xValue = temps.get(nbPoint / 2).doubleValue();
+            if (nbPoint > 1) {
+                xValue = temps.get(nbPoint / 2).doubleValue();
+            } else {
+                xValue = Double.NaN;
+            }
+
             marker = new ValueMarker(xValue, Color.BLUE, new BasicStroke(1.5f));
         }
 
@@ -400,6 +437,38 @@ public final class ChartView extends ChartPanel implements Observable {
         }
     }
 
+    public final void add2DScatterPlot(Measure x, Measure y, String bckGroundColor, String shapeSize, String shapeColor) {
+
+        if (parentPlot.getSubplots().size() == 0) {
+            final DefaultXYDataset dataset = new DefaultXYDataset();
+            double[][] arrayOfDouble = { x.getDoubleValue(), y.getDoubleValue() };
+            dataset.addSeries("Series 1", arrayOfDouble);
+            final NumberAxis xAxis = new NumberAxis(x.getName());
+            final NumberAxis yAxis = new NumberAxis(y.getName());
+            final XYShapeRenderer renderer = new XYShapeRenderer();
+
+            renderer.setDrawOutlines(true);
+            renderer.setBaseOutlinePaint(Color.BLACK);
+
+            final XYPlot plot = new XYPlot(dataset, xAxis, yAxis, renderer);
+
+            double size = Double.parseDouble(shapeSize);
+            Shape shape = new Ellipse2D.Double(-size / 2, -size / 2, size, size);
+            plot.getRenderer().setBaseShape(shape);
+            plot.getRenderer().setSeriesPaint(0, Utilitaire.parseRGBColor(shapeColor, 255));
+            plot.setBackgroundPaint(Utilitaire.parseRGBColor(bckGroundColor, 255));
+
+            getChart().removeLegend();
+
+            parentPlot.setDomainAxis(xAxis);
+
+            parentPlot.add(plot, 1);
+        } else {
+            JOptionPane.showMessageDialog(this, "Un seul graphique de ce type peut-etre pr\u00e9sent par fenetre", "Info",
+                    JOptionPane.INFORMATION_MESSAGE);
+        }
+    }
+
     public final void add3DScatterPlot(Measure x, Measure y, Measure z) {
 
         if (parentPlot.getSubplots().size() == 0) {
@@ -421,6 +490,9 @@ public final class ChartView extends ChartPanel implements Observable {
                 double offset = Math.abs(z.getMax() / 100);
                 min = z.getMin() - offset;
                 max = z.getMax() + offset;
+            } else if (Double.isInfinite(delta)) {
+                min = -0.1;
+                max = 0.1;
             } else {
                 min = z.getMin();
                 max = z.getMax();
@@ -450,6 +522,123 @@ public final class ChartView extends ChartPanel implements Observable {
         }
     }
 
+    public final void add3DScatterPlot(Measure x, Measure y, Measure z, String bckGroundColor, String shapeSize, String zRange) {
+
+        if (parentPlot.getSubplots().size() == 0) {
+            final DefaultXYZDataset dataset = new DefaultXYZDataset();
+            double[][] arrayOfDouble = { x.getDoubleValue(), y.getDoubleValue(), z.getDoubleValue() };
+            dataset.addSeries("Series 1", arrayOfDouble);
+            final NumberAxis xAxis = new NumberAxis(x.getName());
+            final NumberAxis yAxis = new NumberAxis(y.getName());
+            final XYShapeRenderer renderer = new XYShapeRenderer();
+
+            renderer.setDrawOutlines(true);
+            renderer.setBaseOutlinePaint(Color.BLACK);
+
+            ColorPaintScale localLookupPaintScale;
+
+            if (zRange != null && !zRange.trim().isEmpty()) {
+                String[] splitRange = zRange.split(";", 2);
+                try {
+                    ;
+                    double min = Double.parseDouble(splitRange[0]);
+                    double max = Double.parseDouble(splitRange[1]);
+                    localLookupPaintScale = new ColorPaintScale(min, max);
+
+                } catch (NumberFormatException nfe) {
+                    localLookupPaintScale = new ColorPaintScale();
+                }
+            } else {
+                localLookupPaintScale = new ColorPaintScale();
+            }
+
+            renderer.setPaintScale(localLookupPaintScale);
+
+            final XYPlot plot = new XYPlot(dataset, xAxis, yAxis, renderer);
+
+            double size = Double.parseDouble(shapeSize);
+            Shape shape = new Ellipse2D.Double(-size / 2, -size / 2, size, size);
+            plot.getRenderer().setBaseShape(shape);
+
+            plot.setBackgroundPaint(Utilitaire.parseRGBColor(bckGroundColor, 255));
+
+            final NumberAxis zAxis = new NumberAxis(z.getName());
+
+            PaintScaleLegend localPaintScaleLegend = new PaintScaleLegend(localLookupPaintScale, zAxis);
+            localPaintScaleLegend.setPosition(RectangleEdge.RIGHT);
+            localPaintScaleLegend.setMargin(4.0D, 4.0D, 40.0D, 4.0D);
+            localPaintScaleLegend.setAxisLocation(AxisLocation.BOTTOM_OR_RIGHT);
+            getChart().addSubtitle(localPaintScaleLegend);
+            getChart().removeLegend();
+
+            parentPlot.setDomainAxis(xAxis);
+
+            parentPlot.add(plot, 1);
+        } else {
+            JOptionPane.showMessageDialog(this, "Un seul graphique de ce type peut-etre pr\u00e9sent par fenetre", "Info",
+                    JOptionPane.INFORMATION_MESSAGE);
+        }
+    }
+
+    public final void addMeasure(XYPlot plot, Measure time, Measure measure, String color, String width, String axisName) {
+
+        final int nbDataset = plot.getDatasetCount();
+
+        XYSeriesCollection selectedCollection = null;
+
+        ValueAxis axis = null;
+        boolean newAxis = true;
+
+        if (plot.getRangeAxis() == null) {
+            NumberAxis yAxis = new NumberAxis(axisName);
+            plot.setRangeAxis(yAxis);
+        } else {
+            for (int i = 0; i < plot.getRangeAxisCount(); i++) {
+                if (plot.getRangeAxis(i).getLabel() == null || axisName.equals(plot.getRangeAxis(i).getLabel())) {
+                    axis = plot.getRangeAxis(i);
+
+                    int idxAxis = plot.getRangeAxisIndex(axis);
+                    selectedCollection = (XYSeriesCollection) plot.getDataset(idxAxis);
+                    if (selectedCollection.getSeriesCount() == 0) {
+                        axis.setLabel(measure.getName());
+                    }
+                    newAxis = false;
+                    break;
+                }
+            }
+        }
+
+        if (axis == null) {
+            axis = new NumberAxis(axisName);
+        }
+
+        final XYSeries newSerie = new XYSeries(measure.getName());
+        final int nbPoint = measure.getData().size();
+
+        for (int n = 0; n < nbPoint; n++) {
+            newSerie.add(time.getData().get(n), measure.getData().get(n), false);
+        }
+
+        if (!newAxis) {
+            selectedCollection.addSeries(newSerie);
+            plot.getRenderer().setSeriesStroke(selectedCollection.getSeriesCount() - 1, new BasicStroke(Float.parseFloat(width)));
+            plot.getRenderer().setSeriesPaint(selectedCollection.getSeriesCount() - 1, Utilitaire.parseRGBColor(color, 255));
+        } else {
+            XYSeriesCollection newCollection = new XYSeriesCollection(newSerie);
+            final XYItemRenderer renderer = new XYLineAndShapeRenderer(true, false);
+            renderer.setSeriesStroke(0, new BasicStroke(Float.parseFloat(width)));
+            renderer.setSeriesPaint(0, Utilitaire.parseRGBColor(color, 255));
+            plot.setRenderer(nbDataset, renderer);
+            plot.setDataset(nbDataset, newCollection);
+            plot.setRangeAxis(nbDataset, axis);
+            plot.setRangeAxisLocation(nbDataset, AxisLocation.TOP_OR_LEFT);
+            plot.mapDatasetToRangeAxis(nbDataset, nbDataset);
+        }
+
+        plot.setOutlineStroke(oldStrokePlot);
+
+    }
+
     public final void addMeasure(XYPlot plot, Measure time, Measure measure, String axisName) {
 
         final int nbDataset = plot.getDatasetCount();
@@ -459,17 +648,22 @@ public final class ChartView extends ChartPanel implements Observable {
         ValueAxis axis = null;
         boolean newAxis = true;
 
-        for (int i = 0; i < plot.getRangeAxisCount(); i++) {
-            if (plot.getRangeAxis(i).getLabel().equals(axisName)) {
-                axis = plot.getRangeAxis(i);
+        if (plot.getRangeAxis() == null) {
+            NumberAxis yAxis = new NumberAxis(axisName);
+            plot.setRangeAxis(yAxis);
+        } else {
+            for (int i = 0; i < plot.getRangeAxisCount(); i++) {
+                if (plot.getRangeAxis(i).getLabel() == null || axisName.equals(plot.getRangeAxis(i).getLabel())) {
+                    axis = plot.getRangeAxis(i);
 
-                int idxAxis = plot.getRangeAxisIndex(axis);
-                selectedCollection = (XYSeriesCollection) plot.getDataset(idxAxis);
-                if (selectedCollection.getSeriesCount() == 0) {
-                    axis.setLabel(measure.getName());
+                    int idxAxis = plot.getRangeAxisIndex(axis);
+                    selectedCollection = (XYSeriesCollection) plot.getDataset(idxAxis);
+                    if (selectedCollection.getSeriesCount() == 0) {
+                        axis.setLabel(measure.getName());
+                    }
+                    newAxis = false;
+                    break;
                 }
-                newAxis = false;
-                break;
             }
         }
 

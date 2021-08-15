@@ -1,7 +1,7 @@
 /*
  * Creation : 23 mars 2020
  */
-package gui;
+package dialog;
 
 import java.awt.BasicStroke;
 import java.awt.BorderLayout;
@@ -37,11 +37,12 @@ import org.jfree.chart.renderer.xy.XYShapeRenderer;
 import org.jfree.data.Range;
 import org.jfree.data.xy.XYSeriesCollection;
 
-abstract class DialogFactory {
+import gui.ChartView;
+import gui.ColorEditor;
+import gui.ColorRenderer;
 
-}
 
-final class DialogProperties extends JPanel implements ActionListener
+public final class DialogProperties extends JPanel implements ActionListener
 
 {
     private static final long serialVersionUID = 1L;

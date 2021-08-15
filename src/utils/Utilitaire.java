@@ -1,6 +1,11 @@
 package utils;
 
+import java.awt.Color;
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.swing.JFileChooser;
 
@@ -92,6 +97,28 @@ public abstract class Utilitaire {
     public static final double applyResolution(double rawValue, double resol) {
         double roundValue = Math.rint(rawValue / resol);
         return roundValue * resol;
+    }
+
+    public static Color parseRGBColor(String stringColor, int alpha) {
+        Pattern pattern = Pattern.compile("[0-9]{1,3}");
+
+        List<String> listWord = new ArrayList<>();
+
+        final Matcher regexMatcher = pattern.matcher(stringColor);
+
+        while (regexMatcher.find()) {
+            listWord.add(regexMatcher.group());
+        }
+
+        if (listWord.size() == 3) {
+            int r = Integer.parseInt(listWord.get(0));
+            int g = Integer.parseInt(listWord.get(1));
+            int b = Integer.parseInt(listWord.get(2));
+
+            return new Color(r, g, b, alpha);
+        }
+
+        return Color.BLACK;
     }
 
 }

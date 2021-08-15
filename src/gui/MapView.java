@@ -100,6 +100,7 @@ public final class MapView extends JPanel implements Observer {
 
         treeModel = new DefaultTreeModel(new DefaultMutableTreeNode("Fichiers"));
         treeVariable = new JTree(treeModel);
+        treeVariable.setCellRenderer(new TreeCalRenderer());
         addCalToTree(mapCal);
         add(new JScrollPane(treeVariable), gbc);
 
@@ -117,19 +118,20 @@ public final class MapView extends JPanel implements Observer {
                     selectedVariable = (Variable) node.getUserObject();
                     selectedVariable.addObserver(MapView.this);
 
-                    remove(dataTable);
                     dataTable = new CalTable(selectedVariable);
 
                     lineChartX.setTable(dataTable);
                     lineChartY.setTable(dataTable);
 
                     splitPane.setTopComponent(dataTable);
-                    revalidate();
-                    repaint();
+                    splitPane.revalidate();
+                    splitPane.repaint();
 
                     splitPane.setDividerLocation(dataTable.getComponentHeight());
 
                     updateChart(selectedVariable);
+                } else {
+                    clearSelection();
                 }
             }
         });
@@ -225,11 +227,23 @@ public final class MapView extends JPanel implements Observer {
         for (MapCal mapCal : listCal) {
             if (mapCal.getName().equals(nodeCal.toString())) {
                 listCal.remove(mapCal);
+                clearSelection();
                 break;
             }
         }
 
         treeModel.reload();
+    }
+
+    private final void clearSelection() {
+        selectedVariable = null;
+        dataTable = new CalTable(selectedVariable);
+        splitPane.setTopComponent(dataTable);
+        lineChartX.setVisible(false);
+        lineChartY.setVisible(false);
+        surfaceChart.setVisible(false);
+        splitPane.revalidate();
+        splitPane.repaint();
     }
 
     private TreePath find(DefaultMutableTreeNode root, String parent, String child) {
@@ -259,7 +273,7 @@ public final class MapView extends JPanel implements Observer {
         return null;
     }
 
-    public final void updateChart(Variable variable) {
+    private final void updateChart(Variable variable) {
 
         JSurface jSurface = surfaceChart.getSurface();
 
@@ -316,12 +330,14 @@ public final class MapView extends JPanel implements Observer {
 
         final XYSeries[] series = new XYSeries[variable.getDimX() - 1];
 
+        boolean modifiedVar = variable.isModified();
+
         for (int x = 1; x < variable.getDimX(); x++) {
-            series[x - 1] = new XYSeries(variable.getValue(true, 0, x).toString());
+            series[x - 1] = new XYSeries(variable.getValue(modifiedVar, 0, x).toString());
 
             for (int y = 1; y < variable.getDimY(); y++) {
-                series[x - 1].add(Double.parseDouble(variable.getValue(true, y, 0).toString()),
-                        Double.parseDouble(variable.getValue(true, y, x).toString()), false);
+                series[x - 1].add(Double.parseDouble(variable.getValue(modifiedVar, y, 0).toString()),
+                        Double.parseDouble(variable.getValue(modifiedVar, y, x).toString()), false);
             }
         }
 
@@ -332,12 +348,14 @@ public final class MapView extends JPanel implements Observer {
 
         final XYSeries[] series = new XYSeries[variable.getDimY() - 1];
 
+        boolean modifiedVar = variable.isModified();
+
         for (int y = 1; y < variable.getDimY(); y++) {
-            series[y - 1] = new XYSeries(variable.getValue(true, y, 0).toString());
+            series[y - 1] = new XYSeries(variable.getValue(modifiedVar, y, 0).toString());
 
             for (int x = 1; x < variable.getDimX(); x++) {
-                series[y - 1].add(Double.parseDouble(variable.getValue(true, 0, x).toString()),
-                        Double.parseDouble(variable.getValue(true, y, x).toString()), false);
+                series[y - 1].add(Double.parseDouble(variable.getValue(modifiedVar, 0, x).toString()),
+                        Double.parseDouble(variable.getValue(modifiedVar, y, x).toString()), false);
             }
         }
 
@@ -348,10 +366,12 @@ public final class MapView extends JPanel implements Observer {
 
         final XYSeries[] series = new XYSeries[] { new XYSeries("") };
 
+        boolean modifiedVar = variable.isModified();
+
         for (int x = 0; x < variable.getDimX(); x++) {
 
-            series[0].add(Double.parseDouble(variable.getValue(true, 0, x).toString()), Double.parseDouble(variable.getValue(true, 1, x).toString()),
-                    false);
+            series[0].add(Double.parseDouble(variable.getValue(modifiedVar, 0, x).toString()),
+                    Double.parseDouble(variable.getValue(modifiedVar, 1, x).toString()), false);
         }
 
         return series;
@@ -607,8 +627,15 @@ public final class MapView extends JPanel implements Observer {
 
     @Override
     public void update(Observable object, Object arg) {
+
         if (object instanceof Variable) {
             updateChart((Variable) object);
+
+            if (treeVariable.getSelectionPath() != null) {
+                DefaultMutableTreeNode node = (DefaultMutableTreeNode) treeVariable.getSelectionPath().getLastPathComponent();
+                ((DefaultTreeModel) treeVariable.getModel()).nodeChanged(node);
+            }
+
         }
     }
 

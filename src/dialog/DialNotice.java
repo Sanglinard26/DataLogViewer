@@ -1,7 +1,7 @@
 /*
  * Creation : 9 mars 2017
  */
-package gui;
+package dialog;
 
 import java.awt.Toolkit;
 import java.io.BufferedReader;
