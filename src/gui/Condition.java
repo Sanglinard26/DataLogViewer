@@ -24,6 +24,8 @@ import log.Measure;
 
 public final class Condition implements Serializable {
 
+    private static final long serialVersionUID = 1L;
+
     private String name;
     private String expression;
     private boolean active;

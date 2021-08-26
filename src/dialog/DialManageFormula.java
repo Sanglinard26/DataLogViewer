@@ -122,6 +122,7 @@ public final class DialManageFormula extends JDialog {
 
             @Override
             public void actionPerformed(ActionEvent arg0) {
+                ihm.refresh();
                 dispose();
             }
         }), gbc);

@@ -46,6 +46,7 @@ import org.jfree.chart.renderer.xy.XYItemRenderer;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
 import org.jfree.chart.renderer.xy.XYShapeRenderer;
 import org.jfree.chart.title.PaintScaleLegend;
+import org.jfree.data.Range;
 import org.jfree.data.general.DatasetUtilities;
 import org.jfree.data.xy.DefaultXYDataset;
 import org.jfree.data.xy.DefaultXYZDataset;
@@ -131,6 +132,9 @@ public final class ChartView extends ChartPanel implements Observable {
 
     private final class MyChartMouseListener extends MouseAdapter {
 
+        private List<Range> actualRanges = new ArrayList<Range>();
+        private XYPlot plot;
+
         @Override
         public void mouseMoved(MouseEvent e) {
 
@@ -152,6 +156,12 @@ public final class ChartView extends ChartPanel implements Observable {
         @Override
         public void mousePressed(MouseEvent e) {
 
+            plot = parentPlot.findSubplot(getChartRenderingInfo().getPlotInfo(), translateScreenToJava2D(e.getPoint()));
+
+            for (int i = 0; i < plot.getRangeAxisCount(); i++) {
+                actualRanges.add(plot.getRangeAxis(i).getRange());
+            }
+
             if (SwingUtilities.isLeftMouseButton(e)) {
                 setDomainZoomable(false);
             }
@@ -167,6 +177,12 @@ public final class ChartView extends ChartPanel implements Observable {
         @Override
         public void mouseReleased(MouseEvent e) {
             setDomainZoomable(true);
+
+            for (int i = 0; i < plot.getRangeAxisCount(); i++) {
+                plot.getRangeAxis(i).setRange(actualRanges.get(i));
+            }
+
+            actualRanges.clear();
 
             popUpLocation = translateScreenToJava2D(e.getPoint());
 

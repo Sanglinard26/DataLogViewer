@@ -21,8 +21,11 @@ public final class Formula extends Measure {
     private Map<Character, String> variables;
     private boolean valid = false;
 
-    public Formula(String name, String baseExpression, Log log) {
+    public Formula(String name, String unit, String baseExpression, Log log) {
         super(name);
+
+        this.unit = unit;
+
         if ("".equals(baseExpression)) {
             return;
         }

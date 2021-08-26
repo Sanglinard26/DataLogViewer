@@ -4,13 +4,16 @@
 package gui;
 
 import java.awt.BorderLayout;
+import java.awt.Component;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.text.DecimalFormat;
 import java.util.List;
 
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 
 import org.jfree.chart.plot.IntervalMarker;
@@ -46,14 +49,32 @@ public final class PanelCondition extends JPanel {
             }
         });
 
-        modelListCond = new DefaultTableModel(new String[] { "Numéro", "t1", "t2" }, 0);
+        modelListCond = new DefaultTableModel(new String[] { "Numéro", "t1", "t2" }, 0) {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+
         tableListCondition = new JTable(modelListCond);
+
+        tableListCondition.setDefaultRenderer(Object.class, new DecimalFormatRenderer());
         tableListCondition.setPreferredScrollableViewportSize(tableListCondition.getPreferredSize());
         add(new JScrollPane(tableListCondition), BorderLayout.CENTER);
     }
 
     public void setListBoxAnnotation(List<IntervalMarker> listBoxAnnotation) {
         this.listBoxAnnotation = listBoxAnnotation;
+
+        int idx = tableCondition.getSelectedRow();
+
+        if (idx == -1 || listBoxAnnotation == null) {
+            return;
+        }
+
+        populateList(idx);
     }
 
     public final void populateList(int idx) {
@@ -70,6 +91,23 @@ public final class PanelCondition extends JPanel {
 
     public TableCondition getTableCondition() {
         return tableCondition;
+    }
+
+    public JTable getTableListCondition() {
+        return tableListCondition;
+    }
+
+    static class DecimalFormatRenderer extends DefaultTableCellRenderer {
+
+        private static final long serialVersionUID = 1L;
+        private static final DecimalFormat formatter = new DecimalFormat();
+
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+
+            value = formatter.format(value);
+
+            return super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+        }
     }
 
 }

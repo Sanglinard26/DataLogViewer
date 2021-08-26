@@ -47,7 +47,7 @@ import log.Measure;
 
 public abstract class ExportUtils {
 
-    public static final boolean ConfigToXml(Map<String, JFreeChart> listChart, Set<Measure> listFormula, List<Condition> listConditions) {
+    public static final boolean ConfigToXml(File file, Map<String, JFreeChart> listChart, Set<Measure> listFormula, List<Condition> listConditions) {
 
         DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
         DocumentBuilder docBuilder;
@@ -356,7 +356,7 @@ public abstract class ExportUtils {
             transformer.setOutputProperty(OutputKeys.INDENT, "yes");
             transformer.setOutputProperty(OutputKeys.ENCODING, "ISO-8859-1"); // ISO-8859-1
             DOMSource source = new DOMSource(doc);
-            StreamResult resultat = new StreamResult(new File("C:\\User\\U354706\\Perso\\Clio\\ConfigTest.xml"));
+            StreamResult resultat = new StreamResult(file);
 
             transformer.transform(source, resultat);
 

@@ -15,10 +15,8 @@ import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
@@ -57,6 +55,8 @@ import javax.swing.UIManager.LookAndFeelInfo;
 import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.filechooser.FileFilter;
@@ -103,6 +103,8 @@ import utils.Utilitaire;
 public final class Ihm extends JFrame {
 
     private static final long serialVersionUID = 1L;
+
+    private final String DEMO = "demo";
 
     private JTabbedPane tabbedPane;
     private DefaultListModel<Measure> listModel;
@@ -174,7 +176,7 @@ public final class Ihm extends JFrame {
 
                     @Override
                     public String getDescription() {
-                        return "Fichier de configuration graphique (*.cfg)";
+                        return "Fichier de configuration graphique (*.cfg, *.xml)";
                     }
 
                     @Override
@@ -190,7 +192,7 @@ public final class Ihm extends JFrame {
 
                     File config = fc.getSelectedFile();
 
-                    if ("demo".equals(config.getName().toLowerCase())) {
+                    if (DEMO.equals(config.getName().toLowerCase())) {
 
                         try {
                             File tmp = File.createTempFile("config", null);
@@ -218,8 +220,8 @@ public final class Ihm extends JFrame {
             public void actionPerformed(ActionEvent e) {
                 final JFileChooser fileChooser = new JFileChooser(Preference.getPreference(Preference.KEY_CONFIG));
                 fileChooser.setDialogTitle("Enregistement de la configuration");
-                fileChooser.setFileFilter(new FileNameExtensionFilter("Fichier de configuration graphique (*.cfg)", "cfg"));
-                fileChooser.setSelectedFile(new File("config.cfg"));
+                fileChooser.setFileFilter(new FileNameExtensionFilter("Fichier de configuration graphique (*.xml)", "xml"));
+                fileChooser.setSelectedFile(new File("config.xml"));
                 final int rep = fileChooser.showSaveDialog(null);
 
                 if (rep == JFileChooser.APPROVE_OPTION) {
@@ -233,8 +235,8 @@ public final class Ihm extends JFrame {
                     if (idxDot > -1) {
                         extension = fileName.substring(idxDot + 1);
                     }
-                    if (!extension.equalsIgnoreCase("cfg")) {
-                        file = new File(fileName.replace("." + extension, "") + ".cfg");
+                    if (!extension.equalsIgnoreCase("xml")) {
+                        file = new File(fileName.replace("." + extension, "") + ".xml");
                     }
 
                     saveConfig(file);
@@ -418,7 +420,7 @@ public final class Ihm extends JFrame {
 
                     @Override
                     public String getDescription() {
-                        return "Fichier de configuration graphique (*.cfg)";
+                        return "Fichier de configuration graphique (*.cfg, *.xml)";
                     }
 
                     @Override
@@ -426,14 +428,14 @@ public final class Ihm extends JFrame {
                         if (f.isDirectory()) {
                             return true;
                         }
-                        return f.getName().toLowerCase().endsWith("cfg");
+                        return f.getName().toLowerCase().endsWith("cfg") || f.getName().toLowerCase().endsWith("xml");
                     }
                 });
                 final int reponse = fc.showOpenDialog(Ihm.this);
                 if (reponse == JFileChooser.APPROVE_OPTION) {
                     File config = fc.getSelectedFile();
 
-                    if ("demo".equals(config.getName().toLowerCase())) {
+                    if (DEMO.equals(config.getName().toLowerCase())) {
 
                         try {
                             File tmp = File.createTempFile("config", null);
@@ -742,6 +744,38 @@ public final class Ihm extends JFrame {
 
             }
         });
+
+        panelCondition.getTableListCondition().getSelectionModel().addListSelectionListener(new ListSelectionListener() {
+
+            @Override
+            public void valueChanged(ListSelectionEvent e) {
+                int idx = panelCondition.getTableListCondition().getSelectedRow();
+
+                if (idx < 0) {
+                    return;
+                }
+
+                double duration = (double) panelCondition.getTableListCondition().getValueAt(idx, 2)
+                        - (double) panelCondition.getTableListCondition().getValueAt(idx, 1);
+
+                double t1 = (double) panelCondition.getTableListCondition().getValueAt(idx, 1) - (duration * 0.2);
+                double t2 = (double) panelCondition.getTableListCondition().getValueAt(idx, 2) + (duration * 0.2);
+
+                int idxWin = tabbedPane.getSelectedIndex();
+                if (idxWin > -1) {
+                    if (tabbedPane.getComponentAt(idxWin) instanceof ChartView) {
+                        ChartView chartView = (ChartView) tabbedPane.getComponentAt(idxWin);
+
+                        CombinedDomainXYPlot combinedDomainXYPlot = chartView.getPlot();
+
+                        Range newRange = new Range(t1, t2);
+                        combinedDomainXYPlot.getDomainAxis().setRange(newRange);
+
+                    }
+                }
+            }
+        });
+
         gbc.fill = GridBagConstraints.BOTH;
         gbc.gridx = 3;
         gbc.gridy = 2;
@@ -1053,6 +1087,16 @@ public final class Ihm extends JFrame {
         return idx > -1 ? listModel.get(idx) : measure;
     }
 
+    public final void refresh() {
+        if (log != null) {
+            for (Measure form : getListFormula()) {
+                ((Formula) form).calculate(log);
+            }
+
+            reloadLogData(log);
+        }
+    }
+
     private final void reloadLogData(Log log) {
 
         final int nbTab = tabbedPane.getTabCount();
@@ -1101,7 +1145,7 @@ public final class Ihm extends JFrame {
                                 }
 
                                 serie.fireSeriesChanged();
-                                xyPlot.configureRangeAxes();
+                                // xyPlot.configureRangeAxes();
                             } else if (xyPlot.getDataset() instanceof DefaultXYZDataset) {
                                 Comparable<?> serieKey = ((DefaultXYZDataset) xyPlot.getDataset()).getSeriesKey(nSerie);
 
@@ -1144,65 +1188,19 @@ public final class Ihm extends JFrame {
 
     private final void saveConfig(File file) {
 
-        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(file))) {
-            int nbTab = tabbedPane.getTabCount();
-            Map<String, JFreeChart> listChart = new LinkedHashMap<String, JFreeChart>();
+        int nbTab = tabbedPane.getTabCount();
+        Map<String, JFreeChart> listChart = new LinkedHashMap<String, JFreeChart>();
 
-            for (int i = 0; i < nbTab; i++) {
-                if (tabbedPane.getComponentAt(i) instanceof ChartView) {
-                    JFreeChart chart = ((ChartView) tabbedPane.getComponentAt(i)).getChart();
-                    @SuppressWarnings("unchecked")
-                    List<XYPlot> subPlots = ((CombinedDomainXYPlot) chart.getXYPlot()).getSubplots();
-                    for (XYPlot subplot : subPlots) {
-                        int nbSerie = subplot.getDataset().getSeriesCount();
-                        for (int j = 0; j < nbSerie; j++) {
-                            if (subplot.getDataset() instanceof XYSeriesCollection) {
-                                ((XYSeriesCollection) subplot.getDataset()).getSeries(j).clear();
-                            } else if (subplot.getDataset() instanceof DefaultXYZDataset) {
-                                Comparable<?> serieKey = ((DefaultXYZDataset) subplot.getDataset()).getSeriesKey(j);
-                                ((DefaultXYZDataset) subplot.getDataset()).removeSeries(serieKey);
-                                ((DefaultXYZDataset) subplot.getDataset()).addSeries(serieKey, new double[3][1]);
-                            } else {
-                                Comparable<?> serieKey = ((DefaultXYDataset) subplot.getDataset()).getSeriesKey(j);
-                                ((DefaultXYDataset) subplot.getDataset()).removeSeries(serieKey);
-                                ((DefaultXYDataset) subplot.getDataset()).addSeries(serieKey, new double[2][1]);
-                            }
-                        }
-                    }
-                    listChart.put(tabbedPane.getTitleAt(i), chart);
-                }
+        for (int i = 0; i < nbTab; i++) {
+            if (tabbedPane.getComponentAt(i) instanceof ChartView) {
+                JFreeChart chart = ((ChartView) tabbedPane.getComponentAt(i)).getChart();
+                listChart.put(tabbedPane.getTitleAt(i), chart);
             }
-
-            oos.writeObject(listChart);
-            oos.flush();
-
-            for (Measure formule : listFormula) {
-                ((Formula) formule).clearData();
-            }
-            oos.writeObject(listFormula);
-            oos.flush();
-
-            List<Condition> conditions = this.panelCondition.getTableCondition().getModel().getConditions();
-            if (!conditions.isEmpty()) {
-                oos.writeObject(conditions);
-                oos.flush();
-            }
-
-            ExportUtils.ConfigToXml(listChart, listFormula, conditions);
-
-        } catch (FileNotFoundException e1) {
-            e1.printStackTrace();
-        } catch (IOException e1) {
-            e1.printStackTrace();
-        } finally {
-
-            for (Measure formule : listFormula) {
-                ((Formula) formule).calculate(log);
-            }
-
-            reloadLogData(log);
         }
 
+        List<Condition> conditions = this.panelCondition.getTableCondition().getModel().getConditions();
+
+        ExportUtils.ConfigToXml(file, listChart, listFormula, conditions);
     }
 
     private final void openConfig(File file) {
@@ -1297,11 +1295,12 @@ public final class Ihm extends JFrame {
                                     Element axisNode = (Element) listAxis.item(k);
                                     String nameAxis = axisNode.getElementsByTagName("Name").item(0).getTextContent();
 
+                                    String rangeText = axisNode.getElementsByTagName("Range").item(0).getTextContent();
+
+                                    String[] splitRange = rangeText.replace(',', '.').split(";");
+
                                     NodeList listSeries = axisNode.getElementsByTagName("Serie");
 
-                                    // if (k == 0) {
-                                    // chartView.addPlot(new Measure("Time_ms"), new Measure(nameAxis));
-                                    // } else {
                                     for (int l = 0; l < listSeries.getLength(); l++) {
 
                                         Element serieNode = (Element) listSeries.item(l);
@@ -1312,8 +1311,17 @@ public final class Ihm extends JFrame {
                                                 new Measure(nameSerie), colorSerie, widthSerie, nameAxis);
                                     }
 
-                                    // }
+                                    if (splitRange.length == 2) {
+                                        try {
+                                            ValueAxis axis = ((XYPlot) chartView.getPlot().getSubplots().get(j)).getRangeAxis(0);
+                                            double lowerBound = Double.parseDouble(splitRange[0]);
+                                            double upperBound = Double.parseDouble(splitRange[1]);
+                                            Range newRange = new Range(lowerBound, upperBound);
+                                            axis.setRange(newRange);
 
+                                        } catch (NumberFormatException e) {
+                                        }
+                                    }
                                 }
 
                                 break;
@@ -1357,7 +1365,7 @@ public final class Ihm extends JFrame {
                         String unitFormula = formula.getElementsByTagName("Unit").item(0).getTextContent();
                         String expressionFormula = formula.getElementsByTagName("Expression").item(0).getTextContent();
 
-                        listFormula.add(new Formula(nameFormula, expressionFormula, log));
+                        listFormula.add(new Formula(nameFormula, unitFormula, expressionFormula, log));
                     }
 
                     if (log != null) {

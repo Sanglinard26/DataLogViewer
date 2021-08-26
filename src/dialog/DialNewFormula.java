@@ -191,7 +191,7 @@ public final class DialNewFormula extends JDialog {
             @Override
             public void actionPerformed(ActionEvent arg0) {
 
-                Formula newFormula = new Formula(txtName.getText(), formulaText.getText(), ihm.getLog());
+                Formula newFormula = new Formula(txtName.getText(), txtUnit.getText(), formulaText.getText(), ihm.getLog());
                 if (ihm.getLog() != null && newFormula.isValid()) {
                     XYSeriesCollection dataset = (XYSeriesCollection) chartPanel.getChart().getXYPlot().getDataset();
                     XYSeries serie = dataset.getSeries(0);
@@ -224,7 +224,7 @@ public final class DialNewFormula extends JDialog {
             public void actionPerformed(ActionEvent arg0) {
 
                 if (formula == null) {
-                    Formula newFormula = new Formula(txtName.getText(), formulaText.getText(), ihm.getLog());
+                    Formula newFormula = new Formula(txtName.getText(), txtUnit.getText(), formulaText.getText(), ihm.getLog());
                     if (!ihm.getListFormula().contains(newFormula)) {
                         if (newFormula.isValid()) {
                             ihm.addMeasure(newFormula);

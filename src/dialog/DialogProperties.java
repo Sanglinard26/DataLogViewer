@@ -13,6 +13,8 @@ import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.awt.geom.Ellipse2D;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -40,7 +42,6 @@ import org.jfree.data.xy.XYSeriesCollection;
 import gui.ChartView;
 import gui.ColorEditor;
 import gui.ColorRenderer;
-
 
 public final class DialogProperties extends JPanel implements ActionListener
 
@@ -155,12 +156,17 @@ public final class DialogProperties extends JPanel implements ActionListener
         Comparable<?> key;
         XYItemRenderer renderer;
 
+        final DecimalFormat formatter = new DecimalFormat();
+        DecimalFormatSymbols decimalFormatSymbols = new DecimalFormatSymbols();
+        decimalFormatSymbols.setDecimalSeparator('.');
+        formatter.setDecimalFormatSymbols(decimalFormatSymbols);
+
         Range xRange = xyPlot.getDomainAxis().getRange();
-        String txtXRange = xRange.getLowerBound() + ";" + xRange.getUpperBound();
+        String txtXRange = formatter.format(xRange.getLowerBound()) + ";" + formatter.format(xRange.getUpperBound());
         rangeX.setText(txtXRange);
 
         Range yRange = xyPlot.getRangeAxis().getRange();
-        String txtYRange = yRange.getLowerBound() + ";" + yRange.getUpperBound();
+        String txtYRange = formatter.format(yRange.getLowerBound()) + ";" + formatter.format(yRange.getUpperBound());
         rangeY.setText(txtYRange);
 
         renderer = xyPlot.getRenderer();
@@ -199,7 +205,7 @@ public final class DialogProperties extends JPanel implements ActionListener
         CombinedDomainXYPlot combinedplot = chartView.getPlot();
         String serieName;
 
-        String[] splitRange = rangeX.getText().split(";");
+        String[] splitRange = rangeX.getText().replace(',', '.').split(";");
         if (splitRange.length == 2) {
             try {
                 double lowerBound = Double.parseDouble(splitRange[0]);
@@ -216,7 +222,7 @@ public final class DialogProperties extends JPanel implements ActionListener
 
         for (int i = 0; i < xyPlot.getRangeAxisCount(); i++) {
             ValueAxis axis = xyPlot.getRangeAxis(i);
-            splitRange = axisRange.get(axis.getLabel()).split(";");
+            splitRange = axisRange.get(axis.getLabel()).replace(',', '.').split(";");
             if (splitRange.length == 2) {
                 try {
                     double lowerBound = Double.parseDouble(splitRange[0]);
