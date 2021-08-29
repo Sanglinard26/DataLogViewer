@@ -17,10 +17,9 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 import javax.swing.ImageIcon;
 import javax.swing.JMenuItem;
@@ -90,7 +89,10 @@ public final class ChartView extends ChartPanel implements Observable {
 
         oldStrokePlot = parentPlot.getOutlineStroke();
 
-        setChart(new JFreeChart(parentPlot));
+        JFreeChart chart = new JFreeChart(parentPlot);
+        chart.removeLegend();
+
+        setChart(chart);
         setRangeZoomable(false);
         setDomainZoomable(true);
 
@@ -102,6 +104,8 @@ public final class ChartView extends ChartPanel implements Observable {
 
         super(serializedChart, 680, 420, 300, 200, 1920, 1080, true, false, false, false, true, false);
 
+        serializedChart.removeLegend();
+
         setLayout(new BorderLayout());
 
         setPopupMenu(createChartMenu());
@@ -112,7 +116,7 @@ public final class ChartView extends ChartPanel implements Observable {
         for (XYPlot plot : subPlots) {
             plot.addChangeListener(parentPlot);
 
-            Collection listMarker = plot.getDomainMarkers(Layer.FOREGROUND);
+            Collection<?> listMarker = plot.getDomainMarkers(Layer.FOREGROUND);
             if (listMarker != null) {
                 marker = (ValueMarker) listMarker.iterator().next();
                 plot.clearDomainMarkers();
@@ -158,6 +162,10 @@ public final class ChartView extends ChartPanel implements Observable {
 
             plot = parentPlot.findSubplot(getChartRenderingInfo().getPlotInfo(), translateScreenToJava2D(e.getPoint()));
 
+            if (plot == null) {
+                return;
+            }
+
             for (int i = 0; i < plot.getRangeAxisCount(); i++) {
                 actualRanges.add(plot.getRangeAxis(i).getRange());
             }
@@ -178,8 +186,10 @@ public final class ChartView extends ChartPanel implements Observable {
         public void mouseReleased(MouseEvent e) {
             setDomainZoomable(true);
 
-            for (int i = 0; i < plot.getRangeAxisCount(); i++) {
-                plot.getRangeAxis(i).setRange(actualRanges.get(i));
+            if (plot != null && !actualRanges.isEmpty()) {
+                for (int i = 0; i < plot.getRangeAxisCount(); i++) {
+                    plot.getRangeAxis(i).setRange(actualRanges.get(i));
+                }
             }
 
             actualRanges.clear();
@@ -387,7 +397,7 @@ public final class ChartView extends ChartPanel implements Observable {
         return plot;
     }
 
-    public final void addPlot(Measure time, Measure measure) {
+    public final XYPlot addPlot(Measure time, Measure measure) {
 
         final XYSeries series = new XYSeries(measure.getName());
         final XYSeriesCollection collections = new XYSeriesCollection(series);
@@ -424,7 +434,10 @@ public final class ChartView extends ChartPanel implements Observable {
         }
 
         series.fireSeriesChanged();
+
         parentPlot.add(plot, 1);
+
+        return plot;
     }
 
     public final void add2DScatterPlot(Measure x, Measure y) {
@@ -799,9 +812,28 @@ public final class ChartView extends ChartPanel implements Observable {
         return xValue;
     }
 
-    public final Set<String> getMeasures() {
+    public final Color getMeasureColor(XYPlot xyPlot, String measureName) {
 
-        Set<String> listMeasure = new HashSet<String>();
+        XYItemRenderer renderer;
+
+        for (int nDataset = 0; nDataset < xyPlot.getDatasetCount(); nDataset++) {
+
+            int idx = xyPlot.getDataset(nDataset).indexOf(measureName);
+
+            renderer = xyPlot.getRenderer(nDataset);
+
+            if (idx > -1) {
+                return (Color) renderer.getSeriesPaint(idx);
+            }
+        }
+
+        return null;
+
+    }
+
+    public final Map<String, Color> getMeasuresColors() {
+
+        Map<String, Color> listMeasure = new HashMap<String, Color>();
         XYPlot xyPlot;
         XYSeries serie;
         Comparable<?> key;
@@ -813,8 +845,12 @@ public final class ChartView extends ChartPanel implements Observable {
                 return listMeasure;
             }
 
+            XYItemRenderer renderer;
+
             for (int nDataset = 0; nDataset < xyPlot.getDatasetCount(); nDataset++) {
                 int nbSerie = xyPlot.getDataset(nDataset).getSeriesCount();
+
+                renderer = xyPlot.getRenderer(nDataset);
 
                 for (int nSerie = 0; nSerie < nbSerie; nSerie++) {
 
@@ -822,7 +858,7 @@ public final class ChartView extends ChartPanel implements Observable {
 
                     key = serie.getKey();
 
-                    listMeasure.add(key.toString());
+                    listMeasure.put(key.toString(), (Color) renderer.getSeriesPaint(nSerie));
                 }
             }
         }
@@ -842,7 +878,7 @@ public final class ChartView extends ChartPanel implements Observable {
             if ("values".equals(type)) {
                 obs.updateValues((HashMap<String, Double>) object);
             } else {
-                obs.updateData(object.toString());
+                obs.updateData(type, object);
             }
 
         }
@@ -890,8 +926,8 @@ public final class ChartView extends ChartPanel implements Observable {
         case "DELETE":
 
             for (int nDataset = 0; nDataset < plot.getDatasetCount(); nDataset++) {
-                for (int nSerie = 0; nSerie < plot.getSeriesCount(); nSerie++) {
-                    updateObservateur("data", plot.getDataset(nDataset).getSeriesKey(nSerie));
+                for (int nSerie = 0; nSerie < plot.getDataset(nDataset).getSeriesCount(); nSerie++) {
+                    updateObservateur("remove", plot.getDataset(nDataset).getSeriesKey(nSerie));
                 }
             }
 
@@ -902,6 +938,7 @@ public final class ChartView extends ChartPanel implements Observable {
             }
             break;
         case "ECHELLE_Z":
+            @SuppressWarnings("rawtypes")
             Iterator iterator = getChart().getSubtitles().iterator();
             while (iterator.hasNext()) {
                 Object o = iterator.next();

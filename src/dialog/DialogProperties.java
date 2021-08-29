@@ -280,13 +280,15 @@ public final class DialogProperties extends JPanel implements ActionListener
                 renderer.setSeriesPaint(idxSerie, color);
                 renderer.setSeriesStroke(idxSerie, new BasicStroke(widthLine));
 
+                chartView.updateObservateur("update", new Object[] { serieName, color });
+
                 if (delete) {
                     if (xyPlot.getDatasetCount() == 1 && dataset.getSeriesCount() == 1) {
                         combinedplot.remove(xyPlot);
                     } else {
                         dataset.removeSeries(idxSerie);
                     }
-                    chartView.updateObservateur("data", serieName);
+                    chartView.updateObservateur("remove", serieName);
                 }
 
             }

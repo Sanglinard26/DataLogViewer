@@ -9,6 +9,6 @@ public interface Observateur {
 
     public void updateValues(HashMap<String, Double> tableValue);
 
-    public void updateData(String key);
+    public void updateData(String type, Object object);
 
 }

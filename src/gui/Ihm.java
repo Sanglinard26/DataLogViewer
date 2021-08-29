@@ -1,5 +1,6 @@
 package gui;
 
+import java.awt.Color;
 import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
@@ -68,6 +69,8 @@ import javax.xml.parsers.ParserConfigurationException;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.NumberAxis;
 import org.jfree.chart.axis.ValueAxis;
+import org.jfree.chart.event.ChartProgressEvent;
+import org.jfree.chart.event.ChartProgressListener;
 import org.jfree.chart.plot.CombinedDomainXYPlot;
 import org.jfree.chart.plot.IntervalMarker;
 import org.jfree.chart.plot.XYPlot;
@@ -662,6 +665,7 @@ public final class Ihm extends JFrame {
 
         tabbedPane.addChangeListener(new ChangeListener() {
 
+            @SuppressWarnings("unchecked")
             @Override
             public void stateChanged(ChangeEvent e) {
                 int idx = tabbedPane.getSelectedIndex();
@@ -671,7 +675,7 @@ public final class Ihm extends JFrame {
                         scrollTableCursorValues.setVisible(true);
                         panelCondition.setVisible(true);
                         ChartView chartView = (ChartView) tabbedPane.getComponentAt(idx);
-                        ((DataValueModel) tableCursorValues.getModel()).changeList(chartView.getMeasures());
+                        ((DataValueModel) tableCursorValues.getModel()).changeList(chartView.getMeasuresColors());
                         chartView.updateTableValue();
                         if (chartView.getDatasetType() < 2) {
                             chartView.applyCondition(listZone.get(panelCondition.getTableCondition().getActiveCondition()));
@@ -685,7 +689,7 @@ public final class Ihm extends JFrame {
                     scrollListVoie.setVisible(true);
                     scrollTableCursorValues.setVisible(true);
                     panelCondition.setVisible(true);
-                    ((DataValueModel) tableCursorValues.getModel()).changeList(Collections.<String> emptySet());
+                    ((DataValueModel) tableCursorValues.getModel()).changeList(Collections.EMPTY_MAP);
                 }
             }
         });
@@ -975,14 +979,14 @@ public final class Ihm extends JFrame {
         public boolean importData(TransferSupport support) {
 
             try {
-                String measureName = (String) support.getTransferable().getTransferData(DataFlavor.stringFlavor);
+                final String measureName = (String) support.getTransferable().getTransferData(DataFlavor.stringFlavor);
                 int idxMeasure = listModel.indexOf(new Measure(measureName));
                 int idxWindow = tabbedPane.getSelectedIndex();
                 if (idxMeasure < 0 || idxWindow < 0) {
                     return false;
                 }
 
-                ChartView chartView = (ChartView) support.getComponent();
+                final ChartView chartView = (ChartView) support.getComponent();
                 final CombinedDomainXYPlot combinedDomainXYPlot = chartView.getPlot();
                 final XYPlot plot = combinedDomainXYPlot.findSubplot(chartView.getChartRenderingInfo().getPlotInfo(),
                         support.getDropLocation().getDropPoint());
@@ -993,7 +997,19 @@ public final class Ihm extends JFrame {
 
                 if (res == JOptionPane.OK_OPTION) {
                     chartView.addMeasure(plot, log.getTime(), listModel.get(idxMeasure), dialAddMeasure.getAxisName());
-                    ((DataValueModel) tableCursorValues.getModel()).addElement(measureName);
+
+                    chartView.getChart().addProgressListener(new ChartProgressListener() {
+
+                        @Override
+                        public void chartProgress(ChartProgressEvent var1) {
+                            if (var1.getType() == ChartProgressEvent.DRAWING_FINISHED) {
+                                ((DataValueModel) tableCursorValues.getModel()).addElement(measureName, chartView.getMeasureColor(plot, measureName));
+                                chartView.getChart().removeProgressListener(this);
+                            }
+
+                        }
+                    });
+
                     return true;
                 }
             } catch (UnsupportedFlavorException e) {
@@ -1032,7 +1048,7 @@ public final class Ihm extends JFrame {
             return;
         }
 
-        ChartView chartView = (ChartView) tabbedPane.getComponentAt(idxWindow);
+        final ChartView chartView = (ChartView) tabbedPane.getComponentAt(idxWindow);
         @SuppressWarnings("unchecked")
         List<XYPlot> subPlots = chartView.getPlot().getSubplots();
         if (!subPlots.isEmpty()) {
@@ -1041,8 +1057,21 @@ public final class Ihm extends JFrame {
                 return;
             }
         }
-        chartView.addPlot(log.getTime(), listVoie.getSelectedValue());
-        ((DataValueModel) tableCursorValues.getModel()).addElement(listVoie.getSelectedValue().getName());
+        final XYPlot plot = chartView.addPlot(log.getTime(), listVoie.getSelectedValue());
+
+        chartView.getChart().addProgressListener(new ChartProgressListener() {
+
+            @Override
+            public void chartProgress(ChartProgressEvent var1) {
+                if (var1.getType() == ChartProgressEvent.DRAWING_FINISHED) {
+                    final Color colorMeasure = chartView.getMeasureColor(plot, listVoie.getSelectedValue().getName());
+                    ((DataValueModel) tableCursorValues.getModel()).addElement(listVoie.getSelectedValue().getName(), colorMeasure);
+                    chartView.getChart().removeProgressListener(this);
+                }
+
+            }
+        });
+
     }
 
     public final void plotFromDialog(String xLabel, String yLabel, String zLabel) {
@@ -1205,7 +1234,7 @@ public final class Ihm extends JFrame {
 
     private final void openConfig(File file) {
 
-        if (file.getName().endsWith("cfg")) {
+        if (file.getName().endsWith("cfg") || file.getName().endsWith("tmp")) {
             try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
                 @SuppressWarnings("unchecked")
                 Map<String, JFreeChart> charts = (LinkedHashMap<String, JFreeChart>) ois.readObject();
