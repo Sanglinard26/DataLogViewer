@@ -33,6 +33,7 @@ import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.AxisLocation;
 import org.jfree.chart.axis.NumberAxis;
 import org.jfree.chart.axis.ValueAxis;
+import org.jfree.chart.entity.AxisEntity;
 import org.jfree.chart.entity.ChartEntity;
 import org.jfree.chart.entity.PlotEntity;
 import org.jfree.chart.event.PlotChangeEvent;
@@ -67,11 +68,12 @@ public final class ChartView extends ChartPanel implements Observable {
     private static final long serialVersionUID = 1L;
 
     private final CombinedDomainXYPlot parentPlot;
-    private Stroke oldStrokePlot;
-    private Point2D popUpLocation;
+    private static Stroke oldStrokePlot;
+    private static Point2D popUpLocation;
 
     private ValueMarker marker;
     private static double xValue = Double.NaN;
+    private static final HashMap<String, Double> tableValue = new HashMap<String, Double>();
 
     private List<Observateur> listObservateur = new ArrayList<Observateur>();
 
@@ -79,7 +81,7 @@ public final class ChartView extends ChartPanel implements Observable {
 
         super(null, 680, 420, 300, 200, 1920, 1080, true, false, false, false, false, false);
 
-        setPopupMenu(createChartMenu());
+        // setPopupMenu(createChartMenu()); // Déplacer dans MouseMoved pour changer de menu dynamiquement
 
         parentPlot = new CombinedDomainXYPlot();
 
@@ -108,7 +110,7 @@ public final class ChartView extends ChartPanel implements Observable {
 
         setLayout(new BorderLayout());
 
-        setPopupMenu(createChartMenu());
+        // setPopupMenu(createChartMenu()); // Déplacer dans MouseMoved pour changer de menu dynamiquement
 
         this.parentPlot = (CombinedDomainXYPlot) serializedChart.getXYPlot();
         @SuppressWarnings("unchecked")
@@ -147,13 +149,21 @@ public final class ChartView extends ChartPanel implements Observable {
             Point2D p = translateScreenToJava2D(e.getPoint());
 
             ValueAxis xAxis = parentPlot.getDomainAxis();
-            double xMin = xAxis.java2DToValue(p.getX() - 1, dataArea, RectangleEdge.BOTTOM);
-            double xMax = xAxis.java2DToValue(p.getX() + 1, dataArea, RectangleEdge.BOTTOM);
+            double xMin = xAxis.java2DToValue(p.getX() - 2, dataArea, RectangleEdge.BOTTOM);
+            double xMax = xAxis.java2DToValue(p.getX() + 2, dataArea, RectangleEdge.BOTTOM);
 
             if (xValue >= xMin && xValue <= xMax) {
                 setCursor(new Cursor(Cursor.E_RESIZE_CURSOR));
+                return;
+            }
+
+            ChartEntity chartEntity = getEntityForPoint((int) p.getX(), (int) p.getY());
+
+            if (chartEntity instanceof AxisEntity && getDatasetType() == 1) {
+                setCursor(new Cursor(Cursor.HAND_CURSOR));
             } else {
                 setCursor(Cursor.getDefaultCursor());
+                setPopupMenu(createChartMenu());
             }
         }
 
@@ -180,6 +190,23 @@ public final class ChartView extends ChartPanel implements Observable {
             if (SwingUtilities.isLeftMouseButton(e)) {
                 updateTableValue(e);
             }
+
+            if (e.getClickCount() == 2 && getDatasetType() == 1) {
+                Point2D p = translateScreenToJava2D(e.getPoint());
+
+                ChartEntity chartEntity = getEntityForPoint((int) p.getX(), (int) p.getY());
+
+                if (chartEntity instanceof AxisEntity) {
+                    AxisEntity axisEntity = (AxisEntity) chartEntity;
+                    if (axisEntity.getAxis().equals(parentPlot.getDomainAxis())) {
+                        return;
+                    }
+                    String res = JOptionPane.showInputDialog(null, "Nom de l'axe :", axisEntity.getAxis().getLabel());
+                    if (res != null && !res.equals(axisEntity.getAxis().getLabel())) {
+                        axisEntity.getAxis().setLabel(res);
+                    }
+                }
+            }
         }
 
         @Override
@@ -203,10 +230,12 @@ public final class ChartView extends ChartPanel implements Observable {
             }
 
             if (getPopupMenu().isVisible()) {
+
                 boolean visibleZScale = false;
                 if (getDatasetType() > 2) {
                     visibleZScale = true;
                 }
+
                 for (Component c : getPopupMenu().getComponents()) {
                     if ("Echelle_Z".equals(c.getName())) {
                         c.setVisible(visibleZScale);
@@ -243,8 +272,6 @@ public final class ChartView extends ChartPanel implements Observable {
             xValue = Double.NaN;
         }
 
-        HashMap<String, Double> tableValue = new HashMap<String, Double>();
-
         @SuppressWarnings("unchecked")
         List<XYPlot> subplots = parentPlot.getSubplots();
 
@@ -255,6 +282,24 @@ public final class ChartView extends ChartPanel implements Observable {
         for (XYPlot subplot : subplots) {
             for (int i = 0; i < subplot.getDatasetCount(); i++) {
                 for (int j = 0; j < subplot.getDataset(i).getSeriesCount(); j++) {
+
+                    if (i == 0 && j == 0) {
+                        int[] indices = DatasetUtilities.findItemIndicesForX(subplot.getDataset(i), j, xValue);
+
+                        if (indices[0] > -1 && indices[1] > -1) {
+                            double x1 = subplot.getDataset(i).getXValue(j, indices[0]);
+                            double x2 = subplot.getDataset(i).getXValue(j, indices[1]);
+
+                            double moy = (x2 + x1) / 2;
+
+                            if (xValue < moy) {
+                                xValue = x1;
+                            } else {
+                                xValue = x2;
+                            }
+                        }
+                    }
+
                     tableValue.put(subplot.getDataset(i).getSeriesKey(j).toString(), DatasetUtilities.findYValue(subplot.getDataset(i), j, xValue));
                 }
             }
@@ -629,7 +674,7 @@ public final class ChartView extends ChartPanel implements Observable {
                     int idxAxis = plot.getRangeAxisIndex(axis);
                     selectedCollection = (XYSeriesCollection) plot.getDataset(idxAxis);
                     if (selectedCollection.getSeriesCount() == 0) {
-                        axis.setLabel(measure.getName());
+                        axis.setLabel(axisName);
                     }
                     newAxis = false;
                     break;
@@ -766,7 +811,7 @@ public final class ChartView extends ChartPanel implements Observable {
         popUp.add(menuItem);
 
         menuItem = new JMenuItem("Supprimer le graphique", new ImageIcon(getClass().getResource(ICON_REMOVE)));
-        menuItem.setActionCommand("DELETE");
+        menuItem.setActionCommand("DELETE_PLOT");
         menuItem.addActionListener(this);
         popUp.add(menuItem);
 
@@ -828,7 +873,25 @@ public final class ChartView extends ChartPanel implements Observable {
         }
 
         return null;
+    }
 
+    public final XYPlot getPlot(String signalName) {
+        XYPlot xyPlot;
+
+        for (Object plot : parentPlot.getSubplots()) {
+            xyPlot = (XYPlot) plot;
+
+            for (int nDataset = 0; nDataset < xyPlot.getDatasetCount(); nDataset++) {
+
+                int idx = ((XYSeriesCollection) xyPlot.getDataset(nDataset)).getSeriesIndex(signalName);
+
+                if (idx > -1) {
+                    return xyPlot;
+                }
+
+            }
+        }
+        return null;
     }
 
     public final Map<String, Color> getMeasuresColors() {
@@ -923,7 +986,7 @@ public final class ChartView extends ChartPanel implements Observable {
             plot.getDomainAxis().configure();
             parentPlot.plotChanged(new PlotChangeEvent(plot));
             break;
-        case "DELETE":
+        case "DELETE_PLOT":
 
             for (int nDataset = 0; nDataset < plot.getDatasetCount(); nDataset++) {
                 for (int nSerie = 0; nSerie < plot.getDataset(nDataset).getSeriesCount(); nSerie++) {

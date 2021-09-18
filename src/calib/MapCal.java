@@ -52,6 +52,7 @@ public final class MapCal {
     private final String name;
     private final List<Variable> listVariable;
     private MdbData mdbData;
+    private boolean usedByFormula = false;
 
     public MapCal(File mapFile) {
         this.name = mapFile.getName().replace(".map", "");
@@ -115,9 +116,31 @@ public final class MapCal {
         return mdbData;
     }
 
+    public boolean isUsedByFormula() {
+        return usedByFormula;
+    }
+
+    public void setUsedByFormula(boolean usedByFormula) {
+        this.usedByFormula = usedByFormula;
+    }
+
+    @Override
+    public String toString() {
+        return this.name;
+    }
+
     public List<Variable> getListVariable() {
         Collections.sort(listVariable);
         return listVariable;
+    }
+
+    public final Variable getVariable(String name) {
+        for (Variable var : listVariable) {
+            if (name.equals(var.getName())) {
+                return var;
+            }
+        }
+        return null;
     }
 
     public static final boolean toCdfx(List<Variable> listVariable, final File file) {

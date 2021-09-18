@@ -35,7 +35,10 @@ import org.jfree.chart.JFreeChart;
 import org.jfree.data.xy.XYSeries;
 import org.jfree.data.xy.XYSeriesCollection;
 
+import calib.MapCal;
+import calib.Variable;
 import gui.Ihm;
+import gui.MapView;
 import log.Formula;
 import log.Measure;
 
@@ -123,11 +126,36 @@ public final class DialNewFormula extends JDialog {
             @Override
             public boolean importData(TransferSupport supp) {
                 Transferable t = supp.getTransferable();
+
                 String data = "";
                 try {
                     data = (String) t.getTransferData(DataFlavor.stringFlavor);
 
-                    if (!data.equals(Toolkit.getDefaultToolkit().getSystemClipboard().getContents(null).getTransferData(DataFlavor.stringFlavor))) {
+                    MapView mapView = ((Ihm) DialNewFormula.this.getParent()).getMapView();
+
+                    Variable var = null;
+
+                    if (mapView != null && mapView.isVisible()) {
+
+                        MapCal calib = mapView.findSelectedCal();
+
+                        if (calib != null && calib.isUsedByFormula()) {
+                            var = calib.getVariable(data);
+                        } else {
+                            int res = JOptionPane.showConfirmDialog(null,
+                                    "La fichier \"" + calib + "\"" + " n'a pas \u00e9t\u00e9 défini comme r\u00e9f\u00e9rence, le faire?", "INFO",
+                                    JOptionPane.YES_NO_OPTION);
+                            if (res == JOptionPane.YES_OPTION) {
+                                mapView.setCalForFormula(calib.getName());
+                                var = calib.getVariable(data);
+                            } else {
+                                return false;
+                            }
+                        }
+                    }
+
+                    if (!data.equals(Toolkit.getDefaultToolkit().getSystemClipboard().getContents(null).getTransferData(DataFlavor.stringFlavor))
+                            && var == null) {
                         data = "#" + data + "#";
                     }
 
@@ -139,7 +167,13 @@ public final class DialNewFormula extends JDialog {
                     e.printStackTrace();
                 }
 
-                formulaText.insert(data, formulaText.getCaretPosition());
+                int caretPosition = formulaText.getCaretPosition();
+
+                if (checkAccolades(caretPosition)) {
+                    formulaText.insert(data.replace("#", ""), formulaText.getCaretPosition());
+                } else {
+                    formulaText.insert(data, formulaText.getCaretPosition());
+                }
 
                 return true;
             }
@@ -191,7 +225,7 @@ public final class DialNewFormula extends JDialog {
             @Override
             public void actionPerformed(ActionEvent arg0) {
 
-                Formula newFormula = new Formula(txtName.getText(), txtUnit.getText(), formulaText.getText(), ihm.getLog());
+                Formula newFormula = new Formula(txtName.getText(), txtUnit.getText(), formulaText.getText(), ihm.getLog(), ihm.getSelectedCal());
                 if (ihm.getLog() != null && newFormula.isValid()) {
                     XYSeriesCollection dataset = (XYSeriesCollection) chartPanel.getChart().getXYPlot().getDataset();
                     XYSeries serie = dataset.getSeries(0);
@@ -224,7 +258,7 @@ public final class DialNewFormula extends JDialog {
             public void actionPerformed(ActionEvent arg0) {
 
                 if (formula == null) {
-                    Formula newFormula = new Formula(txtName.getText(), txtUnit.getText(), formulaText.getText(), ihm.getLog());
+                    Formula newFormula = new Formula(txtName.getText(), txtUnit.getText(), formulaText.getText(), ihm.getLog(), ihm.getSelectedCal());
                     if (!ihm.getListFormula().contains(newFormula)) {
                         if (newFormula.isValid()) {
                             ihm.addMeasure(newFormula);
@@ -237,7 +271,7 @@ public final class DialNewFormula extends JDialog {
                     formula.setName(txtName.getText());
                     formula.setUnit(txtUnit.getText());
                     formula.setExpression(formulaText.getText());
-                    formula.calculate(ihm.getLog());
+                    formula.calculate(ihm.getLog(), ihm.getSelectedCal());
                     dispose();
                 }
 
@@ -273,12 +307,42 @@ public final class DialNewFormula extends JDialog {
         setVisible(true);
     }
 
+    private boolean checkAccolades(int caretPosition) {
+
+        final char accoladeOuvrante = '{';
+        final char accoladeFermante = '}';
+
+        final String text = formulaText.getText();
+        final int textLength = text.length();
+
+        if (text.isEmpty() || textLength == caretPosition || caretPosition == 0) {
+            return false;
+        }
+
+        int idx1 = caretPosition;
+        int idx2 = caretPosition;
+
+        do {
+            if (text.charAt(idx1--) == accoladeOuvrante) {
+                break;
+            }
+        } while (idx1 == 0);
+
+        do {
+            if (text.charAt(idx2++) == accoladeFermante) {
+                break;
+            }
+        } while (idx2 == textLength - 1);
+
+        return idx2 > idx1 && idx1 != 0 && idx2 != textLength - 1;
+    }
+
     private final JPanel createPad() {
-        String[] tab_string = new String[] { "^", "sqrt()", "cos()", "sin()", "tan()", "+", "-", "*", "/", ".", "0", "1", "2", "3", "4", "5", "6",
-                "7", "8", "9" };
+        String[] tab_string = new String[] { "SCALAIRE{}", "TABLE1D{,}", "TABLE2D{,,}", "^", "sqrt()", "cos()", "sin()", "tan()", "+", "-", "*", "/",
+                ".", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9" };
         JButton[] tab_button = new JButton[tab_string.length];
 
-        JPanel pad = new JPanel(new GridLayout(4, 5));
+        JPanel pad = new JPanel(new GridLayout(6, 5));
 
         for (int i = 0; i < tab_string.length; i++) {
             tab_button[i] = new JButton(tab_string[i]);
@@ -296,6 +360,13 @@ public final class DialNewFormula extends JDialog {
             String str = ((JButton) e.getSource()).getText();
             formulaText.insert(str, formulaText.getCaretPosition());
 
+            int caretPosition = formulaText.getCaretPosition();
+
+            if (str.indexOf('(') > -1 || str.indexOf('{') > -1) {
+                caretPosition--;
+            }
+            formulaText.requestFocusInWindow();
+            formulaText.setCaretPosition(caretPosition);
         }
 
     }

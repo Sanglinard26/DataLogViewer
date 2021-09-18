@@ -1,8 +1,10 @@
 package log;
 
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -10,6 +12,10 @@ import javax.swing.JOptionPane;
 
 import org.mariuszgromada.math.mxparser.Argument;
 import org.mariuszgromada.math.mxparser.Expression;
+
+import calib.MapCal;
+import calib.Variable;
+import utils.Interpolation;
 
 public final class Formula extends Measure {
 
@@ -21,7 +27,15 @@ public final class Formula extends Measure {
     private Map<Character, String> variables;
     private boolean valid = false;
 
-    public Formula(String name, String unit, String baseExpression, Log log) {
+    public static Map<String, String> mapRegexCal;
+    static {
+        mapRegexCal = new HashMap<>();
+        mapRegexCal.put("TABLE2D", "TABLE2D\\{.*?,.*?,.*?\\}");
+        mapRegexCal.put("TABLE1D", "TABLE1D\\{.*?,.*?\\}");
+        mapRegexCal.put("SCALAIRE", "SCALAIRE\\{.*?\\}");
+    }
+
+    public Formula(String name, String unit, String baseExpression, Log log, MapCal calib) {
         super(name);
 
         this.unit = unit;
@@ -34,7 +48,7 @@ public final class Formula extends Measure {
         build();
 
         if (valid) {
-            calculate(log);
+            calculate(log, calib);
         } else {
             JOptionPane.showMessageDialog(null, "V\u00e9rifiez la synthaxe svp", "Erreur", JOptionPane.ERROR_MESSAGE);
         }
@@ -42,6 +56,7 @@ public final class Formula extends Measure {
 
     private final void build() {
         variables = new LinkedHashMap<Character, String>();
+
         renameVariables();
 
         Argument[] args = new Argument[variables.size()];
@@ -63,8 +78,10 @@ public final class Formula extends Measure {
     private final void renameVariables() {
         // char � = 101
         int charDec = 97;
+
+        // Traitement des variables issues du log
         Pattern pattern = Pattern.compile("\\#(.*?)\\#");
-        final Matcher regexMatcher = pattern.matcher(literalExpression);
+        Matcher regexMatcher = pattern.matcher(literalExpression);
 
         String matchedMeasure;
 
@@ -77,6 +94,28 @@ public final class Formula extends Measure {
         }
 
         internExpression = literalExpression.replaceAll("#", "");
+        // *****
+
+        // Traitement des paramètres de calibration
+        String matchedParam;
+
+        Set<Entry<String, String>> entries = mapRegexCal.entrySet();
+
+        for (Entry<String, String> entryRegex : entries) {
+
+            pattern = Pattern.compile(entryRegex.getValue());
+            regexMatcher = pattern.matcher(literalExpression);
+
+            while (regexMatcher.find()) {
+                matchedParam = regexMatcher.group(0);
+                // System.out.println(entryRegex.getKey() + " : " + matchedParam);
+                if (charDec == 101) {
+                    charDec++;
+                }
+                variables.put((char) charDec++, matchedParam);
+            }
+        }
+        // *****
 
         for (Entry<Character, String> entry : variables.entrySet()) {
             internExpression = internExpression.replace(entry.getValue(), entry.getKey().toString());
@@ -84,7 +123,7 @@ public final class Formula extends Measure {
 
     }
 
-    public final void calculate(Log log) {
+    public final void calculate(Log log, MapCal calib) {
         Argument arg;
         Measure[] measures = new Measure[expression.getArgumentsNumber()];
         String var;
@@ -94,10 +133,24 @@ public final class Formula extends Measure {
         }
 
         if (log != null) {
+
             for (int j = 0; j < expression.getArgumentsNumber(); j++) {
                 arg = expression.getArgument(j);
                 var = variables.get(arg.getArgumentName().charAt(0));
-                measures[j] = log.getMeasure(var);
+
+                int idxAccolade = var.indexOf('{');
+                String keyWordCalib = null;
+
+                if (idxAccolade > 6) {
+                    keyWordCalib = var.substring(0, idxAccolade);
+                }
+
+                if (keyWordCalib != null) { // C'est une formule avec des paramètres de calibration
+                    measures[j] = generateMeasureFromCal(log, calib, var.substring(idxAccolade + 1).replace("}", ""));
+                } else {
+                    measures[j] = log.getMeasure(var);
+                }
+
             }
 
             for (int i = 0; i < log.getTime().getData().size(); i++) {
@@ -134,6 +187,78 @@ public final class Formula extends Measure {
         this.literalExpression = expression;
 
         build();
+    }
+
+    private final Measure generateMeasureFromCal(Log log, MapCal cal, String params) {
+
+        String[] splitParams = params.split(",");
+
+        int nbParams = splitParams.length;
+
+        Variable variable = null;
+        Measure x;
+        Measure y;
+        Measure z = null;
+
+        if (cal != null) {
+            variable = cal.getVariable(splitParams[0]);
+            if (variable != null) {
+                z = new Measure(variable.getName());
+            } else {
+                z = new Measure(splitParams[0]);
+                nbParams = 0;
+            }
+        } else {
+            z = new Measure(splitParams[0]);
+            nbParams = 0;
+        }
+
+        switch (nbParams) {
+        case 1:
+
+            for (int i = 0; i < log.getTime().getData().size(); i++) {
+                double res = Double.parseDouble(variable.getValue(false, 0, 0).toString());
+                z.data.add(res);
+                z.setMin(res);
+                z.setMax(res);
+            }
+
+            return z;
+        case 2:
+            x = log.getMeasure(splitParams[1]);
+
+            for (int i = 0; i < log.getTime().getData().size(); i++) {
+                double res = Interpolation.interpLinear1D(variable.toDouble2D(false), x.getData().get(i).doubleValue());
+                z.data.add(res);
+                z.setMin(res);
+                z.setMax(res);
+            }
+
+            return z;
+        case 3:
+            x = log.getMeasure(splitParams[1]);
+            y = log.getMeasure(splitParams[2]);
+
+            for (int i = 0; i < log.getTime().getData().size(); i++) {
+                double res = Interpolation.interpLinear2D(variable.toDouble2D(false), x.getData().get(i).doubleValue(),
+                        y.getData().get(i).doubleValue());
+                z.data.add(res);
+                z.setMin(res);
+                z.setMax(res);
+            }
+            return z;
+        default:
+
+            for (int i = 0; i < log.getTime().getData().size(); i++) {
+                double res = Double.NaN;
+                z.data.add(res);
+                z.setMin(res);
+                z.setMax(res);
+            }
+
+            return z;
+        }
+
     }
 
 }

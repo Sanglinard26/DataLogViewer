@@ -147,7 +147,7 @@ public final class Condition implements Serializable {
             }
 
         } catch (ScriptException se) {
-            JOptionPane.showMessageDialog(null, "Problème de synthaxe !", "Erreur", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(null, "Probl\u00e8me de synthaxe !", "Erreur", JOptionPane.ERROR_MESSAGE);
             bitCondition.set(0, bitCondition.size(), false);
         }
 

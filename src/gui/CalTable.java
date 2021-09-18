@@ -52,7 +52,7 @@ import calib.Variable;
 import utils.Interpolation;
 import utils.Utilitaire;
 
-public class CalTable extends JPanel {
+public final class CalTable extends JPanel {
 
     private static final long serialVersionUID = 1L;
 
@@ -207,7 +207,6 @@ public class CalTable extends JPanel {
 
                     if (actValue != null) {
                         CalTable.this.selectedVariable.saveNewValue(row + offsetRow, col + offsetCol, actValue);
-                        // CalTable.this.selectedVariable.notifyObservers();
                     }
                 }
 
@@ -281,7 +280,7 @@ public class CalTable extends JPanel {
         }
     }
 
-    private void changeBreakPoint() {
+    private final void changeBreakPoint() {
 
         int offsetRow = 0;
         int offsetCol = 0;
@@ -421,6 +420,7 @@ public class CalTable extends JPanel {
         }
     }
 
+    @SuppressWarnings("unchecked")
     public final void populate(Variable variable) {
 
         String value;
@@ -428,6 +428,7 @@ public class CalTable extends JPanel {
 
         boolean modifiedVar = variable.isModified();
 
+        @SuppressWarnings({ "rawtypes" })
         Vector<Vector> dataVector = ((DefaultTableModel) table.getModel()).getDataVector();
 
         if (variable.getDimX() * variable.getDimY() == 1) {
@@ -708,6 +709,17 @@ public class CalTable extends JPanel {
                 }
             });
             add(btReset);
+
+            final JButton btTrace = new JButton("Trace");
+            btTrace.setToolTipText("Trace");
+            btTrace.addActionListener(new ActionListener() {
+
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    System.out.println(CalTable.this.getParent());
+                }
+            });
+            add(btTrace);
         }
     }
 }

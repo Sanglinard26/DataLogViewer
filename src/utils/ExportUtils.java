@@ -138,6 +138,10 @@ public abstract class ExportUtils {
                                 Element axisNode = doc.createElement("Axis");
                                 plotNode.appendChild(axisNode);
 
+                                Element axisNameNode = doc.createElement("Name");
+                                axisNameNode.appendChild(doc.createTextNode(axis.getLabel()));
+                                axisNode.appendChild(axisNameNode);
+
                                 Element axisRangeNode = doc.createElement("Range");
                                 Range yRange = axis.getRange();
                                 String txtYRange = yRange.getLowerBound() + ";" + yRange.getUpperBound();
@@ -178,8 +182,6 @@ public abstract class ExportUtils {
                             break;
                         case 2:
 
-                            // XYSeries serie = selectedCollection.getSeries(0);
-
                             DefaultXYDataset xyDataset = (DefaultXYDataset) plot.getDataset();
 
                             XYShapeRenderer shapeRenderer = (XYShapeRenderer) plot.getRendererForDataset(xyDataset);
@@ -208,10 +210,6 @@ public abstract class ExportUtils {
                             String yLabel = plot.getRangeAxis().getLabel();
                             yNode.appendChild(doc.createTextNode(yLabel));
                             serieNode.appendChild(yNode);
-
-                            // Element serieNameNode = doc.createElement("Name");
-                            // serieNameNode.appendChild(doc.createTextNode(serie.getKey().toString()));
-                            // serieNode.appendChild(serieNameNode);
 
                             Element serieColorNode = doc.createElement("Color");
                             stringColor = ((Color) shapeRenderer.getSeriesPaint(0)).toString();
@@ -278,10 +276,6 @@ public abstract class ExportUtils {
                             String zLabel = ((PaintScaleLegend) chart.getSubtitle(0)).getAxis().getLabel();
                             zNode_.appendChild(doc.createTextNode(zLabel));
                             serieNode_.appendChild(zNode_);
-
-                            // Element serieNameNode = doc.createElement("Name");
-                            // serieNameNode.appendChild(doc.createTextNode(serie.getKey().toString()));
-                            // serieNode.appendChild(serieNameNode);
 
                             Element serieZShapeNode = doc.createElement("Shape_size");
                             serieZShapeNode.appendChild(doc.createTextNode(String.valueOf(((Ellipse2D) shapeZRenderer.getBaseShape()).getHeight())));

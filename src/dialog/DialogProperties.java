@@ -24,6 +24,7 @@ import javax.swing.JButton;
 import javax.swing.JColorChooser;
 import javax.swing.JComboBox;
 import javax.swing.JDialog;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
@@ -157,6 +158,7 @@ public final class DialogProperties extends JPanel implements ActionListener
         XYItemRenderer renderer;
 
         final DecimalFormat formatter = new DecimalFormat();
+        formatter.setGroupingUsed(false);
         DecimalFormatSymbols decimalFormatSymbols = new DecimalFormatSymbols();
         decimalFormatSymbols.setDecimalSeparator('.');
         formatter.setDecimalFormatSymbols(decimalFormatSymbols);
@@ -211,10 +213,12 @@ public final class DialogProperties extends JPanel implements ActionListener
                 double lowerBound = Double.parseDouble(splitRange[0]);
                 double upperBound = Double.parseDouble(splitRange[1]);
                 Range newRange = new Range(lowerBound, upperBound);
-                if (!xyPlot.getDomainAxis().getRange().equals(newRange)) {
+                if (!xyPlot.getDomainAxis().getRange().equals(newRange) && upperBound - lowerBound > 0) {
                     xyPlot.getDomainAxis().setRange(newRange);
                 }
             } catch (NumberFormatException e) {
+                JOptionPane.showMessageDialog(this, "Il y a un probl\u00e8me de synthaxe sur les valeurs min/max de l'axe X.", "Erreur",
+                        JOptionPane.ERROR_MESSAGE);
             }
         }
 
@@ -228,10 +232,12 @@ public final class DialogProperties extends JPanel implements ActionListener
                     double lowerBound = Double.parseDouble(splitRange[0]);
                     double upperBound = Double.parseDouble(splitRange[1]);
                     Range newRange = new Range(lowerBound, upperBound);
-                    if (!axis.getRange().equals(newRange)) {
+                    if (!axis.getRange().equals(newRange) && upperBound - lowerBound > 0) {
                         axis.setRange(newRange);
                     }
                 } catch (NumberFormatException e) {
+                    JOptionPane.showMessageDialog(this, "Il y a un probl\u00e8me de synthaxe sur les valeurs min/max de l'axe Y.", "Erreur",
+                            JOptionPane.ERROR_MESSAGE);
                 }
             }
         }

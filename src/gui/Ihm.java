@@ -49,6 +49,7 @@ import javax.swing.JTabbedPane;
 import javax.swing.JToggleButton;
 import javax.swing.JToolBar;
 import javax.swing.KeyStroke;
+import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
 import javax.swing.TransferHandler;
 import javax.swing.UIManager;
@@ -92,9 +93,12 @@ import dialog.DialNewChart;
 import dialog.DialNewFormula;
 import dialog.DialNews;
 import dialog.DialNotice;
+import dialog.DialogProperties;
 import log.Formula;
 import log.Log;
 import log.Measure;
+import observer.MapCalEvent;
+import observer.MapCalListener;
 import utils.ExportUtils;
 import utils.Preference;
 import utils.Utilitaire;
@@ -103,10 +107,11 @@ import utils.Utilitaire;
  * Creation : 3 mai 2018
  */
 
-public final class Ihm extends JFrame {
+public final class Ihm extends JFrame implements MapCalListener {
 
     private static final long serialVersionUID = 1L;
 
+    private final static String VERSION = "v1.5";
     private final String DEMO = "demo";
 
     private JTabbedPane tabbedPane;
@@ -124,10 +129,12 @@ public final class Ihm extends JFrame {
     private Set<Measure> listFormula = new HashSet<Measure>();
     private boolean axisSync = false;
 
+    private MapView mapView;
+
     private final Map<Integer, List<IntervalMarker>> listZone = new HashMap<Integer, List<IntervalMarker>>();
 
     public Ihm() {
-        super("DataLogViewer");
+        super("DataLogViewer " + VERSION);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         setJMenuBar(createMenu());
@@ -695,6 +702,36 @@ public final class Ihm extends JFrame {
         });
 
         tableCursorValues = new TableCursorValue();
+        tableCursorValues.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+
+        tableCursorValues.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    Object signalName = tableCursorValues.getValueAt(tableCursorValues.getSelectedRow(), 1);
+
+                    int idx = tabbedPane.getSelectedIndex();
+                    if (idx > -1) {
+                        if (tabbedPane.getComponentAt(idx) instanceof ChartView) {
+                            ChartView chartView = (ChartView) tabbedPane.getComponentAt(idx);
+
+                            XYPlot xyPlot = chartView.getPlot(signalName.toString());
+
+                            if (xyPlot != null) {
+                                DialogProperties propertiesPanel = new DialogProperties(xyPlot);
+                                int res = JOptionPane.showConfirmDialog(Ihm.this, propertiesPanel, "Propri\u00e9t\u00e9s", 2, -1);
+                                if (res == JOptionPane.OK_OPTION) {
+                                    propertiesPanel.updatePlot(chartView, xyPlot);
+                                    chartView.getChart().fireChartChanged();
+                                }
+                            }
+                        }
+                    }
+
+                }
+            }
+        });
+
         tableCursorValues.setPreferredScrollableViewportSize(tableCursorValues.getPreferredSize());
         gbc.fill = GridBagConstraints.BOTH;
         gbc.gridx = 3;
@@ -854,7 +891,7 @@ public final class Ihm extends JFrame {
 
                 for (Measure formule : listFormula) {
                     log.getMeasures().add(formule);
-                    ((Formula) formule).calculate(log);
+                    ((Formula) formule).calculate(log, getSelectedCal());
                     listModel.addElement(formule);
                 }
 
@@ -887,20 +924,19 @@ public final class Ihm extends JFrame {
                     + "\nCertaines fonctionnalit\u00e9s seront impact\u00e9es.");
         }
 
-        MapView mapView;
-
         int idxMapView = checkPresence(MapView.class);
 
         if (idxMapView == -1) {
             mapView = new MapView(mapCal);
+            mapView.addMapCalListener(this);
             tabbedPane.addTab("Calibration", mapView);
             tabbedPane.setTabComponentAt(tabbedPane.getTabCount() - 1, new ButtonTabComponent(tabbedPane));
             tabbedPane.setSelectedIndex(tabbedPane.getTabCount() - 1);
+            refresh();
         } else {
             mapView = (MapView) tabbedPane.getComponentAt(idxMapView);
             mapView.addCalToTree(mapCal);
         }
-
     }
 
     private final CalTable addTableWindow() {
@@ -1025,6 +1061,14 @@ public final class Ihm extends JFrame {
         return log;
     }
 
+    public final MapView getMapView() {
+        return mapView;
+    }
+
+    public final MapCal getSelectedCal() {
+        return mapView != null ? mapView.getCalForFormula() : null;
+    }
+
     public final void addMeasure(Measure newMeasure) {
         if (!listModel.contains(newMeasure)) {
             listModel.addElement(newMeasure);
@@ -1119,7 +1163,7 @@ public final class Ihm extends JFrame {
     public final void refresh() {
         if (log != null) {
             for (Measure form : getListFormula()) {
-                ((Formula) form).calculate(log);
+                ((Formula) form).calculate(log, getSelectedCal());
             }
 
             reloadLogData(log);
@@ -1174,7 +1218,7 @@ public final class Ihm extends JFrame {
                                 }
 
                                 serie.fireSeriesChanged();
-                                // xyPlot.configureRangeAxes();
+
                             } else if (xyPlot.getDataset() instanceof DefaultXYZDataset) {
                                 Comparable<?> serieKey = ((DefaultXYZDataset) xyPlot.getDataset()).getSeriesKey(nSerie);
 
@@ -1207,7 +1251,7 @@ public final class Ihm extends JFrame {
                     }
 
                 }
-                // chartView.getChart().fireChartChanged();
+
                 chartView.getPlot().getDomainAxis().setAutoRange(true);
                 chartView.getPlot().configureDomainAxes();
             }
@@ -1263,7 +1307,7 @@ public final class Ihm extends JFrame {
 
                 for (Measure formule : list) {
                     ((Formula) formule).deserialize();
-                    ((Formula) formule).calculate(log);
+                    ((Formula) formule).calculate(log, getSelectedCal());
                     listFormula.add(formule);
                 }
 
@@ -1342,7 +1386,7 @@ public final class Ihm extends JFrame {
 
                                     if (splitRange.length == 2) {
                                         try {
-                                            ValueAxis axis = ((XYPlot) chartView.getPlot().getSubplots().get(j)).getRangeAxis(0);
+                                            ValueAxis axis = ((XYPlot) chartView.getPlot().getSubplots().get(j)).getRangeAxis(k);
                                             double lowerBound = Double.parseDouble(splitRange[0]);
                                             double upperBound = Double.parseDouble(splitRange[1]);
                                             Range newRange = new Range(lowerBound, upperBound);
@@ -1394,7 +1438,7 @@ public final class Ihm extends JFrame {
                         String unitFormula = formula.getElementsByTagName("Unit").item(0).getTextContent();
                         String expressionFormula = formula.getElementsByTagName("Expression").item(0).getTextContent();
 
-                        listFormula.add(new Formula(nameFormula, unitFormula, expressionFormula, log));
+                        listFormula.add(new Formula(nameFormula, unitFormula, expressionFormula, log, getSelectedCal()));
                     }
 
                     if (log != null) {
@@ -1422,6 +1466,14 @@ public final class Ihm extends JFrame {
                     }
 
                     panelCondition.getTableCondition().getModel().setConditions(conditions);
+
+                    int idx = tabbedPane.getSelectedIndex();
+                    if (idx > -1) {
+                        if (tabbedPane.getComponentAt(idx) instanceof ChartView) {
+                            ChartView chartView = (ChartView) tabbedPane.getComponentAt(idx);
+                            ((DataValueModel) tableCursorValues.getModel()).changeList(chartView.getMeasuresColors());
+                        }
+                    }
 
                     document = null;
 
@@ -1471,6 +1523,13 @@ public final class Ihm extends JFrame {
                 new Ihm();
             }
         });
+
+    }
+
+    @Override
+    public void MapCalChanged(MapCalEvent arg) {
+
+        refresh();
 
     }
 

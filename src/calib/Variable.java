@@ -23,6 +23,8 @@ public final class Variable extends Observable implements Comparable<Variable> {
     private Object[] newValues;
     private VariableInfo infos;
 
+    private String[] args;
+
     public Variable(List<String> data, MdbData mdbData) {
         this.name = data.get(0).substring(1, data.get(0).length() - 1);
         this.infos = mdbData.getInfos().get(this.name);
@@ -30,6 +32,10 @@ public final class Variable extends Observable implements Comparable<Variable> {
         // System.out.println(this.name);
 
         build(data);
+
+        if ("Avance base".equals(name)) {
+            args = new String[] { "RPM(tr/min)", "Intake_manifold_P(mbar)" };
+        }
     }
 
     public String getName() {
@@ -43,6 +49,10 @@ public final class Variable extends Observable implements Comparable<Variable> {
     @Override
     public String toString() {
         return this.name;
+    }
+
+    public String[] getArgs() {
+        return args;
     }
 
     public boolean isTextValue() {
@@ -88,15 +98,7 @@ public final class Variable extends Observable implements Comparable<Variable> {
         return this.infos != null ? 1.0 / this.infos.getFactor() : 1.0 / 32768.0;
     }
 
-    public final boolean checkResolution(Object value) {
-        double div = (Double.parseDouble(value.toString())) / getResolution();
-        int rnd = (int) ((Double.parseDouble(value.toString())) / getResolution());
-        double res = div - rnd;
-        // return div - rnd == 0;
-        return true;
-    }
-
-    public boolean checkDim() {
+    public final boolean checkDim() {
 
         if (infos != null) {
             switch (this.type) {
@@ -118,7 +120,7 @@ public final class Variable extends Observable implements Comparable<Variable> {
         return true;
     }
 
-    public Object getValue(boolean modifiedVar, int... coord) {
+    public final Object getValue(boolean modifiedVar, int... coord) {
         int idx = coord[1] + dimX * coord[0];
         if (!modifiedVar) {
             return this.values[idx];
@@ -126,7 +128,7 @@ public final class Variable extends Observable implements Comparable<Variable> {
         return this.newValues[idx];
     }
 
-    public void setValue(boolean newVal, Object value, int... coord) {
+    public final void setValue(boolean newVal, Object value, int... coord) {
         int idx = coord[1] + dimX * coord[0];
         if (!newVal) {
             this.values[idx] = value;
@@ -136,7 +138,7 @@ public final class Variable extends Observable implements Comparable<Variable> {
 
     }
 
-    public void backToRefValue() {
+    public final void backToRefValue() {
         this.newValues = null;
         setChanged();
         notifyObservers();
@@ -339,7 +341,6 @@ public final class Variable extends Observable implements Comparable<Variable> {
     public final Object saturateValue(Object value) {
         if (value instanceof Number) {
             double val = ((Number) value).doubleValue();
-            // double valWithResol = Utilitaire.applyResolution(val, getResolution());
             Double saturatedVal = Math.max(Math.min(val, getMax()), getMin());
             return saturatedVal;
         }

@@ -80,6 +80,11 @@ public final class DialManageFormula extends JDialog {
 
             @Override
             public void actionPerformed(ActionEvent arg0) {
+
+                if (listModel.isEmpty()) {
+                    return;
+                }
+
                 int res = JOptionPane.showConfirmDialog(null, "Voulez-vous supprimer cette formule?", "Question", JOptionPane.YES_NO_OPTION);
                 if (res == JOptionPane.YES_OPTION) {
                     ihm.deleteMeasure(listFormula.getSelectedValue());

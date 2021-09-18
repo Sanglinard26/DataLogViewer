@@ -3,6 +3,8 @@
  */
 package gui;
 
+import java.awt.Color;
+import java.awt.Component;
 import java.awt.Desktop;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -24,8 +26,10 @@ import java.util.Observable;
 import java.util.Observer;
 import java.util.Vector;
 
+import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
 import javax.swing.JFileChooser;
+import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
@@ -39,6 +43,7 @@ import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
 
@@ -47,6 +52,8 @@ import org.jfree.data.xy.XYSeries;
 import calib.MapCal;
 import calib.Variable;
 import net.ericaro.surfaceplotter.surface.JSurface;
+import observer.MapCalEvent;
+import observer.MapCalListener;
 
 public final class MapView extends JPanel implements Observer {
 
@@ -64,6 +71,8 @@ public final class MapView extends JPanel implements Observer {
     private MapChartView mapChartView;
 
     private final DefaultTreeModel treeModel;
+
+    private final List<MapCalListener> listeners = new ArrayList<>();
 
     public MapView(MapCal mapCal) {
 
@@ -100,6 +109,8 @@ public final class MapView extends JPanel implements Observer {
 
         treeModel = new DefaultTreeModel(new DefaultMutableTreeNode("Fichiers"));
         treeVariable = new JTree(treeModel);
+        treeVariable.setDragEnabled(true);
+
         treeVariable.setCellRenderer(new TreeCalRenderer());
         addCalToTree(mapCal);
         add(new JScrollPane(treeVariable), gbc);
@@ -137,6 +148,29 @@ public final class MapView extends JPanel implements Observer {
         });
 
         treeVariable.addMouseListener(new TreeMouseListener());
+        treeVariable.setCellRenderer(new DefaultTreeCellRenderer() {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel, boolean expanded, boolean leaf, int row,
+                    boolean hasFocus) {
+                JLabel c = (JLabel) super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
+
+                Object userObject = ((DefaultMutableTreeNode) value).getUserObject();
+
+                if (userObject instanceof MapCal) {
+                    if (((MapCal) userObject).isUsedByFormula()) {
+                        c.setBorder(BorderFactory.createLineBorder(Color.BLUE));
+                    } else {
+                        c.setBorder(null);
+                    }
+                } else {
+                    c.setBorder(null);
+                }
+
+                return c;
+            }
+        });
 
         dataTable = new CalTable(null);
 
@@ -146,7 +180,7 @@ public final class MapView extends JPanel implements Observer {
         splitPane.setBottomComponent(mapChartView);
     }
 
-    private MapCal findSelectedCal() {
+    public final MapCal findSelectedCal() {
         TreePath path = treeVariable.getSelectionPath();
 
         if (path != null && path.getPath().length > 1) {
@@ -161,9 +195,23 @@ public final class MapView extends JPanel implements Observer {
         return null;
     }
 
+    public final MapCal getCalForFormula() {
+
+        if (listCal == null || listCal.isEmpty()) {
+            return null;
+        }
+
+        for (MapCal mapCal : listCal) {
+            if (mapCal.isUsedByFormula()) {
+                return mapCal;
+            }
+        }
+        return null;
+    }
+
     public void addCalToTree(MapCal cal) {
 
-        DefaultMutableTreeNode nodeCal = new DefaultMutableTreeNode(cal.getName());
+        DefaultMutableTreeNode nodeCal = new DefaultMutableTreeNode(cal);
 
         ((DefaultMutableTreeNode) treeVariable.getModel().getRoot()).add(nodeCal);
 
@@ -219,6 +267,8 @@ public final class MapView extends JPanel implements Observer {
         this.listCal.add(cal);
 
         treeModel.reload();
+
+        fireMapCalChange();
     }
 
     private final void removeCalFromTree(DefaultMutableTreeNode nodeCal) {
@@ -233,6 +283,8 @@ public final class MapView extends JPanel implements Observer {
         }
 
         treeModel.reload();
+
+        fireMapCalChange();
     }
 
     private final void clearSelection() {
@@ -428,8 +480,37 @@ public final class MapView extends JPanel implements Observer {
         }
     }
 
+    public final void addMapCalListener(MapCalListener listener) {
+        this.listeners.add(listener);
+    }
+
+    public final void removeMapCalListener(MapCalListener listener) {
+        this.listeners.remove(listener);
+    }
+
+    private final void fireMapCalChange() {
+        for (MapCalListener l : listeners) {
+            l.MapCalChanged(new MapCalEvent(this));
+        }
+    }
+
+    public final void setCalForFormula(String calName) {
+        for (MapCal c : listCal) {
+            if (c.getName().equals(calName)) {
+                c.setUsedByFormula(true);
+            } else {
+                c.setUsedByFormula(false);
+            }
+        }
+
+        treeVariable.revalidate();
+        treeVariable.repaint();
+        fireMapCalChange();
+    }
+
     private final class TreeMouseListener extends MouseAdapter {
 
+        final String ICON_SELECT = "/icon_selectMap_24.png";
         final String ICON_EXCEL = "/icon_excel_24.png";
         final String ICON_XML = "/icon_xml_24.png";
         final String ICON_MAP = "/icon_exportMap_24.png";
@@ -454,6 +535,18 @@ public final class MapView extends JPanel implements Observer {
                 JMenuItem menuItem;
 
                 if (object.toString().equals(findSelectedCal().getName())) {
+
+                    menuItem = new JMenuItem("Map utilis\u00e9e pour les formules", new ImageIcon(getClass().getResource(ICON_SELECT)));
+                    menuItem.addActionListener(new ActionListener() {
+
+                        @Override
+                        public void actionPerformed(ActionEvent e) {
+
+                            setCalForFormula(object.toString());
+                        }
+                    });
+                    menu.add(menuItem);
+
                     menuItem = new JMenuItem("Supprimer la calibration", new ImageIcon(getClass().getResource(ICON_DELETE)));
                     menuItem.addActionListener(new ActionListener() {
 
@@ -466,7 +559,7 @@ public final class MapView extends JPanel implements Observer {
                 }
 
                 if (selectedVariable != null) {
-                    menuItem = new JMenuItem("Variable sélectionnée", new ImageIcon(getClass().getResource(ICON_EXCEL)));
+                    menuItem = new JMenuItem("Variable s\u00e9lectionn\u00e9e", new ImageIcon(getClass().getResource(ICON_EXCEL)));
                     menuItem.addActionListener(new ExportListener());
                     menuExport.add(menuItem);
                     menuExport.addSeparator();
@@ -583,7 +676,7 @@ public final class MapView extends JPanel implements Observer {
 
                 } else {
 
-                    switch (JOptionPane.showConfirmDialog(null, "Le fichier existe deja, ecraser?", null, JOptionPane.INFORMATION_MESSAGE)) {
+                    switch (JOptionPane.showConfirmDialog(null, "Le fichier existe deja, \u00e9craser?", null, JOptionPane.INFORMATION_MESSAGE)) {
                     case JOptionPane.OK_OPTION:
 
                         result = MapCal.toExcel(listToExport, fileChooser.getSelectedFile());
@@ -600,7 +693,7 @@ public final class MapView extends JPanel implements Observer {
                 if (result) {
 
                     final int reponse = JOptionPane.showConfirmDialog(null,
-                            "Export termine !\n" + fileChooser.getSelectedFile() + "\nVoulez-vous ouvrir le fichier?", null,
+                            "Export termin\u00e9 !\n" + fileChooser.getSelectedFile() + "\nVoulez-vous ouvrir le fichier?", null,
                             JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
 
                     switch (reponse) {
@@ -619,7 +712,7 @@ public final class MapView extends JPanel implements Observer {
                         break;
                     }
                 } else {
-                    JOptionPane.showMessageDialog(null, "Export abandonne !");
+                    JOptionPane.showMessageDialog(null, "Export abandonn\u00e9 !");
                 }
             }
         }
@@ -638,5 +731,4 @@ public final class MapView extends JPanel implements Observer {
 
         }
     }
-
 }
