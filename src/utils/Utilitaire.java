@@ -77,8 +77,17 @@ public abstract class Utilitaire {
 
         Double doubleValue;
 
+        String number = o.toString();
+
+        final int idx = number.indexOf(',');
+
         try {
-            doubleValue = Double.parseDouble(o.toString().replace(",", "."));
+            if (idx == -1) {
+                doubleValue = Double.parseDouble(number);
+            } else {
+                doubleValue = Double.parseDouble(number.replace(',', '.'));
+            }
+
             int i = doubleValue.intValue();
             if (doubleValue - i != 0) {
                 return doubleValue;

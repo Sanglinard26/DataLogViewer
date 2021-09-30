@@ -23,19 +23,33 @@ public final class Variable extends Observable implements Comparable<Variable> {
     private Object[] newValues;
     private VariableInfo infos;
 
-    private String[] args;
+    private String[] inputsVar;
 
     public Variable(List<String> data, MdbData mdbData) {
         this.name = data.get(0).substring(1, data.get(0).length() - 1);
         this.infos = mdbData.getInfos().get(this.name);
 
         // System.out.println(this.name);
+        if (this.name.equals("Consigne vanne fresh air")) {
+            int zz = 0;
+        }
 
         build(data);
 
-        if ("Avance base".equals(name)) {
-            args = new String[] { "RPM(tr/min)", "Intake_manifold_P(mbar)" };
+        int nbInput;
+
+        switch (type) {
+        case COURBE:
+            nbInput = 1;
+            break;
+        case MAP:
+            nbInput = 2;
+            break;
+        default:
+            nbInput = 0;
         }
+
+        inputsVar = new String[nbInput];
     }
 
     public String getName() {
@@ -46,13 +60,23 @@ public final class Variable extends Observable implements Comparable<Variable> {
         return type != null ? type : Type.UNKNOWN;
     }
 
+    public final String[] getInputsVar() {
+        return inputsVar;
+    }
+
+    public final void setInputX(String input) {
+        inputsVar[0] = input;
+    }
+
+    public final void setInputY(String input) {
+        if (inputsVar.length == 2) {
+            inputsVar[1] = input;
+        }
+    }
+
     @Override
     public String toString() {
         return this.name;
-    }
-
-    public String[] getArgs() {
-        return args;
     }
 
     public boolean isTextValue() {
@@ -125,7 +149,13 @@ public final class Variable extends Observable implements Comparable<Variable> {
         if (!modifiedVar) {
             return this.values[idx];
         }
+
+        if (newValues == null) {
+            newValues = Arrays.copyOf(values, values.length);
+        }
+
         return this.newValues[idx];
+
     }
 
     public final void setValue(boolean newVal, Object value, int... coord) {
@@ -201,12 +231,27 @@ public final class Variable extends Observable implements Comparable<Variable> {
                             bkptcol.add(Utilitaire.getStorageObject(s));
                         }
                     }
+
+                    if (bkptcol.isEmpty()) {
+                        nbSemiColon = Utilitaire.countChar(splitEgale[1], SEMICOLON);
+                        for (int a = 0; a < nbSemiColon; a++) {
+                            bkptcol.add(Double.NaN);
+                        }
+                    }
+
                     break;
                 case LIGNE:
                     line = new ArrayList<Object>();
                     for (String s : splitEgale[1].split(SEMICOLON)) {
                         if (!s.isEmpty()) {
                             line.add(Utilitaire.getStorageObject(s));
+                        }
+                    }
+
+                    if (line.isEmpty()) {
+                        nbSemiColon = Utilitaire.countChar(splitEgale[1], SEMICOLON);
+                        for (int a = 0; a < nbSemiColon; a++) {
+                            line.add(Double.NaN);
                         }
                     }
                     break;
@@ -329,10 +374,6 @@ public final class Variable extends Observable implements Comparable<Variable> {
         return infos;
     }
 
-    public final void printInfo() {
-        System.out.println(infos.toString());
-    }
-
     @Override
     public int compareTo(Variable var) {
         return this.name.compareToIgnoreCase(var.getName());
@@ -421,7 +462,8 @@ public final class Variable extends Observable implements Comparable<Variable> {
             for (short x = 0; x < dimX; x++) {
 
                 if (getValue(modifiedVar, y, x) instanceof Number) {
-                    doubleValues[y][x] = Double.parseDouble(getValue(modifiedVar, y, x).toString());
+                    // doubleValues[y][x] = Double.parseDouble(getValue(modifiedVar, y, x).toString());
+                    doubleValues[y][x] = ((Number) getValue(modifiedVar, y, x)).doubleValue();
                 } else {
                     if (x * y != 0) {
                         doubleValues[y][x] = Double.NaN;

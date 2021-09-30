@@ -64,7 +64,7 @@ public class Conversion {
 
     }
 
-    public static final void AppIncToA2l(File appIncFile) {
+    public static final void AppIncToA2l(File[] appIncFile) {
 
         /*
          * /begin PROJECT
@@ -104,40 +104,52 @@ public class Conversion {
          */
 
         final String EQU = "EQU";
+        final String DEFR = "DEFR";
         final Pattern HEX_PATTERN = Pattern.compile("\\b(\\p{XDigit}+h)\\b");
         final String SECTION_DATA = "SECTION DATA";
         final String AT = "AT";
         final String ENDS = "ENDS";
 
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(appIncFile), Charset.forName("ISO-8859-1")))) {
+        List<Variable> listVar = new ArrayList<Variable>();
 
-            String line;
+        for (int nFile = 0; nFile < appIncFile.length; nFile++) {
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(new FileInputStream(appIncFile[nFile]), Charset.forName("ISO-8859-1")))) {
 
-            Variable variable;
-            List<Variable> listVar = new ArrayList<Variable>();
-            String variableName;
-            String adress = null;
-            String infos;
-            HashMap<String, String> varInfos;
+                String line;
 
-            try (BufferedWriter bw = new BufferedWriter(new FileWriter(appIncFile.getAbsolutePath().replace(".inc", ".a2l")))) {
+                Variable variable;
+
+                String variableName;
+                String adress = null;
+                String infos;
+                HashMap<String, String> varInfos;
 
                 while ((line = br.readLine()) != null) {
 
                     int idxEQU = line.toUpperCase().lastIndexOf(EQU);
                     int idxSectionData = line.toUpperCase().lastIndexOf(SECTION_DATA);
+                    int idxDEFR = line.toUpperCase().lastIndexOf(DEFR);
 
-                    if (!line.trim().startsWith("PUBLIC") && idxEQU > -1) {
+                    boolean condition;
+
+                    if (nFile == 0) {
+                        condition = !line.trim().startsWith("PUBLIC") && idxEQU > -1;
+                    } else {
+                        condition = idxDEFR > -1 || idxEQU > -1;
+                    }
+
+                    if (condition) {
 
                         if (line.trim().charAt(0) == ';' || line.contains("hidden")) {
                             continue;
                         }
 
-                        if (line.contains("adcres15")) {
-                            int zz = 0;
+                        if (nFile == 0) {
+                            variableName = line.substring(0, idxEQU - 1).trim();
+                        } else {
+                            variableName = line.substring(0, Math.max(idxEQU, idxDEFR) - 1).trim();
                         }
-
-                        variableName = line.substring(0, idxEQU - 1).trim();
 
                         variable = new Variable(variableName);
                         varInfos = variable.getVarInfos();
@@ -154,7 +166,12 @@ public class Conversion {
                             endAdress = matcher.end();
                         }
 
-                        int idxStartInfo = endAdress > -1 ? endAdress : idxEQU + 3;
+                        int idxStartInfo;
+                        if (nFile == 0) {
+                            idxStartInfo = endAdress > -1 ? endAdress : idxEQU + 3;
+                        } else {
+                            idxStartInfo = endAdress > -1 ? endAdress : Math.max(idxEQU, idxDEFR) + 3;
+                        }
 
                         int idxSemiCol = line.indexOf(';', idxStartInfo);
 
@@ -241,16 +258,22 @@ public class Conversion {
 
                 }
 
-                bw.write("ASAP2_VERSION 1 51\n");
-                bw.write(writeProject("BGM_Project", "\"Project description\"", listVar));
-
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
+        }
 
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
+        // Ecriture A2l
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(appIncFile[0].getAbsolutePath().replace(".inc", ".a2l")))) {
+            bw.write("ASAP2_VERSION 1 60\n");
+            bw.write(writeProject("BGM_Project", "\"Project description\"", listVar));
+
         } catch (IOException e) {
             e.printStackTrace();
         }
+        // ************
 
     }
 
@@ -443,7 +466,7 @@ public class Conversion {
         }
 
         public String getDataType() {
-            return varInfos.get(DATATYPE) != null ? varInfos.get(DATATYPE) : "uint16";
+            return varInfos.get(DATATYPE) != null ? varInfos.get(DATATYPE) : "sint16";
         }
 
         public String getUnit() {
@@ -451,7 +474,7 @@ public class Conversion {
         }
 
         public String getConversion() {
-            return varInfos.get(CONVERSION) != null ? varInfos.get(CONVERSION).replace(',', '.') : "0";
+            return varInfos.get(CONVERSION) != null ? varInfos.get(CONVERSION).replace(',', '.') : "1";
         }
 
         public String getGroup() {
@@ -467,7 +490,7 @@ public class Conversion {
         }
 
         public String getDisplayFormat() {
-            String dispFmt = varInfos.get(DISPLAY_FORMAT) != null ? varInfos.get(DISPLAY_FORMAT) : "%10.10";
+            String dispFmt = varInfos.get(DISPLAY_FORMAT) != null ? varInfos.get(DISPLAY_FORMAT) : "%5.0";
 
             int idx = dispFmt.indexOf('%');
 
@@ -475,7 +498,7 @@ public class Conversion {
                 return dispFmt.substring(idx);
             }
 
-            return "%10.10";
+            return "%5.0";
         }
 
         public String getDisplayBase() {

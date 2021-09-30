@@ -3,8 +3,6 @@
  */
 package gui;
 
-import java.awt.Color;
-import java.awt.Component;
 import java.awt.Desktop;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -26,10 +24,8 @@ import java.util.Observable;
 import java.util.Observer;
 import java.util.Vector;
 
-import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
 import javax.swing.JFileChooser;
-import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
@@ -41,19 +37,22 @@ import javax.swing.JTree;
 import javax.swing.JTree.DynamicUtilTreeNode;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
+import javax.swing.filechooser.FileFilter;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.tree.DefaultMutableTreeNode;
-import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
 
 import org.jfree.data.xy.XYSeries;
 
 import calib.MapCal;
+import calib.MdbWorkspace;
 import calib.Variable;
+import log.Log;
 import net.ericaro.surfaceplotter.surface.JSurface;
 import observer.MapCalEvent;
 import observer.MapCalListener;
+import utils.Preference;
 
 public final class MapView extends JPanel implements Observer {
 
@@ -70,11 +69,13 @@ public final class MapView extends JPanel implements Observer {
 
     private MapChartView mapChartView;
 
+    private Log log;
+
     private final DefaultTreeModel treeModel;
 
     private final List<MapCalListener> listeners = new ArrayList<>();
 
-    public MapView(MapCal mapCal) {
+    public MapView() {
 
         super();
         setLayout(new GridBagLayout());
@@ -112,8 +113,9 @@ public final class MapView extends JPanel implements Observer {
         treeVariable.setDragEnabled(true);
 
         treeVariable.setCellRenderer(new TreeCalRenderer());
-        addCalToTree(mapCal);
-        add(new JScrollPane(treeVariable), gbc);
+
+        JScrollPane sp = new JScrollPane(treeVariable);
+        add(sp, gbc);
 
         treeVariable.addTreeSelectionListener(new TreeSelectionListener() {
 
@@ -129,7 +131,7 @@ public final class MapView extends JPanel implements Observer {
                     selectedVariable = (Variable) node.getUserObject();
                     selectedVariable.addObserver(MapView.this);
 
-                    dataTable = new CalTable(selectedVariable);
+                    dataTable = new CalTable(MapView.this, selectedVariable);
 
                     lineChartX.setTable(dataTable);
                     lineChartY.setTable(dataTable);
@@ -148,36 +150,25 @@ public final class MapView extends JPanel implements Observer {
         });
 
         treeVariable.addMouseListener(new TreeMouseListener());
-        treeVariable.setCellRenderer(new DefaultTreeCellRenderer() {
-            private static final long serialVersionUID = 1L;
 
-            @Override
-            public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel, boolean expanded, boolean leaf, int row,
-                    boolean hasFocus) {
-                JLabel c = (JLabel) super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
-
-                Object userObject = ((DefaultMutableTreeNode) value).getUserObject();
-
-                if (userObject instanceof MapCal) {
-                    if (((MapCal) userObject).isUsedByFormula()) {
-                        c.setBorder(BorderFactory.createLineBorder(Color.BLUE));
-                    } else {
-                        c.setBorder(null);
-                    }
-                } else {
-                    c.setBorder(null);
-                }
-
-                return c;
-            }
-        });
-
-        dataTable = new CalTable(null);
+        dataTable = new CalTable(this, null);
 
         splitPane.setTopComponent(dataTable);
 
         mapChartView = new MapChartView();
         splitPane.setBottomComponent(mapChartView);
+    }
+
+    public final void setLog(Log log) {
+        this.log = log;
+
+        if (dataTable != null) {
+            dataTable.setTrackFlag();
+        }
+    }
+
+    public final Log getLog() {
+        return log;
     }
 
     public final MapCal findSelectedCal() {
@@ -289,7 +280,7 @@ public final class MapView extends JPanel implements Observer {
 
     private final void clearSelection() {
         selectedVariable = null;
-        dataTable = new CalTable(selectedVariable);
+        dataTable = new CalTable(this, selectedVariable);
         splitPane.setTopComponent(dataTable);
         lineChartX.setVisible(false);
         lineChartY.setVisible(false);
@@ -515,6 +506,7 @@ public final class MapView extends JPanel implements Observer {
         final String ICON_XML = "/icon_xml_24.png";
         final String ICON_MAP = "/icon_exportMap_24.png";
         final String ICON_DELETE = "/icon_del_24.png";
+        final String ICON_WORKSPACE = "/icon_addWorkspace_24.png";
 
         @Override
         public void mouseReleased(MouseEvent e) {
@@ -535,6 +527,48 @@ public final class MapView extends JPanel implements Observer {
                 JMenuItem menuItem;
 
                 if (object.toString().equals(findSelectedCal().getName())) {
+
+                    menuItem = new JMenuItem("Associer un workspace", new ImageIcon(getClass().getResource(ICON_WORKSPACE)));
+                    menuItem.addActionListener(new ActionListener() {
+
+                        @Override
+                        public void actionPerformed(ActionEvent e) {
+
+                            final JFileChooser fc = new JFileChooser(Preference.getPreference(Preference.KEY_LOG));
+                            fc.setMultiSelectionEnabled(false);
+                            fc.setFileSelectionMode(JFileChooser.OPEN_DIALOG);
+                            fc.setFileFilter(new FileFilter() {
+
+                                @Override
+                                public String getDescription() {
+                                    return "Workspace (*.mdb)";
+                                }
+
+                                @Override
+                                public boolean accept(File f) {
+                                    if (f.isDirectory()) {
+                                        return true;
+                                    }
+                                    return f.getName().toLowerCase().endsWith("mdb");
+                                }
+                            });
+                            final int reponse = fc.showOpenDialog(null);
+
+                            if (reponse == JFileChooser.APPROVE_OPTION) {
+                                MdbWorkspace workspace = new MdbWorkspace(fc.getSelectedFile());
+                                MapCal cal = findSelectedCal();
+                                boolean res = cal.associateWorksplace(workspace.getVariablesECU());
+                                if (res) {
+                                    JOptionPane.showMessageDialog(null, "Workspace associ\u00e9");
+                                } else {
+                                    JOptionPane.showMessageDialog(null, "Association avort\u00e9e...");
+                                }
+
+                            }
+
+                        }
+                    });
+                    menu.add(menuItem);
 
                     menuItem = new JMenuItem("Map utilis\u00e9e pour les formules", new ImageIcon(getClass().getResource(ICON_SELECT)));
                     menuItem.addActionListener(new ActionListener() {
@@ -676,7 +710,8 @@ public final class MapView extends JPanel implements Observer {
 
                 } else {
 
-                    switch (JOptionPane.showConfirmDialog(null, "Le fichier existe deja, \u00e9craser?", null, JOptionPane.INFORMATION_MESSAGE)) {
+                    switch (JOptionPane.showConfirmDialog(null, "Le fichier existe d\u00e9ja, \u00e9craser?", null,
+                            JOptionPane.INFORMATION_MESSAGE)) {
                     case JOptionPane.OK_OPTION:
 
                         result = MapCal.toExcel(listToExport, fileChooser.getSelectedFile());

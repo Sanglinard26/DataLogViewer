@@ -26,6 +26,8 @@ public final class Formula extends Measure {
     private transient Expression expression;
     private Map<Character, String> variables;
     private boolean valid = false;
+    private boolean mapCalBased = false;
+    private boolean upToDate = false;
 
     public static Map<String, String> mapRegexCal;
     static {
@@ -101,6 +103,8 @@ public final class Formula extends Measure {
 
         Set<Entry<String, String>> entries = mapRegexCal.entrySet();
 
+        int compteurArgCal = 0;
+
         for (Entry<String, String> entryRegex : entries) {
 
             pattern = Pattern.compile(entryRegex.getValue());
@@ -108,14 +112,20 @@ public final class Formula extends Measure {
 
             while (regexMatcher.find()) {
                 matchedParam = regexMatcher.group(0);
-                // System.out.println(entryRegex.getKey() + " : " + matchedParam);
                 if (charDec == 101) {
                     charDec++;
                 }
                 variables.put((char) charDec++, matchedParam);
+                compteurArgCal++;
             }
         }
         // *****
+
+        if (compteurArgCal > 0) {
+            this.mapCalBased = true;
+        } else {
+            this.mapCalBased = false;
+        }
 
         for (Entry<Character, String> entry : variables.entrySet()) {
             internExpression = internExpression.replace(entry.getValue(), entry.getKey().toString());
@@ -123,10 +133,28 @@ public final class Formula extends Measure {
 
     }
 
+    public boolean isMapCalBased() {
+        return mapCalBased;
+    }
+
+    public boolean isUpToDate() {
+        return upToDate;
+    }
+
+    public final void setOutdated() {
+        if (isUpToDate()) {
+            this.upToDate = false;
+        }
+    }
+
     public final void calculate(Log log, MapCal calib) {
         Argument arg;
         Measure[] measures = new Measure[expression.getArgumentsNumber()];
         String var;
+
+        if (isUpToDate() && !isMapCalBased()) {
+            return;
+        }
 
         if (!data.isEmpty()) {
             clearData();
@@ -166,13 +194,20 @@ public final class Formula extends Measure {
                 this.setMin(res);
                 this.setMax(res);
             }
+            if (Double.isInfinite(min) && Double.isInfinite(max)) {
+                upToDate = false;
+            } else {
+                upToDate = true;
+            }
+
         } else {
             double res = expression.calculate();
             this.data.add(res);
             this.setMin(res);
             this.setMax(res);
-        }
 
+            upToDate = false;
+        }
     }
 
     public final boolean isValid() {
@@ -184,9 +219,12 @@ public final class Formula extends Measure {
     }
 
     public void setExpression(String expression) {
-        this.literalExpression = expression;
+        if (expression != null && !expression.isEmpty() && !expression.equals(literalExpression)) {
+            this.literalExpression = expression;
+            upToDate = false;
+            build();
+        }
 
-        build();
     }
 
     private final Measure generateMeasureFromCal(Log log, MapCal cal, String params) {
@@ -217,7 +255,7 @@ public final class Formula extends Measure {
         case 1:
 
             for (int i = 0; i < log.getTime().getData().size(); i++) {
-                double res = Double.parseDouble(variable.getValue(false, 0, 0).toString());
+                double res = Double.parseDouble(variable.getValue(true, 0, 0).toString());
                 z.data.add(res);
                 z.setMin(res);
                 z.setMax(res);
@@ -228,7 +266,7 @@ public final class Formula extends Measure {
             x = log.getMeasure(splitParams[1]);
 
             for (int i = 0; i < log.getTime().getData().size(); i++) {
-                double res = Interpolation.interpLinear1D(variable.toDouble2D(false), x.getData().get(i).doubleValue());
+                double res = Interpolation.interpLinear1D(variable.toDouble2D(true), x.getData().get(i).doubleValue());
                 z.data.add(res);
                 z.setMin(res);
                 z.setMax(res);
@@ -240,7 +278,7 @@ public final class Formula extends Measure {
             y = log.getMeasure(splitParams[2]);
 
             for (int i = 0; i < log.getTime().getData().size(); i++) {
-                double res = Interpolation.interpLinear2D(variable.toDouble2D(false), x.getData().get(i).doubleValue(),
+                double res = Interpolation.interpLinear2D(variable.toDouble2D(true), x.getData().get(i).doubleValue(),
                         y.getData().get(i).doubleValue());
                 z.data.add(res);
                 z.setMin(res);

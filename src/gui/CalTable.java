@@ -19,7 +19,6 @@ import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
-import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Vector;
 
@@ -41,6 +40,7 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
 import javax.swing.table.TableCellRenderer;
@@ -49,6 +49,8 @@ import javax.swing.table.TableColumnModel;
 
 import calib.Type;
 import calib.Variable;
+import log.Log;
+import log.Measure;
 import utils.Interpolation;
 import utils.Utilitaire;
 
@@ -56,6 +58,7 @@ public final class CalTable extends JPanel {
 
     private static final long serialVersionUID = 1L;
 
+    private final MapView mapView;
     private JTable table;
     private RowNumberTable rowTable;
     private BarControl control;
@@ -68,8 +71,16 @@ public final class CalTable extends JPanel {
     private int rowBrkPt;
     private int columnBrkPt;
 
-    public CalTable(Variable variable) {
+    private JToggleButton btTrace;
+    private boolean[][] flagInLog;
+
+    final String ICON_MARKER = "/icon_marker_12.png";
+    private final ImageIcon iconMarker = new ImageIcon(getClass().getResource(ICON_MARKER));
+
+    public CalTable(MapView mapView, Variable variable) {
         super(new BorderLayout(0, 0));
+
+        this.mapView = mapView;
 
         control = new BarControl();
         add(control, BorderLayout.NORTH);
@@ -101,6 +112,28 @@ public final class CalTable extends JPanel {
 
         table = new JTable(nbRow, nbCol);
 
+        table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+
+                JLabel c = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+
+                if (flagInLog != null) {
+                    if (flagInLog[row][column]) {
+                        c.setIcon(iconMarker);
+                    } else {
+                        c.setIcon(null);
+                    }
+                } else {
+                    c.setIcon(null);
+                }
+
+                return c;
+            }
+        });
+
         table.addKeyListener(new KeyAdapter() {
 
             @Override
@@ -115,6 +148,7 @@ public final class CalTable extends JPanel {
 
                 switch (e.getKeyChar()) {
                 case '=':
+                    table.getCellEditor().stopCellEditing(); // On arrête l'édition suite au caractère tapé pour keyTyped
                     res = JOptionPane.showInputDialog(CalTable.this, "Valeur :");
                     val = Utilitaire.getNumberObject(res).doubleValue();
 
@@ -127,6 +161,7 @@ public final class CalTable extends JPanel {
                     table.getCellEditor().stopCellEditing();
                     break;
                 case '+':
+                    table.getCellEditor().stopCellEditing(); // On arrête l'édition suite au caractère tapé pour keyTyped
                     res = JOptionPane.showInputDialog(CalTable.this, "Ajouter :");
                     val = Utilitaire.getNumberObject(res).doubleValue();
 
@@ -140,6 +175,7 @@ public final class CalTable extends JPanel {
                     table.getCellEditor().stopCellEditing();
                     break;
                 case '*':
+                    table.getCellEditor().stopCellEditing(); // On arrête l'édition suite au caractère tapé pour keyTyped
                     res = JOptionPane.showInputDialog(CalTable.this, "Multiplier par :");
                     val = Utilitaire.getNumberObject(res).doubleValue();
 
@@ -153,6 +189,7 @@ public final class CalTable extends JPanel {
                     table.getCellEditor().stopCellEditing();
                     break;
                 case '/':
+                    table.getCellEditor().stopCellEditing(); // On arrête l'édition suite au caractère tapé pour keyTyped
                     res = JOptionPane.showInputDialog(CalTable.this, "Diviser par :");
                     val = Utilitaire.getNumberObject(res).doubleValue();
 
@@ -172,7 +209,7 @@ public final class CalTable extends JPanel {
 
         });
 
-        table.setDefaultEditor(Object.class, new SaturateValueEditor(variable.getMin(), variable.getMax(), variable.getResolution()));
+        table.setDefaultEditor(Object.class, new SaturateValueEditor(variable.getMin(), variable.getMax()));
 
         table.getModel().addTableModelListener(new TableModelListener() {
 
@@ -183,7 +220,7 @@ public final class CalTable extends JPanel {
                     int row = e.getFirstRow();
                     int col = e.getColumn();
 
-                    if (row < 0 || col < 0) {
+                    if (row < 0 || col < 0 || "toto".equals(table.getValueAt(row, col))) {
                         return;
                     }
 
@@ -313,45 +350,20 @@ public final class CalTable extends JPanel {
         final double[][] datasTable = getTableDoubleValue();
         final double[][] datasRef = selectedVariable.toDouble2D(false);
         double result = Double.NaN;
-        BigDecimal bd;
-        BigDecimal bdOrigine;
-        BigDecimal bdOldValTable;
 
         for (int row = 0; row < table.getRowCount(); row++) {
 
             if (selectedVariable.getDimY() > 2) {
                 for (int x = 1; x < selectedVariable.getDimX(); x++) {
                     result = Interpolation.interpLinear2D(datasRef, datasTable[0][x], datasTable[row + 1][0]);
-
-                    bd = BigDecimal.valueOf(result);
-                    bdOrigine = BigDecimal.valueOf(datasRef[row + 1][x]);
-                    bdOldValTable = BigDecimal.valueOf(datasTable[row + 1][x]);
-                    int diff = bd.compareTo(bdOrigine);
-
-                    TableCellRenderer cellRenderer = table.getCellRenderer(row, x - 1);
-                    Component c = cellRenderer.getTableCellRendererComponent(table, bdOldValTable, false, false, row, x - 1);
-
-                    if (bd.compareTo(bdOldValTable) != 0) {
-                        table.setValueAt(result, row, x - 1);
-                    }
+                    table.setValueAt(result, row, x - 1);
                 }
             }
 
             if (selectedVariable.getDimY() == 2) {
                 for (int x = 0; x < selectedVariable.getDimX(); x++) {
                     result = Interpolation.interpLinear1D(datasRef, datasTable[0][x]);
-
-                    bd = BigDecimal.valueOf(result);
-                    bdOrigine = BigDecimal.valueOf(datasRef[1][x]);
-                    bdOldValTable = BigDecimal.valueOf(datasTable[1][x]);
-                    int diff = bd.compareTo(bdOrigine);
-
-                    TableCellRenderer cellRenderer = table.getCellRenderer(0, x);
-                    Component c = cellRenderer.getTableCellRendererComponent(table, bdOldValTable, false, false, 0, x);
-
-                    if (bd.compareTo(bdOldValTable) != 0) {
-                        table.setValueAt(result, 0, x);
-                    }
+                    table.setValueAt(result, 0, x);
                 }
             }
         }
@@ -439,7 +451,6 @@ public final class CalTable extends JPanel {
 
             value = oValue != null ? oValue.toString() : "";
 
-            // table.setValueAt(value, 0, 0);
             dataVector.get(0).set(0, value);
 
         } else if (variable.getDimY() == 2) {
@@ -453,7 +464,6 @@ public final class CalTable extends JPanel {
                 value = variable.getValue(modifiedVar, 1, col).toString();
 
                 table.getColumnModel().getColumn(col).setHeaderValue(xValue);
-                // table.setValueAt(value, 0, col);
                 dataVector.get(0).set(col, value);
             }
         } else if (variable.getDimX() * variable.getDimY() == variable.getDimX()) {
@@ -466,7 +476,6 @@ public final class CalTable extends JPanel {
 
                 value = oValue != null ? oValue.toString() : "";
 
-                // table.setValueAt(value, 0, col);
                 dataVector.get(0).set(col, value);
             }
         } else {
@@ -483,7 +492,6 @@ public final class CalTable extends JPanel {
 
                         table.getColumnModel().getColumn(col - 1).setHeaderValue(xValue);
                         rowTable.setValueAt(yValue, row - 1, 0);
-                        // table.setValueAt(value, row - 1, col - 1);
                         dataVector.get(row - 1).set(col - 1, value);
                     }
                 }
@@ -499,7 +507,6 @@ public final class CalTable extends JPanel {
 
                         value = oValue != null ? oValue.toString() : "";
 
-                        // table.setValueAt(value, row, col);
                         dataVector.get(row).set(col, value);
                     }
                 }
@@ -644,6 +651,7 @@ public final class CalTable extends JPanel {
         final String ICON_COPY = "/icon_copy_24.png";
         final String ICON_MATH = "/icon_math_24.png";
         final String ICON_RESET = "/icon_backRef_24.png";
+        final String ICON_TRACE = "/icon_traceMap_24.png";
 
         public BarControl() {
             super();
@@ -710,16 +718,125 @@ public final class CalTable extends JPanel {
             });
             add(btReset);
 
-            final JButton btTrace = new JButton("Trace");
-            btTrace.setToolTipText("Trace");
+            btTrace = new JToggleButton(new ImageIcon(getClass().getResource(ICON_TRACE)));
+            btTrace.setToolTipText("Afficher les points du log");
             btTrace.addActionListener(new ActionListener() {
 
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    System.out.println(CalTable.this.getParent());
+
+                    if (!btTrace.isSelected()) {
+                        flagInLog = null;
+                        table.repaint();
+                        return;
+                    }
+
+                    setTrackFlag();
                 }
             });
             add(btTrace);
         }
+    }
+
+    public final void setTrackFlag() {
+
+        if (selectedVariable == null || !btTrace.isSelected() || !mapView.findSelectedCal().hasWorkspaceLinked()) {
+            flagInLog = null;
+            return;
+        }
+
+        Log log = mapView.getLog();
+
+        String[] args = selectedVariable.getInputsVar();
+
+        Measure xMeasure;
+        Measure yMeasure;
+
+        float[] xBrkPt;
+        float[] yBrkPt;
+
+        int[] xIndex;
+        int[] yIndex;
+
+        switch (selectedVariable.getType()) {
+        case COURBE:
+            xMeasure = log.getMeasureWoutUnit(args[0]);
+
+            if (xMeasure.getData().isEmpty()) {
+                return;
+            }
+
+            xBrkPt = selectedVariable.getXAxis(true);
+
+            flagInLog = new boolean[1][xBrkPt.length];
+
+            xIndex = new int[2];
+
+            for (int i = 0; i < log.getTime().getData().size(); i++) {
+
+                float x = xMeasure.getData().get(i).floatValue();
+
+                int xIdx = Arrays.binarySearch(xBrkPt, x);
+
+                if (xIdx < 0) {
+                    xIndex[0] = Math.max(-(xIdx + 1) - 1, 0);
+                    xIndex[1] = Math.min(-(xIdx + 1), xBrkPt.length - 1);
+                } else {
+                    Arrays.fill(xIndex, xIdx);
+                }
+
+                flagInLog[0][xIndex[0]] = true;
+                flagInLog[0][xIndex[1]] = true;
+            }
+            break;
+        case MAP:
+            xMeasure = log.getMeasureWoutUnit(args[0]);
+            yMeasure = log.getMeasureWoutUnit(args[1]);
+
+            if (xMeasure.getData().isEmpty() || yMeasure.getData().isEmpty()) {
+                return;
+            }
+
+            xBrkPt = selectedVariable.getXAxis(true);
+            yBrkPt = selectedVariable.getYAxis(true);
+
+            flagInLog = new boolean[yBrkPt.length][xBrkPt.length];
+
+            xIndex = new int[2];
+            yIndex = new int[2];
+
+            for (int i = 0; i < log.getTime().getData().size(); i++) {
+
+                float x = xMeasure.getData().get(i).floatValue();
+                float y = yMeasure.getData().get(i).floatValue();
+
+                int xIdx = Arrays.binarySearch(xBrkPt, x);
+                int yIdx = Arrays.binarySearch(yBrkPt, y);
+
+                if (xIdx < 0) {
+                    xIndex[0] = Math.max(-(xIdx + 1) - 1, 0);
+                    xIndex[1] = Math.min(-(xIdx + 1), xBrkPt.length - 1);
+                } else {
+                    Arrays.fill(xIndex, xIdx);
+                }
+
+                if (yIdx < 0) {
+                    yIndex[0] = Math.max(-(yIdx + 1) - 1, 0);
+                    yIndex[1] = Math.min(-(yIdx + 1), yBrkPt.length - 1);
+                } else {
+                    Arrays.fill(yIndex, yIdx);
+                }
+
+                flagInLog[yIndex[0]][xIndex[0]] = true;
+                flagInLog[yIndex[0]][xIndex[1]] = true;
+                flagInLog[yIndex[1]][xIndex[0]] = true;
+                flagInLog[yIndex[1]][xIndex[1]] = true;
+            }
+            break;
+        default:
+            return;
+        }
+
+        table.repaint();
     }
 }

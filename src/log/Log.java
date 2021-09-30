@@ -20,9 +20,7 @@ public final class Log {
     private String name;
     private List<Measure> datas;
     private int nbPoints = 0;
-    private String typeFile = "Unknown";
     private String timeName = "";
-    private float timeResol;
 
     public Log(File file) {
         if (file != null) {
@@ -32,17 +30,14 @@ public final class Log {
 
             switch (extension) {
             case "txt":
-                typeFile = "PcsLab";
                 timeName = "Time_ms";
                 parseTxt(file);
                 break;
             case "msl":
-                typeFile = "MegaSquirt";
                 timeName = "Time";
                 parseMsl(file);
                 break;
             default:
-                typeFile = "Unknown";
                 break;
             }
 
@@ -52,9 +47,11 @@ public final class Log {
 
     private final void parseTxt(File file) {
 
-        final String delimiter = "\t|,";
+        final String tabDelimiter = "\t";
+        final String commaDelimiter = ",";
+        String delimiter = "";
 
-        try (BufferedReader bf = new BufferedReader(new FileReader(file))) {
+        try (final BufferedReader bf = new BufferedReader(new FileReader(file))) {
 
             String line;
             String parsedValue;
@@ -64,13 +61,19 @@ public final class Log {
 
             while ((line = bf.readLine()) != null) {
 
+                if (cntLine == 1) {
+                    if (line.indexOf(commaDelimiter) > -1) {
+                        delimiter = commaDelimiter;
+                    } else {
+                        delimiter = tabDelimiter;
+                    }
+                }
+
                 splitTab = line.split(delimiter);
 
                 switch (cntLine) {
                 case 0:
-                    if (splitTab.length > 0) {
-                        this.fnr = splitTab[0].replaceAll("\"", "");
-                    }
+                    this.fnr = line.trim();
                     break;
                 case 1:
                     this.datas = new ArrayList<Measure>(splitTab.length);
@@ -91,25 +94,20 @@ public final class Log {
                             parsedValue = splitTab[idxCol];
 
                             Number value = Utilitaire.getNumberObject(parsedValue.trim());
+
                             this.datas.get(idxCol).getData().add(value);
                             this.datas.get(idxCol).setMin(value);
                             this.datas.get(idxCol).setMax(value);
 
                         }
-                    } else {
-                        System.out.println("Erreur ligne : " + cntLine);
+
+                        this.nbPoints++;
                     }
                     break;
                 }
 
                 cntLine++;
             }
-
-            for (Measure measure : this.datas) {
-                this.nbPoints = Math.max(this.nbPoints, measure.getData().size());
-            }
-
-            calcTimeResol();
 
         } catch (FileNotFoundException e) {
             e.printStackTrace();
@@ -185,22 +183,11 @@ public final class Log {
                 this.nbPoints = Math.max(this.nbPoints, measure.getData().size());
             }
 
-            calcTimeResol();
-
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-
-    public final float getTimeResol() {
-        return timeResol;
-    }
-
-    private final void calcTimeResol() {
-        Measure time = getTime();
-        this.timeResol = (float) (time.getMax() / (time.getData().size() - 1));
     }
 
     public final List<Measure> getMeasures() {
@@ -213,10 +200,6 @@ public final class Log {
 
     public final String getFnr() {
         return this.fnr;
-    }
-
-    public final String getFileType() {
-        return typeFile;
     }
 
     public final Measure getTime() {
@@ -232,4 +215,23 @@ public final class Log {
         return idx > -1 ? this.datas.get(idx) : measure;
     }
 
+    public final Measure getMeasureWoutUnit(String nameWoutUnit) {
+
+        String measureWoutUnit;
+
+        for (Measure measure : datas) {
+            measureWoutUnit = measure.getName();
+            int idx = measureWoutUnit.indexOf('(');
+            if (idx > -1) {
+                measureWoutUnit = measureWoutUnit.substring(0, idx);
+            }
+
+            if (measureWoutUnit.equals(nameWoutUnit)) {
+                return getMeasure(measure.getName());
+            }
+        }
+
+        return new Measure(nameWoutUnit);
+
+    }
 }

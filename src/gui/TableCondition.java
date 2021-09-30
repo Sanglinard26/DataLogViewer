@@ -281,6 +281,7 @@ final class ConditionModel extends AbstractTableModel {
 
     public final void setConditions(List<Condition> conditions) {
         this.conditions = conditions;
+        fireTableDataChanged();
     }
 
     public final void clearList() {

@@ -15,6 +15,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 import java.util.TimeZone;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -32,6 +35,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.DocumentType;
 import org.w3c.dom.Element;
 
+import calib.MdbWorkspace.VariableECU;
 import jxl.Workbook;
 import jxl.format.Alignment;
 import jxl.format.Border;
@@ -53,6 +57,7 @@ public final class MapCal {
     private final List<Variable> listVariable;
     private MdbData mdbData;
     private boolean usedByFormula = false;
+    private boolean hasWorkspace = false;
 
     public MapCal(File mapFile) {
         this.name = mapFile.getName().replace(".map", "");
@@ -89,17 +94,10 @@ public final class MapCal {
 
                     if (mdbData.getInfos().isEmpty() || variable.getInfos() != null) {
                         listVariable.add(variable);
-                        if (!variable.checkDim()) {
-                            // System.out.println(variable.getName() + " => CheckDim nOK");
-                        }
-
-                    } else {
-                        // System.out.println(variable.getName() + " => non présente dans le mdb");
                     }
 
                     nLigne--;
                 }
-
             }
 
         } catch (IOException e) {
@@ -129,6 +127,10 @@ public final class MapCal {
         return this.name;
     }
 
+    public final boolean hasWorkspaceLinked() {
+        return hasWorkspace;
+    }
+
     public List<Variable> getListVariable() {
         Collections.sort(listVariable);
         return listVariable;
@@ -141,6 +143,33 @@ public final class MapCal {
             }
         }
         return null;
+    }
+
+    public final boolean associateWorksplace(Map<String, VariableECU> variablesECU) {
+
+        boolean result = false;
+
+        Set<Entry<String, VariableECU>> entries = variablesECU.entrySet();
+        for (Variable var : listVariable) {
+            for (Entry entry : entries) {
+                VariableECU variableECU = (VariableECU) entry.getValue();
+                if (var.getInfos().getVarCol() == variableECU.getOffset()) {
+                    var.setInputX(entry.getKey().toString());
+                    result = true;
+                } else if (var.getInfos().getVarLigne() == variableECU.getOffset()) {
+                    var.setInputY(entry.getKey().toString());
+                    result = true;
+                }
+            }
+        }
+
+        if (result) {
+            hasWorkspace = true;
+        } else {
+            hasWorkspace = false;
+        }
+
+        return result;
     }
 
     public static final boolean toCdfx(List<Variable> listVariable, final File file) {
@@ -555,24 +584,43 @@ public final class MapCal {
                     pw.print(BKPTCOL + EGALE);
 
                     for (short x = 1; x < var.getDimX(); x++) {
-                        pw.print(var.getValue(modifiedVar, 0, x) + SEMICOLON);
+
+                        value = var.getValue(modifiedVar, 0, x);
+
+                        if (value == null || "NaN".equals(value.toString())) {
+                            value = "";
+                        }
+                        pw.print(value + SEMICOLON);
                     }
                     pw.println();
 
                     pw.print(BKPTLIGN + EGALE);
 
                     for (short y = 1; y < var.getDimY(); y++) {
-                        pw.print(var.getValue(modifiedVar, y, 0) + SEMICOLON);
+
+                        value = var.getValue(modifiedVar, y, 0);
+
+                        if (value == null || "NaN".equals(value.toString())) {
+                            value = "";
+                        }
+                        pw.print(value + SEMICOLON);
                     }
                     pw.println();
 
                     for (short y = 1; y < var.getDimY(); y++) {
                         for (short x = 0; x < var.getDimX(); x++) {
+
+                            value = var.getValue(modifiedVar, y, x);
+
+                            if (value == null || "NaN".equals(value.toString())) {
+                                value = "";
+                            }
+
                             if (x == 0) {
-                                pw.print(LIGNE + var.getValue(modifiedVar, y, x) + EGALE);
+                                pw.print(LIGNE + value + EGALE);
                                 continue;
                             }
-                            pw.print(var.getValue(modifiedVar, y, x) + SEMICOLON);
+                            pw.print(value + SEMICOLON);
                         }
                         pw.println();
                     }

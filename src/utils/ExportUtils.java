@@ -131,6 +131,12 @@ public abstract class ExportUtils {
 
                         switch (datasetType) {
                         case 1:
+
+                            Element plotTimeBase = doc.createElement("TimeBase");
+                            String timeBase = parentPlot.getDomainAxis().getLabel();
+                            plotTimeBase.appendChild(doc.createTextNode(timeBase));
+                            plotNode.appendChild(plotTimeBase);
+
                             for (int i = 0; i < plot.getRangeAxisCount(); i++) {
 
                                 axis = plot.getRangeAxis(i);
@@ -354,7 +360,7 @@ public abstract class ExportUtils {
 
             transformer.transform(source, resultat);
 
-            System.out.println("Fichier sauvegardé avec succès!");
+            return true;
 
         } catch (ParserConfigurationException | TransformerException e) {
             e.printStackTrace();

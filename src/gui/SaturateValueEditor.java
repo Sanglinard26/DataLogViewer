@@ -42,16 +42,15 @@ public class SaturateValueEditor extends DefaultCellEditor {
     private static final long serialVersionUID = 1L;
 
     JTextField tf;
-    private double minimum, maximum, resol;
+    private double minimum, maximum;
 
-    public SaturateValueEditor(double min, double max, double resol) {
+    public SaturateValueEditor(double min, double max) {
         super(new JTextField());
 
         tf = (JTextField) getComponent();
 
         this.minimum = min;
         this.maximum = max;
-        this.resol = resol;
 
         tf.setHorizontalAlignment(JTextField.TRAILING);
     }
@@ -67,13 +66,12 @@ public class SaturateValueEditor extends DefaultCellEditor {
 
     public Object getCellEditorValue() {
         JTextField tf = (JTextField) getComponent();
-        Object o = tf.getText();
+        String text = tf.getText();
         try {
-            double val = Double.parseDouble(o.toString());
-            // double valWithResol = Utilitaire.applyResolution(val, resol);
+            double val = Double.parseDouble(text);
             return Math.max(Math.min(val, maximum), minimum);
         } catch (NumberFormatException nfe) {
-            return o;
+            return text;
         }
     }
 

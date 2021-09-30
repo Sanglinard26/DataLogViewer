@@ -23,8 +23,8 @@ public final class MdbData {
     private static final String NOMCARTO = "NomCarto";
     private static final String TYPENAME = "Typename";
     private static final String SOUSTYPE = "Soustype";
-    private static final String VARCOL = "Varcol";
-    private static final String VARLIGNE = "Varligne";
+    private static final String VARCOL = "ColVarAdr";
+    private static final String VARLIGNE = "LgnVarAdr";
     private static final String NBBKPTCOL = "NbBkptCol"; // float
     private static final String NBBKPTLGN = "NbBkptLgn"; // float
     private static final String TYPEVAR = "TypeVariable";
@@ -92,7 +92,7 @@ public final class MdbData {
             }
 
             listInfos.put(row.getString(NOMCARTO),
-                    new VariableInfo(row.getString(TYPENAME), row.getString(SOUSTYPE), row.getString(VARCOL), row.getString(VARLIGNE),
+                    new VariableInfo(row.getString(TYPENAME), row.getString(SOUSTYPE), row.getInt(VARCOL), row.getInt(VARLIGNE),
                             row.getShort(NBBKPTCOL), row.getShort(NBBKPTLGN), row.getInt(COLBKPTFACTOR), row.getDouble(ROWBKPTFACTOR),
                             row.getDouble(FACTOR), row.getByte(TYPEVAR), row.getDouble(VAL_MAX), row.getDouble(VAL_MIN), row.getString(DETAIL)));
         }
@@ -115,8 +115,8 @@ public final class MdbData {
 
         private String typeName;
         private String sousType;
-        private String varCol;
-        private String varLigne;
+        private int varCol;
+        private int varLigne;
         private short nbBkPtCol;
         private short nbBkPtRow;
         private int colBkPtFactor;
@@ -127,7 +127,7 @@ public final class MdbData {
         private double min;
         private String detail;
 
-        public VariableInfo(String typeName, String sousType, String varCol, String varLigne, short nbBkPtCol, short nbBkPtRow, int colBkPtFactor,
+        public VariableInfo(String typeName, String sousType, int varCol, int varLigne, short nbBkPtCol, short nbBkPtRow, int colBkPtFactor,
                 double rowBkPtFactor, double factor, byte typeVar, double max, double min, String detail) {
             this.typeName = typeName;
             this.sousType = sousType;
@@ -152,11 +152,11 @@ public final class MdbData {
             return sousType != null ? sousType : "";
         }
 
-        public String getVarCol() {
+        public int getVarCol() {
             return varCol;
         }
 
-        public String getVarLigne() {
+        public int getVarLigne() {
             return varLigne;
         }
 

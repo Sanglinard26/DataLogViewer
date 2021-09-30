@@ -14,6 +14,7 @@ import java.awt.geom.Ellipse2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.HashMap;
@@ -72,6 +73,7 @@ public final class ChartView extends ChartPanel implements Observable {
     private static Point2D popUpLocation;
 
     private ValueMarker marker;
+    private static double oldXValue = Double.NaN;
     private static double xValue = Double.NaN;
     private static final HashMap<String, Double> tableValue = new HashMap<String, Double>();
 
@@ -80,8 +82,6 @@ public final class ChartView extends ChartPanel implements Observable {
     public ChartView() {
 
         super(null, 680, 420, 300, 200, 1920, 1080, true, false, false, false, false, false);
-
-        // setPopupMenu(createChartMenu()); // Déplacer dans MouseMoved pour changer de menu dynamiquement
 
         parentPlot = new CombinedDomainXYPlot();
 
@@ -279,6 +279,8 @@ public final class ChartView extends ChartPanel implements Observable {
             return;
         }
 
+        boolean xValueUpdated = false;
+
         for (XYPlot subplot : subplots) {
             for (int i = 0; i < subplot.getDatasetCount(); i++) {
                 for (int j = 0; j < subplot.getDataset(i).getSeriesCount(); j++) {
@@ -286,7 +288,7 @@ public final class ChartView extends ChartPanel implements Observable {
                     if (i == 0 && j == 0) {
                         int[] indices = DatasetUtilities.findItemIndicesForX(subplot.getDataset(i), j, xValue);
 
-                        if (indices[0] > -1 && indices[1] > -1) {
+                        if (indices[0] > -1 && indices[1] > -1 && !xValueUpdated) {
                             double x1 = subplot.getDataset(i).getXValue(j, indices[0]);
                             double x2 = subplot.getDataset(i).getXValue(j, indices[1]);
 
@@ -297,6 +299,8 @@ public final class ChartView extends ChartPanel implements Observable {
                             } else {
                                 xValue = x2;
                             }
+
+                            xValueUpdated = true;
                         }
                     }
 
@@ -305,14 +309,22 @@ public final class ChartView extends ChartPanel implements Observable {
             }
         }
 
-        marker.setValue(xValue);
+        if (xValue != oldXValue) {
+            marker.setValue(xValue);
+            updateObservateur("values", tableValue);
+        }
 
-        updateObservateur("values", tableValue);
+        oldXValue = xValue;
+
+    }
+
+    public final void moveMarker(double value) {
+        xValue = value;
+        parentPlot.getDomainAxis().setRange(value - 5, value + 5);
+        updateTableValue();
     }
 
     public final void updateTableValue() {
-
-        HashMap<String, Double> tableValue = new HashMap<String, Double>();
 
         @SuppressWarnings("unchecked")
         List<XYPlot> subplots = parentPlot.getSubplots();
@@ -367,7 +379,6 @@ public final class ChartView extends ChartPanel implements Observable {
                     if (end - begin > 0) {
                         listZone.add(new IntervalMarker(serie.getX(begin).doubleValue(), serie.getX(end).doubleValue(), color));
                     }
-
                 }
             }
 
@@ -376,7 +387,6 @@ public final class ChartView extends ChartPanel implements Observable {
                     subplot.addDomainMarker(zone, Layer.BACKGROUND);
                 }
             }
-
         }
 
         return listZone;
@@ -881,15 +891,43 @@ public final class ChartView extends ChartPanel implements Observable {
         for (Object plot : parentPlot.getSubplots()) {
             xyPlot = (XYPlot) plot;
 
-            for (int nDataset = 0; nDataset < xyPlot.getDatasetCount(); nDataset++) {
+            switch (getDatasetType()) {
+            case 1:
+                for (int nDataset = 0; nDataset < xyPlot.getDatasetCount(); nDataset++) {
 
-                int idx = ((XYSeriesCollection) xyPlot.getDataset(nDataset)).getSeriesIndex(signalName);
+                    int idx = ((XYSeriesCollection) xyPlot.getDataset(nDataset)).getSeriesIndex(signalName);
 
-                if (idx > -1) {
-                    return xyPlot;
+                    if (idx > -1) {
+                        return xyPlot;
+                    }
+
                 }
+                break;
+            case 2:
 
+                String[] tabLabelXYChart = new String[2];
+                tabLabelXYChart[0] = xyPlot.getDomainAxis().getLabel();
+                tabLabelXYChart[1] = xyPlot.getRangeAxis().getLabel();
+
+                int idx = Arrays.binarySearch(tabLabelXYChart, signalName);
+
+                return idx >= 0 ? xyPlot : null;
+
+            case 3:
+
+                String[] tabLabelXYZChart = new String[3];
+                tabLabelXYZChart[0] = xyPlot.getDomainAxis().getLabel();
+                tabLabelXYZChart[1] = xyPlot.getRangeAxis().getLabel();
+                tabLabelXYZChart[2] = ((PaintScaleLegend) this.getChart().getSubtitle(0)).getAxis().getLabel();
+
+                int idx2 = Arrays.binarySearch(tabLabelXYZChart, signalName);
+
+                return idx2 >= 0 ? xyPlot : null;
+
+            default:
+                return null;
             }
+
         }
         return null;
     }
@@ -901,12 +939,12 @@ public final class ChartView extends ChartPanel implements Observable {
         XYSeries serie;
         Comparable<?> key;
 
+        if (getDatasetType() > 1) {
+            return listMeasure;
+        }
+
         for (Object plot : parentPlot.getSubplots()) {
             xyPlot = (XYPlot) plot;
-
-            if (!(xyPlot.getDataset() instanceof XYSeriesCollection)) {
-                return listMeasure;
-            }
 
             XYItemRenderer renderer;
 

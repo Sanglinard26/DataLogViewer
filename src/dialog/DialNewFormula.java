@@ -265,7 +265,7 @@ public final class DialNewFormula extends JDialog {
                             dispose();
                         }
                     } else {
-                        JOptionPane.showMessageDialog(null, "Une voie existe d\u00e9jà sous ce nom là", "Info", JOptionPane.WARNING_MESSAGE);
+                        JOptionPane.showMessageDialog(null, "Une voie existe d\u00e9jà sous ce nom", "Info", JOptionPane.WARNING_MESSAGE);
                     }
                 } else {
                     formula.setName(txtName.getText());

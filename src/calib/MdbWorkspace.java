@@ -69,7 +69,7 @@ public final class MdbWorkspace {
     public MdbWorkspace(File mdbFile) {
         this.name = mdbFile.getName().replace(".mdb", "");
         readDatabase(mdbFile);
-        writeToXml();
+        // writeToXml();
     }
 
     public String getName() {
@@ -80,18 +80,25 @@ public final class MdbWorkspace {
         return afficheurs != null ? afficheurs : new HashMap<String, Afficheur>();
     }
 
+    public Map<String, VariableECU> getVariablesECU() {
+        return variablesECU != null ? variablesECU : new HashMap<String, VariableECU>();
+    }
+
     private final void readDatabase(File mdbFile) {
 
         try {
             Database db = DatabaseBuilder.open(mdbFile);
 
             Table tableAfficheurs = db.getTable(AFFICHEUR);
-            this.afficheurs = getAfficheurInfo(tableAfficheurs);
-
             Table tableComVarList = db.getTable(COMVARLIST);
-            this.comVarList = getComVarList(tableComVarList);
-
             Table tableVariablesECU = db.getTable(VARIABLES);
+
+            if (tableAfficheurs == null || tableComVarList == null || tableVariablesECU == null) {
+                return;
+            }
+
+            this.afficheurs = getAfficheurInfo(tableAfficheurs);
+            this.comVarList = getComVarList(tableComVarList);
             this.variablesECU = getVariablesECU(tableVariablesECU);
 
             db.close();
@@ -102,7 +109,7 @@ public final class MdbWorkspace {
         }
     }
 
-    public final Map<String, Afficheur> getAfficheurInfo(Table tableAfficheurs) {
+    private final Map<String, Afficheur> getAfficheurInfo(Table tableAfficheurs) {
 
         HashMap<String, Afficheur> listInfos = new HashMap<String, Afficheur>(tableAfficheurs.getRowCount());
 
@@ -114,7 +121,7 @@ public final class MdbWorkspace {
         return listInfos;
     }
 
-    public final Map<Integer, VariableDisplay> getComVarList(Table table) {
+    private final Map<Integer, VariableDisplay> getComVarList(Table table) {
 
         HashMap<Integer, VariableDisplay> listVariable = new HashMap<Integer, VariableDisplay>(table.getRowCount());
 
@@ -141,7 +148,7 @@ public final class MdbWorkspace {
         return listVariable;
     }
 
-    public final Map<String, VariableECU> getVariablesECU(Table tableVariablesECU) {
+    private final Map<String, VariableECU> getVariablesECU(Table tableVariablesECU) {
 
         HashMap<String, VariableECU> listVariables = new HashMap<String, VariableECU>(tableVariablesECU.getRowCount());
 
