@@ -116,17 +116,21 @@ public class ButtonTabComponent extends JPanel {
                 if (e.getKeyCode() == KeyEvent.VK_ENTER) {
                     int i = pane.indexOfTabComponent(ButtonTabComponent.this);
                     if (i != -1) {
-                    	String newName = textfield.getText();
-                    	int idx = pane.indexOfTab(newName);
-                    	if(idx == -1 || idx == i)
-                    	{
-                    		pane.setTitleAt(i, textfield.getText());
+                        String newName = textfield.getText();
+                        int idx = pane.indexOfTab(newName);
+                        if (idx == -1 || idx == i) {
+                            pane.setTitleAt(i, textfield.getText());
                             cl.show(panel, "label component");
-                    	}else{
-                    		JOptionPane.showMessageDialog(null, "Il existe d\u00e9j\u00e0 une fen\u00eatre avec ce nom", "INFO", JOptionPane.INFORMATION_MESSAGE);
-                    	}
-                        
+                        } else {
+                            JOptionPane.showMessageDialog(null, "Il existe d\u00e9j\u00e0 une fen\u00eatre avec ce nom", "INFO",
+                                    JOptionPane.INFORMATION_MESSAGE);
+                        }
+
                     }
+                }
+
+                if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
+                    cl.show(panel, "label component");
                 }
             }
         });

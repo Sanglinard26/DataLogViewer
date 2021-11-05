@@ -14,7 +14,6 @@ import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.Comparator;
@@ -35,6 +34,8 @@ import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTree;
 import javax.swing.JTree.DynamicUtilTreeNode;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.filechooser.FileFilter;
@@ -54,7 +55,7 @@ import observer.MapCalEvent;
 import observer.MapCalListener;
 import utils.Preference;
 
-public final class MapView extends JPanel implements Observer {
+public final class MapView extends JPanel implements Observer, ListSelectionListener {
 
     private static final long serialVersionUID = 1L;
 
@@ -132,6 +133,8 @@ public final class MapView extends JPanel implements Observer {
                     selectedVariable.addObserver(MapView.this);
 
                     dataTable = new CalTable(MapView.this, selectedVariable);
+                    dataTable.getTable().getSelectionModel().addListSelectionListener(MapView.this);
+                    dataTable.getTable().getColumnModel().getSelectionModel().addListSelectionListener(MapView.this);
 
                     lineChartX.setTable(dataTable);
                     lineChartY.setTable(dataTable);
@@ -334,13 +337,6 @@ public final class MapView extends JPanel implements Observer {
                 return;
             }
 
-            float[][] zValuesNew = new float[2][length];
-
-            zValuesNew[0] = Arrays.copyOf(zValuesOrigin[0], length);
-            zValuesNew[1] = Arrays.copyOf(zValuesOrigin[0], length);
-
-            surfaceChart.getArraySurfaceModel().setValues(variable.getXAxis(modifiedVariable), new float[] { 0, 1 }, zValuesNew);
-            jSurface.setXLabel("X");
             chartVisible.set(1);
 
             this.lineChartY.changeSeries(createCurve(variable), variable.getMin(), variable.getMax());
@@ -645,7 +641,7 @@ public final class MapView extends JPanel implements Observer {
 
                         MapCal mapCal = findSelectedCal();
 
-                        final JFileChooser fileChooser = new JFileChooser();
+                        final JFileChooser fileChooser = new JFileChooser(Preference.getPreference(Preference.KEY_CAL));
                         fileChooser.setDialogTitle("Enregistement du fichier");
                         fileChooser.setFileFilter(new FileNameExtensionFilter("Fichier Map", "map"));
                         fileChooser.setSelectedFile(new File(mapCal.getName() + "_new.map"));
@@ -765,5 +761,24 @@ public final class MapView extends JPanel implements Observer {
             }
 
         }
+    }
+
+    @Override
+    public void valueChanged(ListSelectionEvent e) {
+
+        if (!e.getValueIsAdjusting()) {
+            int[] cols = dataTable.getTable().getSelectedColumns();
+            int[] rows = dataTable.getTable().getSelectedRows();
+
+            if (lineChartX.isVisible()) {
+                lineChartX.updateAnnotation(rows, cols);
+            }
+
+            if (lineChartY.isVisible()) {
+                lineChartY.updateAnnotation(rows, cols);
+            }
+
+        }
+
     }
 }

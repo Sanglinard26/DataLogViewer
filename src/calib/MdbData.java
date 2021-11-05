@@ -93,8 +93,8 @@ public final class MdbData {
 
             listInfos.put(row.getString(NOMCARTO),
                     new VariableInfo(row.getString(TYPENAME), row.getString(SOUSTYPE), row.getInt(VARCOL), row.getInt(VARLIGNE),
-                            row.getShort(NBBKPTCOL), row.getShort(NBBKPTLGN), row.getInt(COLBKPTFACTOR), row.getDouble(ROWBKPTFACTOR),
-                            row.getDouble(FACTOR), row.getByte(TYPEVAR), row.getDouble(VAL_MAX), row.getDouble(VAL_MIN), row.getString(DETAIL)));
+                            row.getShort(NBBKPTCOL), row.getShort(NBBKPTLGN), row.getDouble(FACTOR), row.getByte(TYPEVAR), row.getDouble(VAL_MAX),
+                            row.getDouble(VAL_MIN), row.getString(DETAIL)));
         }
 
         return listInfos;
@@ -119,24 +119,20 @@ public final class MdbData {
         private int varLigne;
         private short nbBkPtCol;
         private short nbBkPtRow;
-        private int colBkPtFactor;
-        private double rowBkPtFactor;
         private double factor;
         private byte typeVar;
         private double max;
         private double min;
         private String detail;
 
-        public VariableInfo(String typeName, String sousType, int varCol, int varLigne, short nbBkPtCol, short nbBkPtRow, int colBkPtFactor,
-                double rowBkPtFactor, double factor, byte typeVar, double max, double min, String detail) {
+        public VariableInfo(String typeName, String sousType, int varCol, int varLigne, short nbBkPtCol, short nbBkPtRow, double factor, byte typeVar,
+                double max, double min, String detail) {
             this.typeName = typeName;
             this.sousType = sousType;
             this.varCol = varCol;
             this.varLigne = varLigne;
             this.nbBkPtCol = nbBkPtCol;
             this.nbBkPtRow = nbBkPtRow;
-            this.colBkPtFactor = colBkPtFactor;
-            this.rowBkPtFactor = rowBkPtFactor;
             this.factor = factor;
             this.typeVar = typeVar;
             this.max = max;
@@ -166,14 +162,6 @@ public final class MdbData {
 
         public short getNbBkPtRow() {
             return nbBkPtRow;
-        }
-
-        public int getColBkPtFactor() {
-            return colBkPtFactor;
-        }
-
-        public double getRowBkPtFactor() {
-            return rowBkPtFactor;
         }
 
         public double getFactor() {

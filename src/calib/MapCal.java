@@ -151,14 +151,16 @@ public final class MapCal {
 
         Set<Entry<String, VariableECU>> entries = variablesECU.entrySet();
         for (Variable var : listVariable) {
-            for (Entry entry : entries) {
-                VariableECU variableECU = (VariableECU) entry.getValue();
-                if (var.getInfos().getVarCol() == variableECU.getOffset()) {
-                    var.setInputX(entry.getKey().toString());
-                    result = true;
-                } else if (var.getInfos().getVarLigne() == variableECU.getOffset()) {
-                    var.setInputY(entry.getKey().toString());
-                    result = true;
+            if (var.getInfos() != null) {
+                for (Entry<String, VariableECU> entry : entries) {
+                    VariableECU variableECU = entry.getValue();
+                    if (var.getInfos().getVarCol() == variableECU.getOffset()) {
+                        var.setInputX(entry.getKey().toString());
+                        result = true;
+                    } else if (var.getInfos().getVarLigne() == variableECU.getOffset()) {
+                        var.setInputY(entry.getKey().toString());
+                        result = true;
+                    }
                 }
             }
         }

@@ -151,6 +151,8 @@ public class Conversion {
                             variableName = line.substring(0, Math.max(idxEQU, idxDEFR) - 1).trim();
                         }
 
+                        // System.out.println(variableName);
+
                         variable = new Variable(variableName);
                         varInfos = variable.getVarInfos();
                         listVar.add(variable);

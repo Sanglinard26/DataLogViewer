@@ -1,8 +1,10 @@
 package gui;
 
+import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Container;
+import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -33,13 +35,11 @@ import java.util.Set;
 
 import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
-import javax.swing.DefaultListModel;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
-import javax.swing.JList;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
@@ -77,6 +77,7 @@ import org.jfree.chart.event.ChartProgressListener;
 import org.jfree.chart.plot.CombinedDomainXYPlot;
 import org.jfree.chart.plot.IntervalMarker;
 import org.jfree.chart.plot.XYPlot;
+import org.jfree.chart.renderer.xy.XYItemRenderer;
 import org.jfree.chart.title.PaintScaleLegend;
 import org.jfree.data.Range;
 import org.jfree.data.xy.DefaultXYDataset;
@@ -91,10 +92,10 @@ import org.xml.sax.SAXException;
 import calib.MapCal;
 import dialog.DialAddMeasure;
 import dialog.DialManageFormula;
+import dialog.DialManual;
 import dialog.DialNewChart;
 import dialog.DialNewFormula;
 import dialog.DialNews;
-import dialog.DialNotice;
 import dialog.DialogProperties;
 import log.Formula;
 import log.Log;
@@ -109,7 +110,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
     private static final long serialVersionUID = 1L;
 
-    private final static String VERSION = "v1.51";
+    private final static String VERSION = "v1.52";
     private final String DEMO = "demo";
 
     private final static String LOG_PANEL = "LOG";
@@ -120,9 +121,8 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
     private final JTabbedPane mainTabbedPane;
     private JTabbedPane chartTabbedPane;
-    private DefaultListModel<Measure> listModel;
-    private JList<Measure> listVoie;
-    private JScrollPane scrollListVoie;
+    private FilteredListModel listModel;
+    private FilteredListMeasure listLogMeasure;
     private JScrollPane scrollTableCursorValues;
     private TableCursorValue tableCursorValues;
     private PanelCondition panelCondition;
@@ -133,6 +133,8 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
     private Log log;
     private Set<Measure> listFormula = new HashSet<Measure>();
     private boolean axisSync = false;
+
+    boolean activeThread = true;
 
     private MapView mapView;
 
@@ -387,7 +389,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         menu.add(subMenu);
 
         subMenu = new JMenu("Calibration");
-        menuItem = new JMenuItem(new AbstractAction("Chemin d'import") {
+        menuItem = new JMenuItem(new AbstractAction("Chemin d'import/export") {
 
             private static final long serialVersionUID = 1L;
 
@@ -418,12 +420,12 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         });
         menu.add(menuItem);
 
-        menuItem = new JMenuItem("Notice", new ImageIcon(getClass().getResource(ICON_NOTICE)));
+        menuItem = new JMenuItem("Aide", new ImageIcon(getClass().getResource(ICON_NOTICE)));
         menuItem.addActionListener(new ActionListener() {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                new DialNotice(Ihm.this);
+                new DialManual(Ihm.this);
             }
         });
         menu.add(menuItem);
@@ -649,15 +651,14 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
         final GridBagConstraints gbc = new GridBagConstraints();
 
-        listModel = new DefaultListModel<Measure>();
+        listModel = new FilteredListModel();
 
         final JPanel panel = new JPanel();
 
         panel.setLayout(new GridBagLayout());
 
-        listVoie = new JList<Measure>();
-        listVoie.setCellRenderer(new ListLabelRenderer());
-        listVoie.addMouseListener(new MouseAdapter() {
+        listLogMeasure = new FilteredListMeasure(listModel);
+        listLogMeasure.getListMeasure().addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 2) {
@@ -665,7 +666,6 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                 }
             }
         });
-        listVoie.setModel(listModel);
         gbc.fill = GridBagConstraints.BOTH;
         gbc.gridx = 0;
         gbc.gridy = 1;
@@ -675,9 +675,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         gbc.weighty = 0;
         gbc.insets = new Insets(0, 0, 0, 0);
         gbc.anchor = GridBagConstraints.FIRST_LINE_START;
-        listVoie.setDragEnabled(true);
-        scrollListVoie = new JScrollPane(listVoie);
-        panel.add(scrollListVoie, gbc);
+        panel.add(listLogMeasure, gbc);
 
         chartTabbedPane = new JTabbedPane();
         chartTabbedPane.setBorder(BorderFactory.createEtchedBorder());
@@ -701,13 +699,14 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                 if (idx > -1) {
 
                     ChartView chartView = (ChartView) chartTabbedPane.getComponentAt(idx);
-                    ((DataValueModel) tableCursorValues.getModel()).changeList(chartView.getMeasuresColors());
+                    tableCursorValues.getModel().changeList(chartView.getMeasuresColors());
 
                     if (chartView.getDatasetType() < 2) {
                         chartView.updateTableValue();
                         chartView.applyCondition(listZone.get(panelCondition.getTableCondition().getActiveCondition()));
                     }
-
+                } else {
+                    tableCursorValues.getModel().clearList();
                 }
             }
         });
@@ -720,7 +719,12 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
             @Override
             public void mouseClicked(MouseEvent e) {
 
+                activeThread = true;
+
                 if (e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1) {
+
+                    activeThread = false;
+
                     Object signalName = tableCursorValues.getValueAt(tableCursorValues.getSelectedRow(), 1);
 
                     int idx = chartTabbedPane.getSelectedIndex();
@@ -736,10 +740,75 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                                 if (res == JOptionPane.OK_OPTION) {
                                     propertiesPanel.updatePlot(chartView, xyPlot);
                                     chartView.getChart().fireChartChanged();
+                                    ;
+
                                 }
                             }
                         }
                     }
+                }
+
+                if (e.getClickCount() == 1) {
+
+                    Thread t = new Thread(new Runnable() {
+
+                        @Override
+                        public void run() {
+
+                            int row = tableCursorValues.getSelectedRow();
+
+                            if (row == -1) {
+                                return;
+                            }
+
+                            String signalName = tableCursorValues.getValueAt(row, 1).toString();
+
+                            ChartView chartView = (ChartView) chartTabbedPane.getSelectedComponent();
+
+                            if (chartView == null) {
+                                return;
+                            }
+
+                            XYPlot plot = chartView.getPlot(signalName);
+
+                            if (plot == null) {
+                                return;
+                            }
+
+                            XYItemRenderer renderer = null;
+                            int serieIdx = -1;
+
+                            for (int nDataset = 0; nDataset < plot.getDatasetCount(); nDataset++) {
+                                serieIdx = ((XYSeriesCollection) plot.getDataset(nDataset)).getSeriesIndex(signalName);
+                                if (serieIdx > -1) {
+                                    renderer = plot.getRenderer(nDataset);
+                                    break;
+                                }
+                            }
+
+                            float widthLine = ((BasicStroke) renderer.getSeriesStroke(serieIdx)).getLineWidth();
+
+                            for (int i = 0; i < 7; i++) {
+
+                                if (!activeThread) {
+                                    renderer.setSeriesStroke(serieIdx, new BasicStroke(widthLine));
+                                    return;
+                                }
+
+                                renderer.setSeriesStroke(serieIdx, new BasicStroke(widthLine + 3 * (i % 2)));
+
+                                try {
+                                    Thread.sleep(500);
+                                } catch (InterruptedException e1) {
+                                    renderer.setSeriesStroke(serieIdx, new BasicStroke(widthLine));
+                                }
+                            }
+
+                        }
+                    }, "highlightCurve");
+
+                    t.start();
+
                 }
             }
 
@@ -931,7 +1000,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
                 log = new Log(fc.getSelectedFile());
 
-                if (!listModel.isEmpty()) {
+                if (listModel.getSize() > 0) {
                     listModel.clear();
                 }
 
@@ -941,6 +1010,13 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
                 for (Measure formule : listFormula) {
                     log.getMeasures().add(formule);
+                    // ((Formula) formule).setOutdated();
+                    // ((Formula) formule).calculate(log, getSelectedCal());
+                    // listModel.addElement(formule);
+                }
+
+                for (Measure formule : listFormula) {
+                    // log.getMeasures().add(formule);
                     ((Formula) formule).setOutdated();
                     ((Formula) formule).calculate(log, getSelectedCal());
                     listModel.addElement(formule);
@@ -1023,6 +1099,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         for (int i = chartTabbedPane.getTabCount() - 1; i >= 0; i--) {
             chartTabbedPane.removeTabAt(i);
         }
+        tableCursorValues.getModel().clearList();
     }
 
     private final class MeasureHandler extends TransferHandler {
@@ -1064,14 +1141,14 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                 int res = JOptionPane.showConfirmDialog(Ihm.this, dialAddMeasure, "Ajout mesure", 2, -1);
 
                 if (res == JOptionPane.OK_OPTION) {
-                    chartView.addMeasure(plot, log.getTime(), listModel.get(idxMeasure), dialAddMeasure.getAxisName());
+                    chartView.addMeasure(plot, log.getTime(), listModel.getElementAt(idxMeasure), dialAddMeasure.getAxisName());
 
                     chartView.getChart().addProgressListener(new ChartProgressListener() {
 
                         @Override
                         public void chartProgress(ChartProgressEvent var1) {
                             if (var1.getType() == ChartProgressEvent.DRAWING_FINISHED) {
-                                ((DataValueModel) tableCursorValues.getModel()).addElement(measureName, chartView.getMeasureColor(plot, measureName));
+                                tableCursorValues.getModel().addElement(measureName, chartView.getMeasureColor(plot, measureName));
                                 chartView.getChart().removeProgressListener(this);
                             }
 
@@ -1111,10 +1188,15 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         }
     }
 
-    public final void deleteMeasure(Measure newMeasure) {
-        listModel.removeElement(newMeasure);
-        listFormula.remove(newMeasure);
-        log.getMeasures().remove(newMeasure);
+    public final void deleteMeasure(Measure measure) {
+        listModel.removeElement(measure);
+        listFormula.remove(measure);
+        log.getMeasures().remove(measure);
+
+        for (int i = 0; i < chartTabbedPane.getTabCount(); i++) {
+            ((ChartView) chartTabbedPane.getComponentAt(i)).removeMeasure(measure.getName());
+        }
+
     }
 
     private final void directToPlot() {
@@ -1138,15 +1220,15 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                 return;
             }
         }
-        final XYPlot plot = chartView.addPlot(log.getTime(), listVoie.getSelectedValue());
+        final XYPlot plot = chartView.addPlot(log.getTime(), listLogMeasure.getSelectedValue());
 
         chartView.getChart().addProgressListener(new ChartProgressListener() {
 
             @Override
             public void chartProgress(ChartProgressEvent var1) {
                 if (var1.getType() == ChartProgressEvent.DRAWING_FINISHED) {
-                    final Color colorMeasure = chartView.getMeasureColor(plot, listVoie.getSelectedValue().getName());
-                    ((DataValueModel) tableCursorValues.getModel()).addElement(listVoie.getSelectedValue().getName(), colorMeasure);
+                    final Color colorMeasure = chartView.getMeasureColor(plot, listLogMeasure.getSelectedValue().getName());
+                    tableCursorValues.getModel().addElement(listLogMeasure.getSelectedValue().getName(), colorMeasure);
                     chartView.getChart().removeProgressListener(this);
                 }
 
@@ -1196,7 +1278,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         final Measure measure = new Measure(name);
         final int idx = listModel.indexOf(measure);
 
-        return idx > -1 ? listModel.get(idx) : measure;
+        return idx > -1 ? listModel.getElementAt(idx) : measure;
     }
 
     public final void refresh() {
@@ -1223,6 +1305,8 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         if (log == null) {
             return;
         }
+
+        this.setCursor(new Cursor(Cursor.WAIT_CURSOR));
 
         final List<Number> temps = log.getTime().getData();
         final int nbPoint = temps.size();
@@ -1258,7 +1342,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                                     }
                                 }
 
-                                // serie.fireSeriesChanged();
+                                serie.fireSeriesChanged();
 
                             } else if (xyPlot.getDataset() instanceof DefaultXYZDataset) {
                                 Comparable<?> serieKey = ((DefaultXYZDataset) xyPlot.getDataset()).getSeriesKey(nSerie);
@@ -1297,6 +1381,8 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                 chartView.getPlot().configureDomainAxes();
             }
         }
+
+        this.setCursor(Cursor.getDefaultCursor());
     }
 
     private final void reloadFormulaData(Log log, String formulaName) {
@@ -1607,7 +1693,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                     if (idx > -1) {
                         if (chartTabbedPane.getComponentAt(idx) instanceof ChartView) {
                             ChartView chartView = (ChartView) chartTabbedPane.getComponentAt(idx);
-                            ((DataValueModel) tableCursorValues.getModel()).changeList(chartView.getMeasuresColors());
+                            tableCursorValues.getModel().changeList(chartView.getMeasuresColors());
                         }
                     }
 
@@ -1630,7 +1716,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
     public static void main(String[] args) {
 
-        // File[] fileToConvert = new File[] { new File("c:\\user\\U354706\\Perso\\Clio\\soft\\applicatif_26072021_Cor.inc"),
+        // File[] fileToConvert = new File[] { new File("c:\\user\\U354706\\Perso\\Clio\\soft\\applicatif_04102021.inc"),
         // new File("c:\\user\\U354706\\Perso\\Clio\\soft\\sfr167.inc") };
 
         // Conversion.AppIncToA2l(fileToConvert);

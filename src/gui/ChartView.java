@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import javax.swing.ImageIcon;
 import javax.swing.JMenuItem;
@@ -780,6 +781,29 @@ public final class ChartView extends ChartPanel implements Observable {
 
     }
 
+    public final void removeMeasure(String measureName) {
+        XYPlot plot = getPlot(measureName);
+
+        if (plot == null) {
+            return;
+        }
+
+        XYSeriesCollection dataset;
+
+        for (int i = 0; i < plot.getDatasetCount(); i++) {
+            dataset = (XYSeriesCollection) plot.getDataset(i);
+
+            int idxSerie = dataset.getSeriesIndex(measureName);
+
+            if (idxSerie > -1) {
+                dataset.removeSeries(idxSerie);
+                tableValue.remove(measureName);
+            }
+        }
+
+        updateObservateur("remove", measureName);
+    }
+
     public final void highlightPlot(DropLocation dropLocation) {
 
         ChartEntity chartEntity = getEntityForPoint(dropLocation.getDropPoint().x, dropLocation.getDropPoint().y);
@@ -934,7 +958,7 @@ public final class ChartView extends ChartPanel implements Observable {
 
     public final Map<String, Color> getMeasuresColors() {
 
-        Map<String, Color> listMeasure = new HashMap<String, Color>();
+        Map<String, Color> listMeasure = new TreeMap<String, Color>();
         XYPlot xyPlot;
         XYSeries serie;
         Comparable<?> key;

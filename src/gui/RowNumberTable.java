@@ -181,7 +181,6 @@ public class RowNumberTable extends JTable implements ChangeListener, PropertyCh
             }
 
             setText((value == null) ? "" : value.toString());
-            // setBorder(UIManager.getBorder("TableHeader.cellBorder"));
 
             return this;
         }

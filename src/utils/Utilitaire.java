@@ -56,8 +56,17 @@ public abstract class Utilitaire {
 
         Double doubleValue;
 
+        String objectString = o.toString();
+
+        final int idx = objectString.indexOf(',');
+
         try {
-            doubleValue = Double.parseDouble(o.toString().replace(",", "."));
+            if (idx == -1) {
+                doubleValue = Double.parseDouble(objectString);
+            } else {
+                doubleValue = Double.parseDouble(objectString.replace(",", "."));
+            }
+
             int i = doubleValue.intValue();
             if (doubleValue - i != 0) {
                 return doubleValue;

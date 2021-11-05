@@ -3,6 +3,7 @@
  */
 package gui;
 
+import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;
@@ -26,6 +27,7 @@ import org.jfree.chart.ChartMouseEvent;
 import org.jfree.chart.ChartMouseListener;
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
+import org.jfree.chart.annotations.XYDrawableAnnotation;
 import org.jfree.chart.entity.ChartEntity;
 import org.jfree.chart.entity.EntityCollection;
 import org.jfree.chart.entity.PlotEntity;
@@ -61,6 +63,9 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
     private final JScrollPane sp;
 
     private boolean onMove = false;
+
+    // private XYAnnotation selectedAnnotation;
+    private static final CircleDrawer cd = new CircleDrawer(Color.BLACK, new BasicStroke(2.0f), null);
 
     public LineChart(char type) {
 
@@ -131,6 +136,8 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
 
         this.zMin = min;
         this.zMax = max;
+
+        chart.getXYPlot().clearAnnotations();
 
         if (onMove) {
             return;
@@ -226,6 +233,49 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
 
     }
 
+    public final void updateAnnotation(int[] rows, int[] cols) {
+
+        XYPlot plot = chart.getXYPlot();
+        plot.clearAnnotations();
+
+        if (dataset.getSeriesCount() > 1) {
+
+            if (type == 'x') {
+
+                listSeries.setSelectedIndices(cols);
+
+                for (int col : cols) {
+                    for (int row : rows) {
+                        double xVal = dataset.getXValue(col, row);
+                        double yVal = dataset.getYValue(col, row);
+                        plot.addAnnotation(new XYDrawableAnnotation(xVal, yVal, 11, 11, cd));
+                    }
+                }
+
+            } else {
+
+                listSeries.setSelectedIndices(rows);
+
+                for (int col : cols) {
+                    for (int row : rows) {
+                        double xVal = dataset.getXValue(row, col);
+                        double yVal = dataset.getYValue(row, col);
+                        plot.addAnnotation(new XYDrawableAnnotation(xVal, yVal, 11, 11, cd));
+                    }
+                }
+
+            }
+
+        } else {
+            for (int col : cols) {
+                double xVal = dataset.getXValue(0, col);
+                double yVal = dataset.getYValue(0, col);
+                plot.addAnnotation(new XYDrawableAnnotation(xVal, yVal, 11, 11, cd));
+            }
+        }
+
+    }
+
     @Override
     public void mouseDragged(MouseEvent e) {
 
@@ -288,8 +338,6 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
 
     @Override
     public void mouseMoved(MouseEvent e) {
-        // TODO Auto-generated method stub
-
     }
 
 }

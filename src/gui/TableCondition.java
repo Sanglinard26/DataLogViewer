@@ -261,6 +261,11 @@ final class ConditionModel extends AbstractTableModel {
         switch (columnIndex) {
         case 0:
             condition.setActive(!condition.isActive());
+            for (Condition selCondition : conditions) {
+                if (condition != selCondition) {
+                    selCondition.setActive(false);
+                }
+            }
             break;
         case 1:
             condition.setName(aValue.toString());
@@ -271,7 +276,7 @@ final class ConditionModel extends AbstractTableModel {
         default:
             break;
         }
-        fireTableCellUpdated(rowIndex, columnIndex);
+        fireTableDataChanged();
 
     }
 

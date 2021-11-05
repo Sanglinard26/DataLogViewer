@@ -22,10 +22,12 @@ import java.awt.event.MouseListener;
 import java.util.Arrays;
 import java.util.Vector;
 
+import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JLabel;
+import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
@@ -111,6 +113,44 @@ public final class CalTable extends JPanel {
         }
 
         table = new JTable(nbRow, nbCol);
+        table.addMouseListener(new MouseAdapter() {
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                if (e.isPopupTrigger()) {
+
+                    final String ICON_RESET = "/icon_backRef_16.png";
+
+                    JPopupMenu menu = new JPopupMenu();
+                    JMenuItem menuItem = new JMenuItem(new AbstractAction("Revenir aux valeurs de base sur la zone s\u00e9lectionn\u00e9e",
+                            new ImageIcon(getClass().getResource(ICON_RESET))) {
+
+                        private static final long serialVersionUID = 1L;
+
+                        @Override
+                        public void actionPerformed(ActionEvent e) {
+                            int[] cols = table.getSelectedColumns();
+                            int[] rows = table.getSelectedRows();
+
+                            Object refValue;
+
+                            for (int col : cols) {
+                                for (int row : rows) {
+                                    refValue = selectedVariable.getValue(false, row + 1, col + 1);
+                                    table.setValueAt(refValue, row, col);
+                                }
+                            }
+
+                            populate(selectedVariable);
+
+                        }
+                    });
+                    menu.add(menuItem);
+                    menu.show(e.getComponent(), e.getX(), e.getY());
+
+                }
+            }
+        });
 
         table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
             private static final long serialVersionUID = 1L;
@@ -150,6 +190,9 @@ public final class CalTable extends JPanel {
                 case '=':
                     table.getCellEditor().stopCellEditing(); // On arrête l'édition suite au caractère tapé pour keyTyped
                     res = JOptionPane.showInputDialog(CalTable.this, "Valeur :");
+                    if (res == null || res.isEmpty()) {
+                        return;
+                    }
                     val = Utilitaire.getNumberObject(res).doubleValue();
 
                     for (int col : cols) {
@@ -163,6 +206,9 @@ public final class CalTable extends JPanel {
                 case '+':
                     table.getCellEditor().stopCellEditing(); // On arrête l'édition suite au caractère tapé pour keyTyped
                     res = JOptionPane.showInputDialog(CalTable.this, "Ajouter :");
+                    if (res == null || res.isEmpty()) {
+                        return;
+                    }
                     val = Utilitaire.getNumberObject(res).doubleValue();
 
                     for (int col : cols) {
@@ -177,6 +223,9 @@ public final class CalTable extends JPanel {
                 case '*':
                     table.getCellEditor().stopCellEditing(); // On arrête l'édition suite au caractère tapé pour keyTyped
                     res = JOptionPane.showInputDialog(CalTable.this, "Multiplier par :");
+                    if (res == null || res.isEmpty()) {
+                        return;
+                    }
                     val = Utilitaire.getNumberObject(res).doubleValue();
 
                     for (int col : cols) {
@@ -191,6 +240,9 @@ public final class CalTable extends JPanel {
                 case '/':
                     table.getCellEditor().stopCellEditing(); // On arrête l'édition suite au caractère tapé pour keyTyped
                     res = JOptionPane.showInputDialog(CalTable.this, "Diviser par :");
+                    if (res == null || res.isEmpty()) {
+                        return;
+                    }
                     val = Utilitaire.getNumberObject(res).doubleValue();
 
                     for (int col : cols) {
@@ -220,7 +272,7 @@ public final class CalTable extends JPanel {
                     int row = e.getFirstRow();
                     int col = e.getColumn();
 
-                    if (row < 0 || col < 0 || "toto".equals(table.getValueAt(row, col))) {
+                    if (row < 0 || col < 0) {
                         return;
                     }
 
@@ -521,10 +573,11 @@ public final class CalTable extends JPanel {
         final TableColumnModel columnModel = table.getColumnModel();
         final int nbCol = columnModel.getColumnCount();
         final int nbRow = table.getRowCount();
-        int maxWidth;
+        int maxWidth = 10;
         TableCellRenderer cellRenderer;
         Object value;
         Component component;
+        Component componentHeader;
         TableColumn column;
 
         for (short col = 0; col < nbCol; col++) {
@@ -535,10 +588,18 @@ public final class CalTable extends JPanel {
                 component = cellRenderer.getTableCellRendererComponent(table, value, false, false, row, col);
                 ((JLabel) component).setHorizontalAlignment(SwingConstants.CENTER);
                 maxWidth = Math.max(((JLabel) component).getPreferredSize().width, maxWidth);
-                maxWidth = Math.max(columnModel.getColumn(col).getPreferredWidth(), maxWidth);
+
+                if (table.getTableHeader() != null) {
+                    componentHeader = table.getTableHeader().getDefaultRenderer().getTableCellRendererComponent(table,
+                            columnModel.getColumn(col).getHeaderValue(), false, false, 0, col);
+                    maxWidth = Math.max(((JLabel) componentHeader).getPreferredSize().width, maxWidth);
+                }
             }
+        }
+
+        for (short col = 0; col < nbCol; col++) {
             column = columnModel.getColumn(col);
-            column.setPreferredWidth(maxWidth + 5);
+            column.setPreferredWidth(maxWidth + 15);
         }
 
     }
@@ -725,13 +786,22 @@ public final class CalTable extends JPanel {
                 @Override
                 public void actionPerformed(ActionEvent e) {
 
-                    if (!btTrace.isSelected()) {
+                    if (!btTrace.isSelected() && table != null) {
                         flagInLog = null;
                         table.repaint();
                         return;
                     }
 
-                    setTrackFlag();
+                    String logOK = mapView.getLog() != null ? "OK" : "nOK";
+                    String workspaceOK = mapView.findSelectedCal() != null && mapView.findSelectedCal().hasWorkspaceLinked() ? "OK" : "nOK";
+
+                    if ("OK".equals(logOK) && "OK".equals(workspaceOK)) {
+                        setTrackFlag();
+                    } else {
+                        JOptionPane.showMessageDialog(null, "Cette fonction a besoin :\n -d'un workspace associ\u00e9 au fichier *.map => "
+                                + workspaceOK + "\n -d'un log => " + logOK, "INFO", JOptionPane.WARNING_MESSAGE);
+                    }
+
                 }
             });
             add(btTrace);
@@ -740,7 +810,7 @@ public final class CalTable extends JPanel {
 
     public final void setTrackFlag() {
 
-        if (selectedVariable == null || !btTrace.isSelected() || !mapView.findSelectedCal().hasWorkspaceLinked()) {
+        if (selectedVariable == null || !btTrace.isSelected()) {
             flagInLog = null;
             return;
         }

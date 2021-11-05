@@ -2,7 +2,7 @@
 <classpath>
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="src" path="images"/>
-	<classpathentry kind="src" path="resources"/>
+	<classpathentry excluding="help/" kind="src" path="resources"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.7"/>
 	<classpathentry kind="lib" path="jcommon-1.0.23.jar"/>
 	<classpathentry kind="lib" path="jfreechart-1.0.19.jar" sourcepath="c:/user/U354706/Perso/Java/jfreechart-1.0.19/jfreechart-1.0.19/source/org/jfree"/>

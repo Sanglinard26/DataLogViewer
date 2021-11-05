@@ -19,6 +19,7 @@ public final class Variable extends Observable implements Comparable<Variable> {
     private Type type;
     private int dimX;
     private int dimY;
+
     private Object[] values;
     private Object[] newValues;
     private VariableInfo infos;
@@ -30,9 +31,6 @@ public final class Variable extends Observable implements Comparable<Variable> {
         this.infos = mdbData.getInfos().get(this.name);
 
         // System.out.println(this.name);
-        if (this.name.equals("Consigne vanne fresh air")) {
-            int zz = 0;
-        }
 
         build(data);
 
@@ -118,32 +116,6 @@ public final class Variable extends Observable implements Comparable<Variable> {
         return this.infos != null ? this.infos.getMin() : Short.MIN_VALUE;
     }
 
-    public final double getResolution() {
-        return this.infos != null ? 1.0 / this.infos.getFactor() : 1.0 / 32768.0;
-    }
-
-    public final boolean checkDim() {
-
-        if (infos != null) {
-            switch (this.type) {
-            case SCALAIRE:
-                return this.dimX == infos.getNbBkPtCol();
-            case ARRAY:
-                return this.dimX == infos.getNbBkPtCol();
-            case COURBE:
-                return this.dimX == infos.getNbBkPtCol() && this.dimY == infos.getNbBkPtRow() + 2;
-            case MAP:
-                return this.dimX - 1 == infos.getNbBkPtCol() && this.dimY - 1 == infos.getNbBkPtRow();
-            case TEXT:
-                return this.dimX == infos.getNbBkPtCol() && this.dimY == infos.getNbBkPtRow();
-            default:
-                break;
-            }
-        }
-
-        return true;
-    }
-
     public final Object getValue(boolean modifiedVar, int... coord) {
         int idx = coord[1] + dimX * coord[0];
         if (!modifiedVar) {
@@ -165,7 +137,6 @@ public final class Variable extends Observable implements Comparable<Variable> {
         } else {
             this.newValues[idx] = value;
         }
-
     }
 
     public final void backToRefValue() {

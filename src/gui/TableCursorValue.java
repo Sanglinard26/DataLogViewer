@@ -10,7 +10,6 @@ import java.util.Set;
 
 import javax.swing.JTable;
 import javax.swing.table.AbstractTableModel;
-import javax.swing.table.TableModel;
 
 import observer.Observateur;
 
@@ -27,8 +26,8 @@ public final class TableCursorValue extends JTable implements Observateur {
     }
 
     @Override
-    public TableModel getModel() {
-        return super.getModel();
+    public DataValueModel getModel() {
+        return (DataValueModel) super.getModel();
     }
 
     @Override
@@ -36,9 +35,9 @@ public final class TableCursorValue extends JTable implements Observateur {
 
         Set<Entry<String, Double>> set = tableValue.entrySet();
         for (Entry<String, Double> entry : set) {
-            int idx = ((DataValueModel) getModel()).labels.indexOf(entry.getKey());
+            int idx = getModel().labels.indexOf(entry.getKey());
             if (idx > -1) {
-                ((DataValueModel) getModel()).setValueAt(entry.getValue(), idx, 2);
+                getModel().setValueAt(entry.getValue(), idx, 2);
             }
         }
 
@@ -49,13 +48,13 @@ public final class TableCursorValue extends JTable implements Observateur {
 
         switch (type) {
         case "remove":
-            ((DataValueModel) getModel()).removeElement(object.toString());
+            getModel().removeElement(object.toString());
             break;
         case "update":
             Object[] objects = (Object[]) object;
-            int idx = ((DataValueModel) getModel()).labels.indexOf(objects[0]);
+            int idx = getModel().labels.indexOf(objects[0]);
             if (idx > -1) {
-                ((DataValueModel) getModel()).setValueAt(objects[1], idx, 0);
+                getModel().setValueAt(objects[1], idx, 0);
             }
             break;
         default:

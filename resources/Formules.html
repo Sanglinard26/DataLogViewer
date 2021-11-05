@@ -1,0 +1,33 @@
+<html>
+<body>
+    <h1>Formules</h1>
+
+    <u>Nouvelle formule :</u>
+    <p>Pour cr&eacute;er une formule &agrave; partir des variables disponibles dans le log il faut aller dans le menu "Formules" puis "Nouvelle"</p>
+    
+    Une boite de dialogue pour l'&eacute;dition de celle-ci :<br>
+    <img src="Formules_edition.png" alt="Edition formule" width="699" height="406">
+    
+    
+    <p>
+    /!\ Il est n&eacute;c&eacute;ssaire d'encadrer le nom de chaque variable issue du log par le caract&egrave;re <strong>#</strong> /!\.
+    <br>Pour les utilisateurs de PcsLab il y a la possiblit&eacute; de cr&eacute;er des formules &agrave; partir des param&egrave;tres de calibration.</p>
+    
+    Voici quelques exemples de formules :
+    <ul>
+        <li>#RPM(tr/min)#/120
+        <li>950 => En mettant un unique nombre on d&eacute;finit une formule qui aura la m&ecirc;me valeur tout au long du log (typiquement un seuil fixe)
+        <li>TABLE2D{Avance base,RPM(tr/min),Intake_manifold_P(mbar)} => Pour chaque point du log l'avance de base sera recalcul&eacute;e &agrave; partir de la calibration charg&eacute;e.
+    </ul>
+    
+    <p><u>Gestion des formules :</u></p>
+    
+    <p>Pour acc&eacute;der au gestionnaire de formule il faut passer le menu "Formules", ensuite "Gestionnaire".
+    Au sein de cette fen&ecirc;tre il sera possible de modifier une formule existente ou &eacute;ventuellement d'en supprimer.
+    <br><img src="Formule_gestion.png" alt="Gestion formule" width="286" height="392">
+    </p>
+    
+    <p>La sauvegarde des formules est int&eacute;gr&eacute;e à l'enregistrement du fichier de configuration.</p>
+
+</body>
+</html>

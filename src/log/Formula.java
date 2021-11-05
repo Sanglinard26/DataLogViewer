@@ -177,6 +177,9 @@ public final class Formula extends Measure {
                     measures[j] = generateMeasureFromCal(log, calib, var.substring(idxAccolade + 1).replace("}", ""));
                 } else {
                     measures[j] = log.getMeasure(var);
+                    if (measures[j] instanceof Formula) {
+                        ((Formula) measures[j]).calculate(log, calib);
+                    }
                 }
 
             }
