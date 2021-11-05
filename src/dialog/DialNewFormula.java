@@ -271,7 +271,7 @@ public final class DialNewFormula extends JDialog {
                     formula.setName(txtName.getText());
                     formula.setUnit(txtUnit.getText());
                     formula.setExpression(formulaText.getText());
-                    formula.calculate(ihm.getLog(), ihm.getSelectedCal());
+                    // formula.calculate(ihm.getLog(), ihm.getSelectedCal());
                     dispose();
                 }
 
