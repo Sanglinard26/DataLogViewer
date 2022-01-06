@@ -25,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -110,7 +111,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
     private static final long serialVersionUID = 1L;
 
-    private final static String VERSION = "v1.52";
+    private final static String VERSION = "v1.53";
     private final String DEMO = "demo";
 
     private final static String LOG_PANEL = "LOG";
@@ -686,7 +687,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         gbc.gridwidth = 1;
         gbc.gridheight = 2;
         gbc.weightx = 70;
-        gbc.weighty = 1;
+        gbc.weighty = 95;
         gbc.insets = new Insets(0, 0, 0, 0);
         gbc.anchor = GridBagConstraints.FIRST_LINE_START;
         panel.add(chartTabbedPane, gbc);
@@ -703,7 +704,13 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
                     if (chartView.getDatasetType() < 2) {
                         chartView.updateTableValue();
-                        chartView.applyCondition(listZone.get(panelCondition.getTableCondition().getActiveCondition()));
+                        chartView.applyCondition(listZone.get(panelCondition.getTableCondition().getNumActiveCondition()));
+                    } else {
+                        Condition condition = panelCondition.getTableCondition().getActiveCondition();
+                        if (condition != null) {
+                            BitSet bitCondition = condition.applyCondition(log);
+                            chartView.applyCondition(condition.isActive(), bitCondition, log);
+                        }
                     }
                 } else {
                     tableCursorValues.getModel().clearList();
@@ -831,7 +838,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
         tableCursorValues.setPreferredScrollableViewportSize(tableCursorValues.getPreferredSize());
         gbc.fill = GridBagConstraints.BOTH;
-        gbc.gridx = 3;
+        gbc.gridx = 2;
         gbc.gridy = 1;
         gbc.gridwidth = 1;
         gbc.gridheight = 1;
@@ -849,7 +856,12 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
             public void tableChanged(TableModelEvent e) {
                 if (e.getType() == TableModelEvent.UPDATE) {
 
-                    final int row = e.getFirstRow();
+                    final int row = panelCondition.getTableCondition().getSelectedRow();
+
+                    if (row < 0) {
+                        return;
+                    }
+
                     final Condition condition = (Condition) panelCondition.getTableCondition().getModel().getValueAt(row, 1);
 
                     int idx = chartTabbedPane.getSelectedIndex();
@@ -863,7 +875,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
                                     @Override
                                     public void run() {
-                                        BitSet bitCondition = condition.apply(log);
+                                        BitSet bitCondition = condition.applyCondition(log);
 
                                         if (condition.isActive()) {
                                             listZone.put(row, chartView.applyCondition(condition.isActive(), bitCondition, condition.getColor()));
@@ -871,10 +883,23 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                                         } else {
                                             listZone.remove(row);
                                             chartView.removeCondition();
+                                            panelCondition.setListBoxAnnotation(Collections.<IntervalMarker> emptyList());
                                         }
                                     }
                                 });
                                 thread.start();
+                            } else {
+
+                                Thread thread = new Thread(new Runnable() {
+
+                                    @Override
+                                    public void run() {
+                                        BitSet bitCondition = condition.applyCondition(log);
+                                        chartView.applyCondition(condition.isActive(), bitCondition, log);
+                                    }
+                                });
+                                thread.start();
+
                             }
                         }
                     }
@@ -893,21 +918,23 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                     return;
                 }
 
-                double duration = (double) panelCondition.getTableListCondition().getValueAt(idx, 2)
-                        - (double) panelCondition.getTableListCondition().getValueAt(idx, 1);
-
-                double t1 = (double) panelCondition.getTableListCondition().getValueAt(idx, 1) - (duration * 0.2);
-                double t2 = (double) panelCondition.getTableListCondition().getValueAt(idx, 2) + (duration * 0.2);
-
                 int idxWin = chartTabbedPane.getSelectedIndex();
                 if (idxWin > -1) {
                     if (chartTabbedPane.getComponentAt(idxWin) instanceof ChartView) {
                         ChartView chartView = (ChartView) chartTabbedPane.getComponentAt(idxWin);
 
-                        CombinedDomainXYPlot combinedDomainXYPlot = chartView.getPlot();
+                        if (chartView.getDatasetType() < 2) {
+                            CombinedDomainXYPlot combinedDomainXYPlot = chartView.getPlot();
 
-                        Range newRange = new Range(t1, t2);
-                        combinedDomainXYPlot.getDomainAxis().setRange(newRange);
+                            double duration = (double) panelCondition.getTableListCondition().getValueAt(idx, 2)
+                                    - (double) panelCondition.getTableListCondition().getValueAt(idx, 1);
+
+                            double t1 = (double) panelCondition.getTableListCondition().getValueAt(idx, 1) - (duration * 0.2);
+                            double t2 = (double) panelCondition.getTableListCondition().getValueAt(idx, 2) + (duration * 0.2);
+
+                            Range newRange = new Range(t1, t2);
+                            combinedDomainXYPlot.getDomainAxis().setRange(newRange);
+                        }
 
                     }
                 }
@@ -915,7 +942,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         });
 
         gbc.fill = GridBagConstraints.BOTH;
-        gbc.gridx = 3;
+        gbc.gridx = 2;
         gbc.gridy = 2;
         gbc.gridwidth = 1;
         gbc.gridheight = 1;
@@ -1110,11 +1137,13 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
             boolean doImport = support.isDataFlavorSupported(DataFlavor.stringFlavor);
 
             if (doImport) {
-                ChartView chartView = (ChartView) support.getComponent();
-                if (chartView.getDatasetType() > 1) {
-                    return false;
+                if (support.getComponent() instanceof ChartView) {
+                    ChartView chartView = (ChartView) support.getComponent();
+                    if (chartView.getDatasetType() > 1) {
+                        return false;
+                    }
+                    chartView.highlightPlot(support.getDropLocation());
                 }
-                chartView.highlightPlot(support.getDropLocation());
             }
 
             return doImport;
@@ -1127,36 +1156,40 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                 final String measureName = (String) support.getTransferable().getTransferData(DataFlavor.stringFlavor);
                 int idxMeasure = listModel.indexOf(new Measure(measureName));
                 int idxWindow = chartTabbedPane.getSelectedIndex();
+
                 if (idxMeasure < 0 || idxWindow < 0) {
                     return false;
                 }
 
-                final ChartView chartView = (ChartView) support.getComponent();
-                final CombinedDomainXYPlot combinedDomainXYPlot = chartView.getPlot();
-                final XYPlot plot = combinedDomainXYPlot.findSubplot(chartView.getChartRenderingInfo().getPlotInfo(),
-                        support.getDropLocation().getDropPoint());
+                if (support.getComponent() instanceof ChartView) {
+                    final ChartView chartView = (ChartView) support.getComponent();
+                    final CombinedDomainXYPlot combinedDomainXYPlot = chartView.getPlot();
+                    final XYPlot plot = combinedDomainXYPlot.findSubplot(chartView.getChartRenderingInfo().getPlotInfo(),
+                            support.getDropLocation().getDropPoint());
 
-                DialAddMeasure dialAddMeasure = new DialAddMeasure(plot, measureName);
+                    DialAddMeasure dialAddMeasure = new DialAddMeasure(plot, measureName);
 
-                int res = JOptionPane.showConfirmDialog(Ihm.this, dialAddMeasure, "Ajout mesure", 2, -1);
+                    int res = JOptionPane.showConfirmDialog(Ihm.this, dialAddMeasure, "Ajout mesure", 2, -1);
 
-                if (res == JOptionPane.OK_OPTION) {
-                    chartView.addMeasure(plot, log.getTime(), listModel.getElementAt(idxMeasure), dialAddMeasure.getAxisName());
+                    if (res == JOptionPane.OK_OPTION) {
+                        chartView.addMeasure(plot, log.getTime(), listModel.getElementAt(idxMeasure), dialAddMeasure.getAxisName());
 
-                    chartView.getChart().addProgressListener(new ChartProgressListener() {
+                        chartView.getChart().addProgressListener(new ChartProgressListener() {
 
-                        @Override
-                        public void chartProgress(ChartProgressEvent var1) {
-                            if (var1.getType() == ChartProgressEvent.DRAWING_FINISHED) {
-                                tableCursorValues.getModel().addElement(measureName, chartView.getMeasureColor(plot, measureName));
-                                chartView.getChart().removeProgressListener(this);
+                            @Override
+                            public void chartProgress(ChartProgressEvent var1) {
+                                if (var1.getType() == ChartProgressEvent.DRAWING_FINISHED) {
+                                    tableCursorValues.getModel().addElement(measureName, chartView.getMeasureColor(plot, measureName));
+                                    chartView.getChart().removeProgressListener(this);
+                                }
+
                             }
+                        });
 
-                        }
-                    });
-
-                    return true;
+                        return true;
+                    }
                 }
+
             } catch (UnsupportedFlavorException e) {
             } catch (IOException e) {
             }
@@ -1314,6 +1347,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         for (int n = 0; n < nbTab; n++) {
             if (chartTabbedPane.getComponentAt(n) instanceof ChartView) {
                 chartView = (ChartView) chartTabbedPane.getComponentAt(n);
+
                 for (Object plot : chartView.getPlot().getSubplots()) {
                     xyPlot = (XYPlot) plot;
 
@@ -1379,6 +1413,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
                 chartView.getPlot().getDomainAxis().setAutoRange(true);
                 chartView.getPlot().configureDomainAxes();
+
             }
         }
 
@@ -1780,8 +1815,9 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         XYSeries serie = null;
 
         for (int nDataset = 0; nDataset < plot.getDatasetCount(); nDataset++) {
-            serie = ((XYSeriesCollection) plot.getDataset(nDataset)).getSeries(signalName);
-            if (serie != null) {
+            int idx = ((XYSeriesCollection) plot.getDataset(nDataset)).getSeriesIndex(signalName);
+            if (idx > -1) {
+                serie = ((XYSeriesCollection) plot.getDataset(nDataset)).getSeries(signalName);
                 break;
             }
         }

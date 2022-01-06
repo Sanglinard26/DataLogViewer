@@ -175,6 +175,10 @@ public final class DialNewFormula extends JDialog {
                     formulaText.insert(data, formulaText.getCaretPosition());
                 }
 
+                DialNewFormula.this.requestFocus();
+                formulaText.requestFocusInWindow();
+                formulaText.setCaretPosition(formulaText.getText().length());
+
                 return true;
             }
         });
@@ -271,7 +275,6 @@ public final class DialNewFormula extends JDialog {
                     formula.setName(txtName.getText());
                     formula.setUnit(txtUnit.getText());
                     formula.setExpression(formulaText.getText());
-                    // formula.calculate(ihm.getLog(), ihm.getSelectedCal());
                     dispose();
                 }
 
@@ -338,8 +341,8 @@ public final class DialNewFormula extends JDialog {
     }
 
     private final JPanel createPad() {
-        String[] tab_string = new String[] { "SCALAIRE{}", "TABLE1D{,}", "TABLE2D{,,}", "^", "sqrt()", "cos()", "sin()", "tan()", "+", "-", "*", "/",
-                ".", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9" };
+        String[] tab_string = new String[] { "SCALAIRE{}", "TABLE1D{,}", "TABLE2D{,,}", "abs()", "^", "sqrt()", "cos()", "sin()", "tan()", "+", "-",
+                "*", "/", ".", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9" };
         JButton[] tab_button = new JButton[tab_string.length];
 
         JPanel pad = new JPanel(new GridLayout(6, 5));

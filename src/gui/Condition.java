@@ -5,19 +5,15 @@ package gui;
 
 import java.awt.Color;
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
-import javax.script.ScriptException;
-import javax.swing.JOptionPane;
+import org.mariuszgromada.math.mxparser.Argument;
+import org.mariuszgromada.math.mxparser.Expression;
 
 import log.Log;
 import log.Measure;
@@ -63,7 +59,12 @@ public final class Condition implements Serializable {
     }
 
     public void setActive(boolean active) {
-        this.active = active;
+        if (!isEmpty()) {
+            this.active = active;
+        } else {
+            this.active = false;
+        }
+
     }
 
     public final boolean isEmpty() {
@@ -78,77 +79,69 @@ public final class Condition implements Serializable {
         this.expression = operateur;
     }
 
-    private String replaceVarName(Map<String, String> variables) {
-
-        String internExpression = this.expression.replaceAll("#", "");
-
-        for (Entry<String, String> entry : variables.entrySet()) {
-            internExpression = internExpression.replace(entry.getValue(), entry.getKey().toString());
-        }
-
-        return internExpression;
-    }
-
-    private Map<String, String> findMeasure() {
-        LinkedHashMap<String, String> variables = new LinkedHashMap<String, String>();
-
-        Pattern pattern = Pattern.compile("\\#(.*?)\\#");
-        final Matcher regexMatcher = pattern.matcher(this.expression);
-
-        String matchedMeasure;
-
-        int cnt = 1;
-
-        while (regexMatcher.find()) {
-            matchedMeasure = regexMatcher.group(1);
-
-            variables.put("a" + cnt++, matchedMeasure);
-        }
-
-        return variables;
-    }
-
-    public BitSet apply(Log log) {
-
+    public BitSet applyCondition(Log log) {
         BitSet bitCondition = new BitSet(log.getTime().getData().size());
 
         if ("".equals(expression) || !active) {
             return bitCondition;
         }
 
-        ScriptEngineManager factory = new ScriptEngineManager();
-        ScriptEngine engine = factory.getEngineByName("JavaScript");
+        Map<Character, String> variables = new LinkedHashMap<Character, String>();
 
-        Map<String, String> variables = findMeasure();
-        String renameExpression = replaceVarName(variables);
+        // char � = 101
+        int charDec = 97;
 
-        List<Measure> measures = new ArrayList<Measure>(variables.size());
-        for (String measureName : variables.values()) {
-            measures.add(log.getMeasure(measureName));
+        // Traitement des variables issues du log
+        Pattern pattern = Pattern.compile("\\#(.*?)\\#");
+        Matcher regexMatcher = pattern.matcher(expression);
+
+        String matchedMeasure;
+
+        while (regexMatcher.find()) {
+            matchedMeasure = regexMatcher.group(1);
+            if (charDec == 101) {
+                charDec++;
+            }
+            variables.put((char) charDec++, matchedMeasure);
         }
 
-        try {
+        String internExpression = expression.replaceAll("#", "");
 
-            String val;
+        for (Entry<Character, String> entry : variables.entrySet()) {
+            internExpression = internExpression.replace(entry.getValue(), entry.getKey().toString());
+        }
 
-            for (int i = 0; i < log.getTime().getData().size(); i++) {
+        Argument[] args = new Argument[variables.size()];
 
-                for (int j = 0; j < measures.size(); j++) {
+        int cnt = 0;
+        for (Character var : variables.keySet()) {
+            args[cnt++] = new Argument(var.toString(), Double.NaN);
+        }
 
-                    val = "a" + (j + 1) + "=" + measures.get(j).getData().get(i);
-                    engine.eval(val);
+        Expression conditionExpression = new Expression(internExpression, args);
+
+        Measure[] measures = new Measure[conditionExpression.getArgumentsNumber()];
+        String var;
+        Argument arg;
+
+        for (int j = 0; j < conditionExpression.getArgumentsNumber(); j++) {
+            arg = conditionExpression.getArgument(j);
+            var = variables.get(arg.getArgumentName().charAt(0));
+            measures[j] = log.getMeasure(var);
+        }
+
+        for (int i = 0; i < log.getTime().getData().size(); i++) {
+            for (int j = 0; j < conditionExpression.getArgumentsNumber(); j++) {
+                arg = conditionExpression.getArgument(j);
+                if (measures[j].getData().isEmpty()) {
+                    break;
                 }
-
-                boolean result = (boolean) engine.eval(renameExpression);
-                if (result) {
-                    bitCondition.set(i);
-                }
-
+                arg.setArgumentValue(measures[j].getData().get(i).doubleValue());
             }
-
-        } catch (ScriptException se) {
-            JOptionPane.showMessageDialog(null, "Probl\u00e8me de synthaxe !", "Erreur", JOptionPane.ERROR_MESSAGE);
-            bitCondition.set(0, bitCondition.size(), false);
+            double res = conditionExpression.calculate();
+            if (res == 1) {
+                bitCondition.set(i);
+            }
         }
 
         return bitCondition;

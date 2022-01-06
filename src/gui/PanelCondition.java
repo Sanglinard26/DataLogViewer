@@ -5,8 +5,6 @@ package gui;
 
 import java.awt.BorderLayout;
 import java.awt.Component;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.text.DecimalFormat;
 import java.util.List;
 
@@ -34,21 +32,6 @@ public final class PanelCondition extends JPanel {
         tableCondition.setPreferredScrollableViewportSize(tableCondition.getPreferredSize());
         add(new JScrollPane(tableCondition), BorderLayout.NORTH);
 
-        tableCondition.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mousePressed(MouseEvent e) {
-
-                int idx = tableCondition.getSelectedRow();
-
-                if (idx == -1 || listBoxAnnotation == null) {
-                    return;
-                }
-
-                populateList(idx);
-
-            }
-        });
-
         modelListCond = new DefaultTableModel(new String[] { "Numéro", "t1", "t2" }, 0) {
             private static final long serialVersionUID = 1L;
 
@@ -68,19 +51,10 @@ public final class PanelCondition extends JPanel {
     public void setListBoxAnnotation(List<IntervalMarker> listBoxAnnotation) {
         this.listBoxAnnotation = listBoxAnnotation;
 
-        int idx = tableCondition.getSelectedRow();
-
-        if (idx == -1 || listBoxAnnotation == null) {
-            return;
-        }
-
-        populateList(idx);
+        populateList();
     }
 
-    public final void populateList(int idx) {
-        if (!(boolean) tableCondition.getModel().getValueAt(idx, 0)) {
-            listBoxAnnotation.clear();
-        }
+    public final void populateList() {
 
         modelListCond.setRowCount(0);
 

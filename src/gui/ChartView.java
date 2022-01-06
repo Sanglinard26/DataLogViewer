@@ -60,6 +60,7 @@ import org.jfree.ui.Layer;
 import org.jfree.ui.RectangleEdge;
 
 import dialog.DialogProperties;
+import log.Log;
 import log.Measure;
 import observer.Observable;
 import observer.Observateur;
@@ -349,6 +350,47 @@ public final class ChartView extends ChartPanel implements Observable {
         updateObservateur("values", tableValue);
     }
 
+    public final void applyCondition(boolean active, BitSet bitCondition, Log log) {
+
+        XYPlot plot = (XYPlot) parentPlot.getSubplots().get(0);
+
+        String xLabel = plot.getDomainAxis().getLabel();
+        String yLabel = plot.getRangeAxis().getLabel();
+
+        Measure x = log.getMeasure(xLabel);
+        Measure y = log.getMeasure(yLabel);
+
+        if (getDatasetType() == 3) {
+            String zLabel = ((PaintScaleLegend) getChart().getSubtitle(0)).getAxis().getLabel();
+            Measure z = log.getMeasure(zLabel);
+
+            final DefaultXYZDataset xyzDataset = new DefaultXYZDataset();
+
+            if (active) {
+                double[][] filterdXYZarray = { x.getDoubleValue(bitCondition), y.getDoubleValue(bitCondition), z.getDoubleValue(bitCondition) };
+                xyzDataset.addSeries("Series 1", filterdXYZarray);
+            } else {
+                double[][] xYZarray = { x.getDoubleValue(), y.getDoubleValue(), z.getDoubleValue() };
+                xyzDataset.addSeries("Series 1", xYZarray);
+            }
+
+            plot.setDataset(0, xyzDataset);
+        } else {
+            final DefaultXYDataset xyDataset = new DefaultXYDataset();
+
+            if (active) {
+                double[][] filterdXYarray = { x.getDoubleValue(bitCondition), y.getDoubleValue(bitCondition) };
+                xyDataset.addSeries("Series 1", filterdXYarray);
+            } else {
+                double[][] xYarray = { x.getDoubleValue(), y.getDoubleValue() };
+                xyDataset.addSeries("Series 1", xYarray);
+            }
+
+            plot.setDataset(0, xyDataset);
+        }
+
+    }
+
     public final List<IntervalMarker> applyCondition(boolean active, BitSet bitCondition, Color color) {
 
         List<IntervalMarker> listZone = new ArrayList<IntervalMarker>();
@@ -478,6 +520,7 @@ public final class ChartView extends ChartPanel implements Observable {
             }
 
             marker = new ValueMarker(xValue, Color.BLUE, new BasicStroke(1.5f));
+
         }
 
         plot.addDomainMarker(0, marker, Layer.FOREGROUND);

@@ -5,6 +5,7 @@ package log;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.List;
 
 public class Measure implements Comparable<Measure>, Serializable {
@@ -68,6 +69,18 @@ public class Measure implements Comparable<Measure>, Serializable {
         final double[] result = new double[data.size()];
         for (int i = 0; i < data.size(); i++) {
             result[i] = data.get(i).doubleValue();
+        }
+        return result;
+    }
+
+    public final double[] getDoubleValue(BitSet bitCondition) {
+
+        final double[] result = new double[bitCondition.cardinality()];
+        int cnt = 0;
+        for (int i = 0; i < bitCondition.size(); i++) {
+            if (bitCondition.get(i)) {
+                result[cnt++] = data.get(i).doubleValue();
+            }
         }
         return result;
     }

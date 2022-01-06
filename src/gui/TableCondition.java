@@ -68,13 +68,22 @@ public final class TableCondition extends JTable {
         return null;
     }
 
-    public final int getActiveCondition() {
+    public final int getNumActiveCondition() {
         for (int i = 0; i < getRowCount(); i++) {
             if ((boolean) getValueAt(i, 0)) {
                 return i;
             }
         }
         return -1;
+    }
+
+    public final Condition getActiveCondition() {
+        for (int i = 0; i < getRowCount(); i++) {
+            if ((boolean) getValueAt(i, 0)) {
+                return (Condition) getValueAt(i, 1);
+            }
+        }
+        return null;
     }
 
     @Override
@@ -262,7 +271,7 @@ final class ConditionModel extends AbstractTableModel {
         case 0:
             condition.setActive(!condition.isActive());
             for (Condition selCondition : conditions) {
-                if (condition != selCondition) {
+                if (condition != selCondition && selCondition.isActive()) {
                     selCondition.setActive(false);
                 }
             }
