@@ -47,18 +47,13 @@ public class Measure implements Comparable<Measure>, Serializable {
         return max;
     }
 
-    public void setMax(Number value) {
-        if (Double.isNaN(value.doubleValue())) {
-            return;
-        }
-        this.max = Math.max(max, value.doubleValue());
-    }
-
-    public void setMin(Number value) {
+    public final void addPoint(Number value) {
+        this.data.add(value);
         if (Double.isNaN(value.doubleValue())) {
             return;
         }
         this.min = Math.min(min, value.doubleValue());
+        this.max = Math.max(max, value.doubleValue());
     }
 
     public final List<Number> getData() {

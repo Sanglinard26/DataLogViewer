@@ -33,6 +33,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
@@ -232,21 +235,22 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                 final int reponse = fc.showOpenDialog(Ihm.this);
                 if (reponse == JFileChooser.APPROVE_OPTION) {
 
-                    File config = fc.getSelectedFile();
+                    final File config = fc.getSelectedFile();
 
                     if (DEMO.equals(config.getName().toLowerCase())) {
 
                         try {
-                            File tmp = File.createTempFile("config", null);
+                            final File tmp = File.createTempFile("config", null);
                             tmp.deleteOnExit();
                             Files.copy(getClass().getResourceAsStream("/config.cfg"), tmp.toPath(), StandardCopyOption.REPLACE_EXISTING);
+
                             openConfig(tmp);
+
                             mainTabbedPane.setSelectedIndex(0);
                             return;
                         } catch (IOException e1) {
                         }
                     }
-
                     openConfig(config);
                     mainTabbedPane.setSelectedIndex(0);
                 }
@@ -478,7 +482,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                 });
                 final int reponse = fc.showOpenDialog(Ihm.this);
                 if (reponse == JFileChooser.APPROVE_OPTION) {
-                    File config = fc.getSelectedFile();
+                    final File config = fc.getSelectedFile();
 
                     if (DEMO.equals(config.getName().toLowerCase())) {
 
@@ -494,6 +498,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                     }
 
                     openConfig(config);
+
                     mainTabbedPane.setSelectedIndex(0);
                 }
 
@@ -1025,11 +1030,11 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
             if (reponse == JFileChooser.APPROVE_OPTION) {
 
-                log = new Log(fc.getSelectedFile());
-
                 if (listModel.getSize() > 0) {
                     listModel.clear();
                 }
+
+                log = new Log(fc.getSelectedFile());
 
                 for (Measure measure : log.getMeasures()) {
                     listModel.addElement(measure);
@@ -1037,13 +1042,9 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
                 for (Measure formule : listFormula) {
                     log.getMeasures().add(formule);
-                    // ((Formula) formule).setOutdated();
-                    // ((Formula) formule).calculate(log, getSelectedCal());
-                    // listModel.addElement(formule);
                 }
 
                 for (Measure formule : listFormula) {
-                    // log.getMeasures().add(formule);
                     ((Formula) formule).setOutdated();
                     ((Formula) formule).calculate(log, getSelectedCal());
                     listModel.addElement(formule);
@@ -1053,7 +1054,9 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                 labelLogName.setText("<html>Nom de l'acquisition : " + "<b>" + log.getName());
 
                 // load data in chart
-                reloadLogData(log);
+                if (chartTabbedPane.getTabCount() > 0) {
+                    reloadLogData(log);
+                }
 
                 mapView.setLog(log);
 
@@ -1124,6 +1127,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
     private final void closeWindows() {
         for (int i = chartTabbedPane.getTabCount() - 1; i >= 0; i--) {
+            ((ChartView) chartTabbedPane.getComponentAt(i)).delObservateur();
             chartTabbedPane.removeTabAt(i);
         }
         tableCursorValues.getModel().clearList();
@@ -1328,96 +1332,128 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
     private final void reloadLogData(Log log) {
 
+        final long start = System.currentTimeMillis();
+
         final int nbTab = chartTabbedPane.getTabCount();
-        ChartView chartView;
-        XYPlot xyPlot;
-        XYSeries serie;
-        Comparable<?> key;
-        Measure measure = null;
 
         if (log == null) {
             return;
         }
 
-        this.setCursor(new Cursor(Cursor.WAIT_CURSOR));
+        Ihm.this.setCursor(new Cursor(Cursor.WAIT_CURSOR));
 
-        final List<Number> temps = log.getTime().getData();
-        final int nbPoint = temps.size();
+        final int nbProcs = Math.max(1, Runtime.getRuntime().availableProcessors() / 2);
+
+        ChartView chartView;
+
+        ExecutorService executor = Executors.newFixedThreadPool(nbProcs);
 
         for (int n = 0; n < nbTab; n++) {
             if (chartTabbedPane.getComponentAt(n) instanceof ChartView) {
                 chartView = (ChartView) chartTabbedPane.getComponentAt(n);
-
-                for (Object plot : chartView.getPlot().getSubplots()) {
-                    xyPlot = (XYPlot) plot;
-
-                    for (int nDataset = 0; nDataset < xyPlot.getDatasetCount(); nDataset++) {
-
-                        int nbSerie = xyPlot.getDataset(nDataset).getSeriesCount();
-
-                        for (int nSerie = 0; nSerie < nbSerie; nSerie++) {
-
-                            if (xyPlot.getDataset() instanceof XYSeriesCollection) {
-
-                                serie = ((XYSeriesCollection) xyPlot.getDataset(nDataset)).getSeries(nSerie);
-
-                                serie.clear();
-
-                                key = serie.getKey();
-
-                                measure = pickMeasureFromList(key.toString());
-
-                                final int sizeData = measure.getData().size();
-
-                                for (int n1 = 0; n1 < nbPoint; n1++) {
-
-                                    if (n1 < sizeData) {
-                                        serie.add(temps.get(n1), measure.getData().get(n1), false);
-                                    }
-                                }
-
-                                serie.fireSeriesChanged();
-
-                            } else if (xyPlot.getDataset() instanceof DefaultXYZDataset) {
-                                Comparable<?> serieKey = ((DefaultXYZDataset) xyPlot.getDataset()).getSeriesKey(nSerie);
-
-                                String xLabel = xyPlot.getDomainAxis().getLabel();
-                                String yLabel = xyPlot.getRangeAxis().getLabel();
-                                String zLabel = ((PaintScaleLegend) chartView.getChart().getSubtitle(0)).getAxis().getLabel();
-
-                                Measure xMeasure = pickMeasureFromList(xLabel);
-                                Measure yMeasure = pickMeasureFromList(yLabel);
-                                Measure zMeasure = pickMeasureFromList(zLabel);
-
-                                ((DefaultXYZDataset) xyPlot.getDataset()).addSeries(serieKey,
-                                        new double[][] { xMeasure.getDoubleValue(), yMeasure.getDoubleValue(), zMeasure.getDoubleValue() });
-
-                            } else {
-                                Comparable<?> serieKey = ((DefaultXYDataset) xyPlot.getDataset()).getSeriesKey(nSerie);
-
-                                String xLabel = xyPlot.getDomainAxis().getLabel();
-                                String yLabel = xyPlot.getRangeAxis().getLabel();
-
-                                Measure xMeasure = pickMeasureFromList(xLabel);
-                                Measure yMeasure = pickMeasureFromList(yLabel);
-
-                                ((DefaultXYDataset) xyPlot.getDataset()).addSeries(serieKey,
-                                        new double[][] { xMeasure.getDoubleValue(), yMeasure.getDoubleValue() });
-
-                            }
-
-                        }
-                    }
-
-                }
-
-                chartView.getPlot().getDomainAxis().setAutoRange(true);
-                chartView.getPlot().configureDomainAxes();
-
+                executor.execute(new UpdateDataset(chartView));
             }
         }
 
-        this.setCursor(Cursor.getDefaultCursor());
+        executor.shutdown();
+        try {
+            executor.awaitTermination(0, TimeUnit.MICROSECONDS);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        while (!executor.isTerminated()) {
+        }
+
+        Ihm.this.setCursor(Cursor.getDefaultCursor());
+
+        System.out.println("reloadLogData : " + (System.currentTimeMillis() - start) + "ms");
+
+    }
+
+    private final class UpdateDataset implements Runnable {
+        private ChartView chartView;
+
+        public UpdateDataset(ChartView chartView) {
+            this.chartView = chartView;
+        }
+
+        @Override
+        public void run() {
+
+            final List<Number> temps = log.getTime().getData();
+            final int nbPoint = temps.size();
+
+            XYPlot xyPlot;
+            XYSeries serie;
+            Comparable<?> key;
+            Measure measure = null;
+
+            for (Object plot : chartView.getPlot().getSubplots()) {
+                xyPlot = (XYPlot) plot;
+
+                for (int nDataset = 0; nDataset < xyPlot.getDatasetCount(); nDataset++) {
+
+                    int nbSerie = xyPlot.getDataset(nDataset).getSeriesCount();
+
+                    for (int nSerie = 0; nSerie < nbSerie; nSerie++) {
+
+                        if (xyPlot.getDataset() instanceof XYSeriesCollection) {
+
+                            serie = ((XYSeriesCollection) xyPlot.getDataset(nDataset)).getSeries(nSerie);
+
+                            serie.clear();
+
+                            key = serie.getKey();
+
+                            measure = pickMeasureFromList(key.toString());
+
+                            final int sizeData = measure.getData().size();
+
+                            for (int n1 = 0; n1 < nbPoint; n1++) {
+
+                                if (n1 < sizeData) {
+                                    serie.add(temps.get(n1), measure.getData().get(n1), false);
+                                }
+                            }
+
+                            // serie.fireSeriesChanged();
+
+                        } else if (xyPlot.getDataset() instanceof DefaultXYZDataset) {
+                            Comparable<?> serieKey = ((DefaultXYZDataset) xyPlot.getDataset()).getSeriesKey(nSerie);
+
+                            String xLabel = xyPlot.getDomainAxis().getLabel();
+                            String yLabel = xyPlot.getRangeAxis().getLabel();
+                            String zLabel = ((PaintScaleLegend) chartView.getChart().getSubtitle(0)).getAxis().getLabel();
+
+                            Measure xMeasure = pickMeasureFromList(xLabel);
+                            Measure yMeasure = pickMeasureFromList(yLabel);
+                            Measure zMeasure = pickMeasureFromList(zLabel);
+
+                            ((DefaultXYZDataset) xyPlot.getDataset()).addSeries(serieKey,
+                                    new double[][] { xMeasure.getDoubleValue(), yMeasure.getDoubleValue(), zMeasure.getDoubleValue() });
+
+                        } else {
+                            Comparable<?> serieKey = ((DefaultXYDataset) xyPlot.getDataset()).getSeriesKey(nSerie);
+
+                            String xLabel = xyPlot.getDomainAxis().getLabel();
+                            String yLabel = xyPlot.getRangeAxis().getLabel();
+
+                            Measure xMeasure = pickMeasureFromList(xLabel);
+                            Measure yMeasure = pickMeasureFromList(yLabel);
+
+                            ((DefaultXYDataset) xyPlot.getDataset()).addSeries(serieKey,
+                                    new double[][] { xMeasure.getDoubleValue(), yMeasure.getDoubleValue() });
+
+                        }
+                    }
+                }
+            }
+
+            chartView.getPlot().getDomainAxis().setAutoRange(true);
+            chartView.getPlot().configureDomainAxes();
+        }
+
     }
 
     private final void reloadFormulaData(Log log, String formulaName) {
@@ -1575,6 +1611,8 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
             }
         } else {
 
+            long start = System.currentTimeMillis();
+
             DocumentBuilder builder;
             Document document = null;
             DocumentBuilderFactory factory;
@@ -1587,8 +1625,9 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                 document = builder.parse(new File(file.toURI()));
 
                 final Element racine = document.getDocumentElement();
+                ChartView chartView;
 
-                if (racine.getNodeName().equals("Configuration")) {
+                if ("Configuration".equals(racine.getNodeName())) {
 
                     NodeList listWindow = racine.getElementsByTagName("Window");
                     int nbWindow = listWindow.getLength();
@@ -1597,7 +1636,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                         Element window = (Element) listWindow.item(i);
                         String nameWindow = window.getElementsByTagName("Name").item(0).getTextContent();
                         int typeWindow = Integer.parseInt(window.getElementsByTagName("Type").item(0).getTextContent());
-                        ChartView chartView = addChartWindow(nameWindow);
+                        chartView = addChartWindow(nameWindow);
 
                         NodeList listPlot = window.getElementsByTagName("Plot");
                         int nbPlot = listPlot.getLength();
@@ -1695,7 +1734,9 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                         String unitFormula = formula.getElementsByTagName("Unit").item(0).getTextContent();
                         String expressionFormula = formula.getElementsByTagName("Expression").item(0).getTextContent();
 
+                        // Tâche longue, 90% de la fonction openConfig : voir pour optimiser
                         listFormula.add(new Formula(nameFormula, unitFormula, expressionFormula, log, getSelectedCal()));
+                        // *****
                     }
 
                     if (log != null) {
@@ -1727,7 +1768,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                     int idx = chartTabbedPane.getSelectedIndex();
                     if (idx > -1) {
                         if (chartTabbedPane.getComponentAt(idx) instanceof ChartView) {
-                            ChartView chartView = (ChartView) chartTabbedPane.getComponentAt(idx);
+                            chartView = (ChartView) chartTabbedPane.getComponentAt(idx);
                             tableCursorValues.getModel().changeList(chartView.getMeasuresColors());
                         }
                     }
@@ -1742,16 +1783,17 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
             } catch (ParserConfigurationException | SAXException | IOException e) {
                 e.printStackTrace();
             } finally {
+
                 reloadLogData(log);
             }
-
+            System.out.println("openConfig : " + (System.currentTimeMillis() - start) + "ms");
         }
 
     }
 
     public static void main(String[] args) {
 
-        // File[] fileToConvert = new File[] { new File("c:\\user\\U354706\\Perso\\Clio\\soft\\applicatif_04102021.inc"),
+        // File[] fileToConvert = new File[] { new File("c:\\user\\U354706\\Perso\\Clio\\soft\\applicatif_04102021_Cor.inc"),
         // new File("c:\\user\\U354706\\Perso\\Clio\\soft\\sfr167.inc") };
 
         // Conversion.AppIncToA2l(fileToConvert);

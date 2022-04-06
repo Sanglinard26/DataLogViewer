@@ -172,6 +172,7 @@ public class ButtonTabComponent extends JPanel {
         public void actionPerformed(ActionEvent e) {
             int i = pane.indexOfTabComponent(ButtonTabComponent.this);
             if (i != -1) {
+                ((ChartView) pane.getComponentAt(i)).delObservateur();
                 pane.remove(i);
             }
         }

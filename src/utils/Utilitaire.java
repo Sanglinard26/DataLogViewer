@@ -77,7 +77,7 @@ public abstract class Utilitaire {
             } else {
                 return i;
             }
-        } catch (Exception e) {
+        } catch (NumberFormatException e) {
             return o;
         }
     }
@@ -107,14 +107,9 @@ public abstract class Utilitaire {
             } else {
                 return i;
             }
-        } catch (Exception e) {
-            return Double.NaN;
+        } catch (NumberFormatException e) {
+            return Float.NaN;
         }
-    }
-
-    public static final double applyResolution(double rawValue, double resol) {
-        double roundValue = Math.rint(rawValue / resol);
-        return roundValue * resol;
     }
 
     public static Color parseRGBColor(String stringColor, int alpha) {

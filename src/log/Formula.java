@@ -148,6 +148,7 @@ public final class Formula extends Measure {
     }
 
     public final void calculate(Log log, MapCal calib) {
+
         Argument arg;
         Measure[] measures = new Measure[expression.getArgumentsNumber()];
         String var;
@@ -193,21 +194,16 @@ public final class Formula extends Measure {
                     arg.setArgumentValue(measures[j].getData().get(i).doubleValue());
                 }
                 double res = expression.calculate();
-                this.data.add(res);
-                this.setMin(res);
-                this.setMax(res);
+                this.addPoint(res);
             }
             if (Double.isInfinite(min) && Double.isInfinite(max)) {
                 upToDate = false;
             } else {
                 upToDate = true;
             }
-
         } else {
             double res = expression.calculate();
-            this.data.add(res);
-            this.setMin(res);
-            this.setMax(res);
+            this.addPoint(res);
 
             upToDate = false;
         }
@@ -259,9 +255,7 @@ public final class Formula extends Measure {
 
             for (int i = 0; i < log.getTime().getData().size(); i++) {
                 double res = Double.parseDouble(variable.getValue(true, 0, 0).toString());
-                z.data.add(res);
-                z.setMin(res);
-                z.setMax(res);
+                z.addPoint(res);
             }
 
             return z;
@@ -270,9 +264,7 @@ public final class Formula extends Measure {
 
             for (int i = 0; i < log.getTime().getData().size(); i++) {
                 double res = Interpolation.interpLinear1D(variable.toDouble2D(true), x.getData().get(i).doubleValue());
-                z.data.add(res);
-                z.setMin(res);
-                z.setMax(res);
+                z.addPoint(res);
             }
 
             return z;
@@ -283,18 +275,14 @@ public final class Formula extends Measure {
             for (int i = 0; i < log.getTime().getData().size(); i++) {
                 double res = Interpolation.interpLinear2D(variable.toDouble2D(true), x.getData().get(i).doubleValue(),
                         y.getData().get(i).doubleValue());
-                z.data.add(res);
-                z.setMin(res);
-                z.setMax(res);
+                z.addPoint(res);
             }
             return z;
         default:
 
             for (int i = 0; i < log.getTime().getData().size(); i++) {
                 double res = Double.NaN;
-                z.data.add(res);
-                z.setMin(res);
-                z.setMax(res);
+                z.addPoint(res);
             }
 
             return z;

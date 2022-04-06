@@ -68,6 +68,8 @@ public final class MapCal {
 
     private final void parseFile(File mapFile) {
 
+        long start = System.currentTimeMillis();
+
         final char crochet = '[';
 
         try {
@@ -103,6 +105,8 @@ public final class MapCal {
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        System.out.println("build from Mdb : " + (System.currentTimeMillis() - start) + "ms");
 
     }
 

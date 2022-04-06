@@ -8,10 +8,12 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -114,7 +116,7 @@ public class Conversion {
 
         for (int nFile = 0; nFile < appIncFile.length; nFile++) {
             try (BufferedReader br = new BufferedReader(
-                    new InputStreamReader(new FileInputStream(appIncFile[nFile]), Charset.forName("ISO-8859-1")))) {
+                    new InputStreamReader(new FileInputStream(appIncFile[nFile]), Charset.forName("ISO-8859-1")))) { // ISO-8859-1
 
                 String line;
 
@@ -268,7 +270,18 @@ public class Conversion {
         }
 
         // Ecriture A2l
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(appIncFile[0].getAbsolutePath().replace(".inc", ".a2l")))) {
+        // try (BufferedWriter bw = new BufferedWriter(new FileWriter(appIncFile[0].getAbsolutePath().replace(".inc", ".a2l")))) {
+        // bw.write("ASAP2_VERSION 1 60\n");
+        // bw.write(writeProject("BGM_Project", "\"Project description\"", listVar));
+
+        // } catch (IOException e) {
+        // e.printStackTrace();
+        // }
+        // ************
+
+        // Ecriture A2l
+        try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(
+                new FileOutputStream(appIncFile[0].getAbsolutePath().replace(".inc", ".a2l")), StandardCharsets.ISO_8859_1));) {
             bw.write("ASAP2_VERSION 1 60\n");
             bw.write(writeProject("BGM_Project", "\"Project description\"", listVar));
 
@@ -317,6 +330,8 @@ public class Conversion {
         sb.append(name);
         sb.append("\n" + description + "\n\n");
 
+        sb.append(writeModPar("\"MOD_PAR description\""));
+
         for (Variable var : listVar) {
             sb.append(writeMeasurement(var.getName(), var.getComment(), var.getDataType(), "CM_" + var.getName(), var.getRangeMin(),
                     var.getRangeMax(), var.getDisplayName(), var.getAdress(), var.getDisplayBase()));
@@ -336,6 +351,20 @@ public class Conversion {
 
         return sb.toString();
 
+    }
+
+    private static final String writeModPar(String description) {
+        StringBuilder sb = new StringBuilder("/begin MOD_PAR ");
+
+        sb.append(description + "\n");
+
+        sb.append("EPK" + " " + "\"Cdfx_Name\"" + "\n");
+
+        sb.append("USER" + " " + "\"Workspace_Name\"" + "\n");
+
+        sb.append("/end MOD_PAR\n\n");
+
+        return sb.toString();
     }
 
     private static final String writeMeasurement(String name, String comment, String dataType, String conversion, String min, String max,

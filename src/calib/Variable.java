@@ -30,11 +30,13 @@ public final class Variable extends Observable implements Comparable<Variable> {
         this.name = data.get(0).substring(1, data.get(0).length() - 1);
         this.infos = mdbData.getInfos().get(this.name);
 
-        // System.out.println(this.name);
+        if (this.infos != null) {
+            build(data, this.infos);
+        } else {
+            build(data);
+        }
 
-        build(data);
-
-        int nbInput;
+        byte nbInput;
 
         switch (type) {
         case COURBE:
@@ -119,14 +121,14 @@ public final class Variable extends Observable implements Comparable<Variable> {
     public final Object getValue(boolean modifiedVar, int... coord) {
         int idx = coord[1] + dimX * coord[0];
         if (!modifiedVar) {
-            return this.values[idx];
+            return this.values[idx] != null ? this.values[idx] : Float.NaN;
         }
 
         if (newValues == null) {
             newValues = Arrays.copyOf(values, values.length);
         }
 
-        return this.newValues[idx];
+        return this.newValues[idx] != null ? this.newValues[idx] : Float.NaN;
 
     }
 
@@ -143,6 +145,343 @@ public final class Variable extends Observable implements Comparable<Variable> {
         this.newValues = null;
         setChanged();
         notifyObservers();
+    }
+
+    private final void build(List<String> data, VariableInfo infosMdb) {
+
+        dimX = infosMdb.getNbBkPtCol();
+        dimY = infosMdb.getNbBkPtRow();
+
+        if (infosMdb.isInterpTable()) {
+            if (dimY == 0) {
+                dimY = 2;
+                type = Type.COURBE;
+                readCurve(data);
+            } else {
+                dimX++;
+                dimY++;
+                type = Type.MAP;
+                readMap(data);
+            }
+        } else {
+            dimY = Math.max(1, dimY);
+            if (dimX == 1) {
+                type = Type.SCALAIRE;
+                readScalarOrArray(data);
+            } else if (dimY > 1) {
+                type = Type.TEXT;
+                readText(data);
+            } else {
+                type = Type.ARRAY;
+                readScalarOrArray(data);
+            }
+        }
+    }
+
+    private final void readScalarOrArray(List<String> data) {
+
+        final String SEMICOLON = ";";
+        final String COLONNES = "colonnes";
+        final String EGALE = "=";
+
+        String[] splitEgale;
+        String[] splitSemiColon;
+
+        values = new Object[dimX * dimY];
+
+        for (int i = 1; i < data.size(); i++) {
+            splitEgale = data.get(i).split(EGALE);
+            if (splitEgale.length > 1 && COLONNES.equals(splitEgale[0])) {
+
+                splitSemiColon = splitEgale[1].split(SEMICOLON);
+
+                for (int a = 0; a < dimX; a++) {
+                    if (a < splitSemiColon.length) {
+                        values[a] = Utilitaire.getStorageObject(splitSemiColon[a]);
+                    } else {
+                        values[a] = Float.NaN;
+                    }
+                }
+
+                return;
+            }
+        }
+    }
+
+    private final void readCurve(List<String> data) {
+        final String SEMICOLON = ";";
+        final String BKPTCOL = "bkptcol";
+        final String LIGNE = "ligne";
+        final String EGALE = "=";
+
+        String[] splitEgale;
+        String[] splitSemiColon;
+
+        values = new Object[dimX * dimY];
+
+        boolean flagBkptCol = false;
+
+        for (int i = 1; i < data.size(); i++) {
+            splitEgale = data.get(i).split(EGALE);
+            if (splitEgale.length > 1) {
+
+                switch (splitEgale[0]) {
+                case BKPTCOL:
+
+                    if (!flagBkptCol) {
+                        splitSemiColon = splitEgale[1].split(SEMICOLON);
+
+                        for (int a = 0; a < dimX; a++) {
+                            if (a < splitSemiColon.length) {
+                                setValue(false, Utilitaire.getStorageObject(splitSemiColon[a]), 0, a);
+                            } else {
+                                setValue(false, Float.NaN, 0, a);
+                            }
+                        }
+                        flagBkptCol = true;
+                    }
+
+                    break;
+                case LIGNE:
+                    splitSemiColon = splitEgale[1].split(SEMICOLON);
+
+                    for (int a = 0; a < dimX; a++) {
+                        if (a < splitSemiColon.length) {
+                            setValue(false, Utilitaire.getStorageObject(splitSemiColon[a]), 1, a);
+                        } else {
+                            setValue(false, Float.NaN, 1, a);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    private final void readMap(List<String> data) {
+        final String SEMICOLON = ";";
+        final String BKPTCOL = "bkptcol";
+        final String BKPTLIGN = "bkptlign";
+        final String EGALE = "=";
+
+        String[] splitEgale;
+        String[] splitSemiColon;
+
+        values = new Object[dimX * dimY];
+        setValue(false, "Y \\ X", 0, 0);
+
+        boolean flagBkptCol = false;
+        boolean flagBkptRow = false;
+
+        for (int i = 1; i < data.size(); i++) {
+            splitEgale = data.get(i).split(EGALE);
+            if (splitEgale.length > 1) {
+
+                switch (splitEgale[0]) {
+                case BKPTCOL:
+
+                    if (!flagBkptCol) {
+                        splitSemiColon = splitEgale[1].split(SEMICOLON);
+
+                        for (int a = 1; a < dimX; a++) {
+                            if (a <= splitSemiColon.length) {
+                                setValue(false, Utilitaire.getStorageObject(splitSemiColon[a - 1]), 0, a);
+                            } else {
+                                setValue(false, Float.NaN, 0, a);
+                            }
+                        }
+                        flagBkptCol = true;
+                    }
+
+                    break;
+                case BKPTLIGN:
+
+                    if (!flagBkptRow) {
+                        splitSemiColon = splitEgale[1].split(SEMICOLON);
+
+                        for (int a = 1; a < dimY; a++) {
+                            if (a <= splitSemiColon.length) {
+                                setValue(false, Utilitaire.getStorageObject(splitSemiColon[a - 1]), a, 0);
+                            } else {
+                                setValue(false, Float.NaN, a, 0);
+                            }
+                        }
+                        flagBkptRow = true;
+                    }
+                    break;
+                default:
+
+                    Number yBrkPt;
+
+                    if (splitEgale[0].indexOf("ligne") > -1 && !"ligne".equals(splitEgale[0])) {
+                        yBrkPt = Utilitaire.getNumberObject(splitEgale[0].replace("ligne", ""));
+
+                        float[] yAxis = getYAxis(false);
+
+                        int idx = Arrays.binarySearch(yAxis, yBrkPt.floatValue());
+
+                        if (idx >= 0) {
+                            splitSemiColon = splitEgale[1].split(SEMICOLON);
+
+                            for (int a = 1; a < dimX; a++) {
+                                if (a <= splitSemiColon.length) {
+                                    setValue(false, Utilitaire.getStorageObject(splitSemiColon[a - 1]), idx + 1, a);
+                                } else {
+                                    setValue(false, Float.NaN, 0, a);
+                                }
+                            }
+                        }
+                    }
+
+                    break;
+                }
+            }
+        }
+    }
+
+    private final void readText(List<String> data) {
+        final String SEMICOLON = ";";
+        final String LIGNE = "ligne";
+        final String EGALE = "=";
+
+        String[] splitEgale;
+        String[] splitSemiColon;
+
+        values = new Object[dimX * dimY];
+
+        int cnt = 0;
+
+        for (int i = 1; i < data.size(); i++) {
+            splitEgale = data.get(i).split(EGALE, 2);
+            if (splitEgale.length > 1) {
+
+                if (splitEgale[0].matches(LIGNE + "\\d")) {
+                    splitSemiColon = splitEgale[1].split(SEMICOLON);
+
+                    for (int a = 0; a < dimX; a++) {
+                        if (a < splitSemiColon.length) {
+                            setValue(false, Utilitaire.getStorageObject(splitSemiColon[a]), cnt, a);
+                        } else {
+                            setValue(false, "", cnt, a);
+                        }
+                    }
+                    cnt++;
+                }
+            }
+        }
+    }
+
+    public final VariableInfo getInfos() {
+        return infos;
+    }
+
+    @Override
+    public int compareTo(Variable var) {
+        return this.name.compareToIgnoreCase(var.getName());
+    }
+
+    public final Object saturateValue(Object value) {
+        if (value instanceof Number) {
+            double val = ((Number) value).doubleValue();
+            Double saturatedVal = Math.max(Math.min(val, getMax()), getMin());
+            return saturatedVal;
+        }
+        return value;
+    }
+
+    public final void saveNewValue(int y, int x, Object newValue) {
+        if (newValues == null) {
+            newValues = Arrays.copyOf(values, values.length);
+        }
+
+        setValue(true, saturateValue(newValue), y, x);
+        setChanged();
+        notifyObservers();
+    }
+
+    public final float[] getXAxis(boolean modifiedVar) {
+
+        float[] xAxis;
+
+        if (dimY > 2) {
+            xAxis = new float[dimX - 1];
+
+            for (int x = 1; x < dimX; x++) {
+                xAxis[x - 1] = Float.parseFloat(getValue(modifiedVar, 0, x).toString());
+            }
+        } else {
+            xAxis = new float[dimX];
+
+            for (int x = 0; x < dimX; x++) {
+                xAxis[x] = Float.parseFloat(getValue(modifiedVar, 0, x).toString());
+            }
+        }
+
+        return xAxis;
+    }
+
+    public final float[] getYAxis(boolean modifiedVar) {
+        float[] yAxis = new float[dimY - 1];
+
+        Object oValue = null;
+
+        for (int y = 1; y < dimY; y++) {
+            oValue = getValue(modifiedVar, y, 0);
+            if (oValue != null) {
+                yAxis[y - 1] = Float.parseFloat(oValue.toString());
+            } else {
+                yAxis[y - 1] = Float.NaN;
+            }
+
+        }
+
+        return yAxis;
+    }
+
+    public final float[][] getZvalues(boolean modifiedVar) {
+
+        float[][] floatValues;
+
+        if (dimY > 2) {
+            floatValues = new float[dimY - 1][dimX - 1];
+            for (short y = 1; y < dimY; y++) {
+                for (short x = 1; x < dimX; x++) {
+                    floatValues[y - 1][x - 1] = Float.parseFloat(getValue(modifiedVar, y, x).toString());
+                }
+            }
+        } else {
+            floatValues = new float[1][dimX];
+            for (short x = 0; x < dimX; x++) {
+                try {
+                    floatValues[0][x] = Float.parseFloat(getValue(modifiedVar, 1, x).toString());
+                } catch (NumberFormatException e) {
+                    floatValues[0][x] = Float.NaN;
+                }
+
+            }
+        }
+
+        return floatValues;
+    }
+
+    public final double[][] toDouble2D(boolean modifiedVar) {
+
+        double[][] doubleValues = new double[dimY][dimX];
+
+        for (short y = 0; y < dimY; y++) {
+            for (short x = 0; x < dimX; x++) {
+
+                if (getValue(modifiedVar, y, x) instanceof Number) {
+                    doubleValues[y][x] = ((Number) getValue(modifiedVar, y, x)).doubleValue();
+                } else {
+                    if (x * y != 0) {
+                        doubleValues[y][x] = Double.NaN;
+                    }
+                }
+            }
+        }
+
+        return doubleValues;
     }
 
     private final void build(List<String> data) {
@@ -167,6 +506,7 @@ public final class Variable extends Observable implements Comparable<Variable> {
             if (splitEgale.length > 1) {
                 switch (splitEgale[0]) {
                 case COLONNES:
+
                     int nbSemiColon = Utilitaire.countChar(splitEgale[1], SEMICOLON);
                     dimX = nbSemiColon;
 
@@ -339,111 +679,6 @@ public final class Variable extends Observable implements Comparable<Variable> {
             }
         }
 
-    }
-
-    public final VariableInfo getInfos() {
-        return infos;
-    }
-
-    @Override
-    public int compareTo(Variable var) {
-        return this.name.compareToIgnoreCase(var.getName());
-    }
-
-    public final Object saturateValue(Object value) {
-        if (value instanceof Number) {
-            double val = ((Number) value).doubleValue();
-            Double saturatedVal = Math.max(Math.min(val, getMax()), getMin());
-            return saturatedVal;
-        }
-        return value;
-    }
-
-    public final void saveNewValue(int y, int x, Object newValue) {
-        if (newValues == null) {
-            newValues = Arrays.copyOf(values, values.length);
-        }
-
-        setValue(true, saturateValue(newValue), y, x);
-        setChanged();
-        notifyObservers();
-    }
-
-    public final float[] getXAxis(boolean modifiedVar) {
-
-        float[] xAxis;
-
-        if (dimY > 2) {
-            xAxis = new float[dimX - 1];
-
-            for (int x = 1; x < dimX; x++) {
-                xAxis[x - 1] = Float.parseFloat(getValue(modifiedVar, 0, x).toString());
-            }
-        } else {
-            xAxis = new float[dimX];
-
-            for (int x = 0; x < dimX; x++) {
-                xAxis[x] = Float.parseFloat(getValue(modifiedVar, 0, x).toString());
-            }
-        }
-
-        return xAxis;
-    }
-
-    public final float[] getYAxis(boolean modifiedVar) {
-        float[] yAxis = new float[dimY - 1];
-
-        for (int y = 1; y < dimY; y++) {
-            yAxis[y - 1] = Float.parseFloat(getValue(modifiedVar, y, 0).toString());
-        }
-        return yAxis;
-    }
-
-    public final float[][] getZvalues(boolean modifiedVar) {
-
-        float[][] floatValues;
-
-        if (dimY > 2) {
-            floatValues = new float[dimY - 1][dimX - 1];
-            for (short y = 1; y < dimY; y++) {
-                for (short x = 1; x < dimX; x++) {
-                    floatValues[y - 1][x - 1] = Float.parseFloat(getValue(modifiedVar, y, x).toString());
-                }
-            }
-        } else {
-            floatValues = new float[1][dimX];
-            for (short x = 0; x < dimX; x++) {
-                try {
-                    floatValues[0][x] = Float.parseFloat(getValue(modifiedVar, 1, x).toString());
-                } catch (NumberFormatException e) {
-                    floatValues[0][x] = Float.NaN;
-                }
-
-            }
-        }
-
-        return floatValues;
-    }
-
-    public final double[][] toDouble2D(boolean modifiedVar) {
-
-        double[][] doubleValues = new double[dimY][dimX];
-
-        for (short y = 0; y < dimY; y++) {
-            for (short x = 0; x < dimX; x++) {
-
-                if (getValue(modifiedVar, y, x) instanceof Number) {
-                    // doubleValues[y][x] = Double.parseDouble(getValue(modifiedVar, y, x).toString());
-                    doubleValues[y][x] = ((Number) getValue(modifiedVar, y, x)).doubleValue();
-                } else {
-                    if (x * y != 0) {
-                        doubleValues[y][x] = Double.NaN;
-                    }
-                }
-            }
-        }
-
-        return doubleValues;
     }
 
 }

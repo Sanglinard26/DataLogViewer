@@ -5,6 +5,7 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Cursor;
+import java.awt.Scrollbar;
 import java.awt.Shape;
 import java.awt.Stroke;
 import java.awt.event.ActionEvent;
@@ -27,6 +28,7 @@ import javax.swing.ImageIcon;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
+import javax.swing.JScrollBar;
 import javax.swing.SwingUtilities;
 import javax.swing.TransferHandler.DropLocation;
 
@@ -102,6 +104,10 @@ public final class ChartView extends ChartPanel implements Observable {
 
         addMouseListener(new MyChartMouseListener());
         addMouseMotionListener(new MyChartMouseListener());
+
+        JScrollBar bar = new JScrollBar(Scrollbar.HORIZONTAL);
+
+        add(bar, BorderLayout.SOUTH);
     }
 
     public ChartView(JFreeChart serializedChart) {
@@ -111,8 +117,6 @@ public final class ChartView extends ChartPanel implements Observable {
         serializedChart.removeLegend();
 
         setLayout(new BorderLayout());
-
-        // setPopupMenu(createChartMenu()); // Déplacer dans MouseMoved pour changer de menu dynamiquement
 
         this.parentPlot = (CombinedDomainXYPlot) serializedChart.getXYPlot();
         @SuppressWarnings("unchecked")
@@ -217,7 +221,9 @@ public final class ChartView extends ChartPanel implements Observable {
 
             if (plot != null && !actualRanges.isEmpty()) {
                 for (int i = 0; i < plot.getRangeAxisCount(); i++) {
-                    plot.getRangeAxis(i).setRange(actualRanges.get(i));
+                    if (!plot.getRangeAxis(i).getRange().equals(actualRanges.get(i))) {
+                        plot.getRangeAxis(i).setRange(actualRanges.get(i));
+                    }
                 }
             }
 
@@ -257,6 +263,12 @@ public final class ChartView extends ChartPanel implements Observable {
 
             updateTableValue(e);
         }
+    }
+
+    public final void scroll(double delta) {
+        Range xRange = this.parentPlot.getDomainAxis().getRange();
+        this.parentPlot.getDomainAxis().setRange(xRange.getLowerBound() + delta, xRange.getUpperBound() + delta);
+
     }
 
     private final void updateTableValue(MouseEvent e) {
@@ -305,7 +317,6 @@ public final class ChartView extends ChartPanel implements Observable {
                             xValueUpdated = true;
                         }
                     }
-
                     tableValue.put(subplot.getDataset(i).getSeriesKey(j).toString(), DatasetUtilities.findYValue(subplot.getDataset(i), j, xValue));
                 }
             }
@@ -459,6 +470,11 @@ public final class ChartView extends ChartPanel implements Observable {
         @SuppressWarnings("unchecked")
         List<XYPlot> subplots = parentPlot.getSubplots();
         for (XYPlot subplot : subplots) {
+
+            if (subplot.getDomainMarkers(Layer.BACKGROUND) == null) {
+                return;
+            }
+
             subplot.clearDomainMarkers();
             if (marker != null) {
                 subplot.addDomainMarker(marker);
@@ -605,6 +621,7 @@ public final class ChartView extends ChartPanel implements Observable {
             dataset.addSeries("Series 1", arrayOfDouble);
             final NumberAxis xAxis = new NumberAxis(x.getName());
             final NumberAxis yAxis = new NumberAxis(y.getName());
+
             final XYShapeRenderer renderer = new XYShapeRenderer();
 
             renderer.setDrawOutlines(true);

@@ -31,7 +31,9 @@ public final class Log {
             switch (extension) {
             case "txt":
                 timeName = "Time_ms";
+                long start = System.currentTimeMillis();
                 parseTxt(file);
+                System.out.println("log : " + (System.currentTimeMillis() - start) + "ms");
                 break;
             case "msl":
                 timeName = "Time";
@@ -56,6 +58,7 @@ public final class Log {
             String line;
             String parsedValue;
             String[] splitTab;
+            Number value;
 
             int cntLine = 0;
 
@@ -87,18 +90,14 @@ public final class Log {
 
                     break;
                 default:
-
                     if (splitTab.length == this.datas.size()) {
                         for (int idxCol = 0; idxCol < this.datas.size(); idxCol++) {
 
                             parsedValue = splitTab[idxCol];
 
-                            Number value = Utilitaire.getNumberObject(parsedValue.trim());
+                            value = Utilitaire.getNumberObject(parsedValue.trim());
 
-                            this.datas.get(idxCol).getData().add(value);
-                            this.datas.get(idxCol).setMin(value);
-                            this.datas.get(idxCol).setMax(value);
-
+                            this.datas.get(idxCol).addPoint(value);
                         }
 
                         this.nbPoints++;
@@ -165,9 +164,7 @@ public final class Log {
 
                             try {
                                 double value = Double.parseDouble(parsedValue.trim());
-                                this.datas.get(idxCol).getData().add(value);
-                                this.datas.get(idxCol).setMin(value);
-                                this.datas.get(idxCol).setMax(value);
+                                this.datas.get(idxCol).addPoint(value);
                             } catch (NumberFormatException e) {
                                 this.datas.get(idxCol).getData().add(Double.NaN);
                             }

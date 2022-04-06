@@ -64,8 +64,8 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
 
     private boolean onMove = false;
 
-    // private XYAnnotation selectedAnnotation;
     private static final CircleDrawer cd = new CircleDrawer(Color.BLACK, new BasicStroke(2.0f), null);
+    private static Shape shape2 = new Ellipse2D.Double(-3, -3, 6, 6);
 
     public LineChart(char type) {
 
@@ -146,18 +146,17 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
         listSeries.clearSelection();
         dataset.removeAllSeries();
 
-        double size = 6;
-        double delta = size / 2.0;
-        Shape shape2 = new Ellipse2D.Double(-delta, -delta, size, size);
-
         for (int idx = 0; idx < series.length; idx++) {
-            dataset.addSeries(series[idx]);
+            if (!"NaN".equals(series[idx].getKey().toString())) {
+                dataset.addSeries(series[idx]);
 
-            renderer.setSeriesShape(idx, shape2);
+                renderer.setSeriesShape(idx, shape2);
 
-            float hue = (float) (idx) / (float) (series.length);
+                float hue = (float) (idx) / (float) (series.length);
 
-            renderer.setSeriesPaint(idx, Color.getHSBColor(hue, 1, 1));
+                renderer.setSeriesPaint(idx, Color.getHSBColor(hue, 1, 1));
+            }
+
         }
 
         listSeries.setListData(series);

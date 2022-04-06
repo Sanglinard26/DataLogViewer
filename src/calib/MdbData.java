@@ -23,13 +23,12 @@ public final class MdbData {
     private static final String NOMCARTO = "NomCarto";
     private static final String TYPENAME = "Typename";
     private static final String SOUSTYPE = "Soustype";
+    private static final String INTERP_TABLE = "InterpTable";
     private static final String VARCOL = "ColVarAdr";
     private static final String VARLIGNE = "LgnVarAdr";
     private static final String NBBKPTCOL = "NbBkptCol"; // float
     private static final String NBBKPTLGN = "NbBkptLgn"; // float
     private static final String TYPEVAR = "TypeVariable";
-    private static final String COLBKPTFACTOR = "ColBkptFactor"; // int
-    private static final String ROWBKPTFACTOR = "RowBkptFactor"; // int
     private static final String FACTOR = "Factor"; // int
     private static final String VAL_MAX = "Valeur_max"; //
     private static final String VAL_MIN = "Valeur_mini"; //
@@ -69,6 +68,7 @@ public final class MdbData {
         }
     }
 
+    @SuppressWarnings("unchecked")
     public final Map<String, VariableInfo> getVariableInfo(Table tableCartos) {
 
         HashMap<String, VariableInfo> listInfos = new HashMap<String, VariableInfo>(tableCartos.getRowCount());
@@ -92,9 +92,9 @@ public final class MdbData {
             }
 
             listInfos.put(row.getString(NOMCARTO),
-                    new VariableInfo(row.getString(TYPENAME), row.getString(SOUSTYPE), row.getInt(VARCOL), row.getInt(VARLIGNE),
-                            row.getShort(NBBKPTCOL), row.getShort(NBBKPTLGN), row.getDouble(FACTOR), row.getByte(TYPEVAR), row.getDouble(VAL_MAX),
-                            row.getDouble(VAL_MIN), row.getString(DETAIL)));
+                    new VariableInfo(row.getString(TYPENAME), row.getString(SOUSTYPE), row.getBoolean(INTERP_TABLE), row.getInt(VARCOL),
+                            row.getInt(VARLIGNE), row.getShort(NBBKPTCOL), row.getShort(NBBKPTLGN), row.getDouble(FACTOR), row.getByte(TYPEVAR),
+                            row.getDouble(VAL_MAX), row.getDouble(VAL_MIN), row.getString(DETAIL)));
         }
 
         return listInfos;
@@ -115,6 +115,7 @@ public final class MdbData {
 
         private String typeName;
         private String sousType;
+        private boolean interpTable;
         private int varCol;
         private int varLigne;
         private short nbBkPtCol;
@@ -125,10 +126,11 @@ public final class MdbData {
         private double min;
         private String detail;
 
-        public VariableInfo(String typeName, String sousType, int varCol, int varLigne, short nbBkPtCol, short nbBkPtRow, double factor, byte typeVar,
-                double max, double min, String detail) {
+        public VariableInfo(String typeName, String sousType, boolean interpTable, int varCol, int varLigne, short nbBkPtCol, short nbBkPtRow,
+                double factor, byte typeVar, double max, double min, String detail) {
             this.typeName = typeName;
             this.sousType = sousType;
+            this.interpTable = interpTable;
             this.varCol = varCol;
             this.varLigne = varLigne;
             this.nbBkPtCol = nbBkPtCol;
@@ -146,6 +148,10 @@ public final class MdbData {
 
         public String getSousType() {
             return sousType != null ? sousType : "";
+        }
+
+        public boolean isInterpTable() {
+            return this.interpTable;
         }
 
         public int getVarCol() {
