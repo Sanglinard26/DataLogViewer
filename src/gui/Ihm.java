@@ -5,6 +5,7 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Container;
 import java.awt.Cursor;
+import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -39,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 
 import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
+import javax.swing.ButtonGroup;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
@@ -50,6 +52,7 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JToggleButton;
@@ -74,7 +77,6 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.jfree.chart.JFreeChart;
-import org.jfree.chart.axis.NumberAxis;
 import org.jfree.chart.axis.ValueAxis;
 import org.jfree.chart.event.ChartProgressEvent;
 import org.jfree.chart.event.ChartProgressListener;
@@ -114,7 +116,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
     private static final long serialVersionUID = 1L;
 
-    private final static String VERSION = "v1.53";
+    private final static String VERSION = "v1.54";
     private final String DEMO = "demo";
 
     private final static String LOG_PANEL = "LOG";
@@ -130,13 +132,13 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
     private JScrollPane scrollTableCursorValues;
     private TableCursorValue tableCursorValues;
     private PanelCondition panelCondition;
+    private JToggleButton btSynchro;
 
     private JLabel labelFnr;
     private JLabel labelLogName;
 
     private Log log;
     private Set<Measure> listFormula = new HashSet<Measure>();
-    private boolean axisSync = false;
 
     boolean activeThread = true;
 
@@ -195,6 +197,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         final String ICON_NOTICE = "/icon_manual_16.png";
         final String ICON_FORMULA = "/icon_formula_16.png";
         final String ICON_MANAGE_FORMULA = "/icon_manageFormula_16.png";
+        final String ICON_COMPAR = "/icon_compar_16.png";
 
         JMenuBar menuBar = new JMenuBar();
 
@@ -350,6 +353,131 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
             @Override
             public void actionPerformed(ActionEvent e) {
                 new DialManageFormula(Ihm.this);
+            }
+        });
+        menu.add(menuItem);
+
+        menu = new JMenu("Divers");
+        menuBar.add(menu);
+
+        menuItem = new JMenuItem(new AbstractAction("Comparaison calibration", new ImageIcon(getClass().getResource(ICON_COMPAR))) {
+
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+
+                final JFileChooser fc = new JFileChooser(Preference.getPreference(Preference.KEY_CAL));
+                fc.setMultiSelectionEnabled(true);
+                fc.setFileSelectionMode(JFileChooser.OPEN_DIALOG);
+                fc.setFileFilter(new FileFilter() {
+
+                    @Override
+                    public String getDescription() {
+                        return "Fichier de calibration (*.map)";
+                    }
+
+                    @Override
+                    public boolean accept(File f) {
+                        if (f.isDirectory()) {
+                            return true;
+                        }
+                        return f.getName().toLowerCase().endsWith("map");
+                    }
+                });
+                final int reponse = fc.showOpenDialog(Ihm.this);
+                if (reponse == JFileChooser.APPROVE_OPTION) {
+
+                    if (fc.getSelectedFiles().length == 2) {
+                        List<MapCal> mapCals = new ArrayList<MapCal>();
+
+                        for (File f : fc.getSelectedFiles()) {
+                            mapCals.add(new MapCal(f));
+                        }
+
+                        JPanel panel = new JPanel();
+                        ButtonGroup bg = new ButtonGroup();
+                        JRadioButton rb1 = new JRadioButton(mapCals.get(0).getName());
+                        panel.add(rb1);
+                        JRadioButton rb2 = new JRadioButton(mapCals.get(1).getName());
+                        panel.add(rb2);
+                        bg.add(rb1);
+                        bg.add(rb2);
+
+                        rb1.setSelected(true);
+
+                        JOptionPane.showMessageDialog(null, panel, "Choix du fichier de r\u00e9f\u00e9rence", JOptionPane.QUESTION_MESSAGE);
+
+                        final JFileChooser fileChooser = new JFileChooser();
+                        fileChooser.setDialogTitle("Enregistement du fichier");
+                        fileChooser.setFileFilter(new FileNameExtensionFilter("Fichier Html", "html"));
+                        fileChooser.setSelectedFile(new File("Comparaison.html"));
+                        final int rep = fileChooser.showSaveDialog(null);
+
+                        if (rep == JFileChooser.APPROVE_OPTION) {
+
+                            boolean result = false;
+
+                            if (!fileChooser.getSelectedFile().exists()) {
+
+                                if (rb1.isSelected()) {
+                                    result = MapCal.compare(mapCals.get(0), mapCals.get(1), fileChooser.getSelectedFile());
+                                } else {
+                                    result = MapCal.compare(mapCals.get(1), mapCals.get(0), fileChooser.getSelectedFile());
+                                }
+                            } else {
+                                switch (JOptionPane.showConfirmDialog(null, "Le fichier existe d\u00e9ja, \u00e9craser?", null,
+                                        JOptionPane.INFORMATION_MESSAGE)) {
+                                case JOptionPane.OK_OPTION:
+
+                                    if (rb1.isSelected()) {
+                                        result = MapCal.compare(mapCals.get(0), mapCals.get(1), fileChooser.getSelectedFile());
+                                    } else {
+                                        result = MapCal.compare(mapCals.get(1), mapCals.get(0), fileChooser.getSelectedFile());
+                                    }
+
+                                    break;
+                                case JOptionPane.NO_OPTION:
+                                    this.actionPerformed(e);
+                                    return;
+                                default:
+                                    break;
+                                }
+                            }
+
+                            mapCals.clear();
+
+                            if (result) {
+                                final int reponse2 = JOptionPane.showConfirmDialog(null,
+                                        "Comparaison termin\u00e9 !\n" + fileChooser.getSelectedFile() + "\nVoulez-vous ouvrir le fichier?", null,
+                                        JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+
+                                switch (reponse2) {
+                                case JOptionPane.OK_OPTION:
+                                    try {
+                                        if (Desktop.isDesktopSupported()) {
+                                            Desktop.getDesktop().open(fileChooser.getSelectedFile());
+                                        }
+                                    } catch (IOException e1) {
+                                        e1.printStackTrace();
+                                    }
+                                    break;
+                                case JOptionPane.NO_OPTION:
+                                    break;
+                                default:
+                                    break;
+                                }
+                            } else {
+                                JOptionPane.showMessageDialog(null, "Export abandonn\u00e9 !");
+                            }
+                        }
+
+                    } else {
+                        JOptionPane.showMessageDialog(null, "Il faut choisir deux fichiers.");
+                    }
+
+                }
+
             }
         });
         menu.add(menuItem);
@@ -592,23 +720,17 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         btNewTable.setEnabled(false);
         bar.add(btNewTable);
 
-        final JToggleButton btSynchro = new JToggleButton(new ImageIcon(getClass().getResource(ICON_SHARE_AXIS)));
+        btSynchro = new JToggleButton(new ImageIcon(getClass().getResource(ICON_SHARE_AXIS)));
         btSynchro.setToolTipText("Synchroniser les axes des abscisses");
+        btSynchro.setEnabled(false);
         btSynchro.addActionListener(new ActionListener() {
 
             @Override
             public void actionPerformed(ActionEvent e) {
 
-                axisSync = btSynchro.isSelected();
-
                 final int idxWindow = chartTabbedPane.getSelectedIndex();
 
-                if (idxWindow < 0 || log == null) {
-                    btSynchro.setSelected(false);
-                    return;
-                }
-
-                if (axisSync) {
+                if (btSynchro.isSelected()) {
 
                     ChartView chartView = (ChartView) chartTabbedPane.getComponentAt(idxWindow);
                     if (chartView.getDatasetType() > 1) {
@@ -627,11 +749,12 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                             continue;
                         }
                         otherChart.getPlot().setDomainAxis(domainAxis);
+                        otherChart.setScrollBarProperties(chartView.getScrollBarModel());
                     }
                 } else {
                     ChartView chartView;
                     Measure time = log.getTime();
-                    Range xAxisRange;
+
                     for (int i = 0; i < chartTabbedPane.getTabCount(); i++) {
                         if (!(chartTabbedPane.getComponentAt(i) instanceof ChartView)) {
                             continue;
@@ -640,9 +763,8 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                         if (chartView.getDatasetType() > 1) {
                             continue;
                         }
-                        xAxisRange = chartView.getPlot().getDomainAxis().getRange();
-                        chartView.getPlot().setDomainAxis(new NumberAxis(time.getName()));
-                        chartView.getPlot().getDomainAxis().setRange(xAxisRange);
+
+                        chartView.removeAxisSynchro(time);
                     }
                 }
 
@@ -1055,6 +1177,9 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
                 // load data in chart
                 if (chartTabbedPane.getTabCount() > 0) {
+
+                    btSynchro.setEnabled(true);
+
                     reloadLogData(log);
                 }
 
@@ -1116,16 +1241,24 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         chartTabbedPane.setTabComponentAt(chartTabbedPane.getTabCount() - 1, new ButtonTabComponent(chartTabbedPane));
         chartTabbedPane.setSelectedIndex(chartTabbedPane.getTabCount() - 1);
 
-        if (axisSync && chartTabbedPane.getTabCount() > 1) {
+        if (btSynchro.isSelected() && chartTabbedPane.getTabCount() > 1) {
+            // TODO : Non robuste lors de l'ouverture d'un fichier de config
             ChartView refChartView = (ChartView) chartTabbedPane.getComponentAt(chartTabbedPane.getTabCount() - 2);
             ValueAxis domainAxis = refChartView.getPlot().getDomainAxis();
             chartView.getPlot().setDomainAxis(domainAxis);
+            chartView.setScrollBarProperties(refChartView.getScrollBarModel());
         }
 
         return chartView;
     }
 
     private final void closeWindows() {
+
+        if (btSynchro.isSelected()) {
+            btSynchro.doClick();
+        }
+        btSynchro.setEnabled(false);
+
         for (int i = chartTabbedPane.getTabCount() - 1; i >= 0; i--) {
             ((ChartView) chartTabbedPane.getComponentAt(i)).delObservateur();
             chartTabbedPane.removeTabAt(i);
@@ -1168,7 +1301,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                 if (support.getComponent() instanceof ChartView) {
                     final ChartView chartView = (ChartView) support.getComponent();
                     final CombinedDomainXYPlot combinedDomainXYPlot = chartView.getPlot();
-                    final XYPlot plot = combinedDomainXYPlot.findSubplot(chartView.getChartRenderingInfo().getPlotInfo(),
+                    final XYPlot plot = combinedDomainXYPlot.findSubplot(chartView.getChartPanel().getChartRenderingInfo().getPlotInfo(),
                             support.getDropLocation().getDropPoint());
 
                     DialAddMeasure dialAddMeasure = new DialAddMeasure(plot, measureName);
@@ -1332,8 +1465,6 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
     private final void reloadLogData(Log log) {
 
-        final long start = System.currentTimeMillis();
-
         final int nbTab = chartTabbedPane.getTabCount();
 
         if (log == null) {
@@ -1357,7 +1488,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
         executor.shutdown();
         try {
-            executor.awaitTermination(0, TimeUnit.MICROSECONDS);
+            executor.awaitTermination(0, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -1365,10 +1496,19 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         while (!executor.isTerminated()) {
         }
 
+        if (btSynchro.isSelected()) {
+            for (int n = 0; n < nbTab; n++) {
+                if (chartTabbedPane.getComponentAt(n) instanceof ChartView) {
+                    chartView = (ChartView) chartTabbedPane.getComponentAt(n);
+                    chartView.getPlot().getDomainAxis().setAutoRange(true);
+                    chartView.getPlot().configureDomainAxes();
+                    chartView.configureScrollbar();
+                    break;
+                }
+            }
+        }
+
         Ihm.this.setCursor(Cursor.getDefaultCursor());
-
-        System.out.println("reloadLogData : " + (System.currentTimeMillis() - start) + "ms");
-
     }
 
     private final class UpdateDataset implements Runnable {
@@ -1398,26 +1538,28 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
                     for (int nSerie = 0; nSerie < nbSerie; nSerie++) {
 
-                        if (xyPlot.getDataset() instanceof XYSeriesCollection) {
+                        if (xyPlot.getDataset(nDataset) instanceof XYSeriesCollection) {
 
                             serie = ((XYSeriesCollection) xyPlot.getDataset(nDataset)).getSeries(nSerie);
 
-                            serie.clear();
+                            if (serie != null) {
+                                serie.clear();
 
-                            key = serie.getKey();
+                                key = serie.getKey();
 
-                            measure = pickMeasureFromList(key.toString());
+                                measure = pickMeasureFromList(key.toString());
 
-                            final int sizeData = measure.getData().size();
+                                final int sizeData = measure.getData().size();
 
-                            for (int n1 = 0; n1 < nbPoint; n1++) {
+                                for (int n1 = 0; n1 < nbPoint; n1++) {
 
-                                if (n1 < sizeData) {
-                                    serie.add(temps.get(n1), measure.getData().get(n1), false);
+                                    if (n1 < sizeData) {
+                                        serie.add(temps.get(n1), measure.getData().get(n1), false);
+                                    }
                                 }
-                            }
 
-                            // serie.fireSeriesChanged();
+                                serie.fireSeriesChanged();
+                            }
 
                         } else if (xyPlot.getDataset() instanceof DefaultXYZDataset) {
                             Comparable<?> serieKey = ((DefaultXYZDataset) xyPlot.getDataset()).getSeriesKey(nSerie);
@@ -1450,8 +1592,13 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                 }
             }
 
-            chartView.getPlot().getDomainAxis().setAutoRange(true);
-            chartView.getPlot().configureDomainAxes();
+            // TODO : Génère un NPE quand la synchro des axes X est active
+            if (!btSynchro.isSelected()) {
+                chartView.getPlot().getDomainAxis().setAutoRange(true);
+                chartView.getPlot().configureDomainAxes();
+                chartView.configureScrollbar();
+            }
+
         }
 
     }
@@ -1611,8 +1758,6 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
             }
         } else {
 
-            long start = System.currentTimeMillis();
-
             DocumentBuilder builder;
             Document document = null;
             DocumentBuilderFactory factory;
@@ -1740,6 +1885,9 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                     }
 
                     if (log != null) {
+
+                        btSynchro.setEnabled(true);
+
                         for (Measure formule : listFormula) {
                             log.getMeasures().add(formule);
                             int idx = listModel.indexOf(formule);
@@ -1786,7 +1934,6 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
                 reloadLogData(log);
             }
-            System.out.println("openConfig : " + (System.currentTimeMillis() - start) + "ms");
         }
 
     }

@@ -9,6 +9,9 @@ import java.awt.Scrollbar;
 import java.awt.Shape;
 import java.awt.Stroke;
 import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.AdjustmentEvent;
+import java.awt.event.AdjustmentListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.Ellipse2D;
@@ -24,9 +27,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import javax.swing.DefaultBoundedRangeModel;
 import javax.swing.ImageIcon;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
+import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollBar;
 import javax.swing.SwingUtilities;
@@ -40,6 +45,8 @@ import org.jfree.chart.axis.ValueAxis;
 import org.jfree.chart.entity.AxisEntity;
 import org.jfree.chart.entity.ChartEntity;
 import org.jfree.chart.entity.PlotEntity;
+import org.jfree.chart.event.AxisChangeEvent;
+import org.jfree.chart.event.AxisChangeListener;
 import org.jfree.chart.event.PlotChangeEvent;
 import org.jfree.chart.plot.CombinedDomainXYPlot;
 import org.jfree.chart.plot.IntervalMarker;
@@ -68,10 +75,11 @@ import observer.Observable;
 import observer.Observateur;
 import utils.Utilitaire;
 
-public final class ChartView extends ChartPanel implements Observable {
+public final class ChartView extends JPanel implements ActionListener, AdjustmentListener, AxisChangeListener, Observable {
 
     private static final long serialVersionUID = 1L;
 
+    private final ChartPanel chartPanel;
     private final CombinedDomainXYPlot parentPlot;
     private static Stroke oldStrokePlot;
     private static Point2D popUpLocation;
@@ -83,9 +91,14 @@ public final class ChartView extends ChartPanel implements Observable {
 
     private List<Observateur> listObservateur = new ArrayList<Observateur>();
 
+    private JScrollBar scrollBar;
+
     public ChartView() {
 
-        super(null, 680, 420, 300, 200, 1920, 1080, true, false, false, false, false, false);
+        super(new BorderLayout(), true);
+
+        this.chartPanel = new ChartPanel(null, 680, 420, 300, 200, 1920, 1080, true, false, false, false, false, false);
+        add(this.chartPanel, BorderLayout.CENTER);
 
         parentPlot = new CombinedDomainXYPlot();
 
@@ -98,25 +111,25 @@ public final class ChartView extends ChartPanel implements Observable {
         JFreeChart chart = new JFreeChart(parentPlot);
         chart.removeLegend();
 
-        setChart(chart);
-        setRangeZoomable(false);
-        setDomainZoomable(true);
+        chartPanel.setChart(chart);
+        chartPanel.setRangeZoomable(false);
+        chartPanel.setDomainZoomable(true);
 
-        addMouseListener(new MyChartMouseListener());
-        addMouseMotionListener(new MyChartMouseListener());
+        chartPanel.addMouseListener(new MyChartMouseListener());
+        chartPanel.addMouseMotionListener(new MyChartMouseListener());
 
-        JScrollBar bar = new JScrollBar(Scrollbar.HORIZONTAL);
-
-        add(bar, BorderLayout.SOUTH);
+        scrollBar = new JScrollBar(Scrollbar.HORIZONTAL);
+        // scrollBar.addAdjustmentListener(this);
+        add(scrollBar, BorderLayout.SOUTH);
     }
 
     public ChartView(JFreeChart serializedChart) {
 
-        super(serializedChart, 680, 420, 300, 200, 1920, 1080, true, false, false, false, true, false);
+        super(new BorderLayout(), true);
+        this.chartPanel = new ChartPanel(serializedChart, 680, 420, 300, 200, 1920, 1080, true, false, false, false, true, false);
+        add(this.chartPanel, BorderLayout.CENTER);
 
         serializedChart.removeLegend();
-
-        setLayout(new BorderLayout());
 
         this.parentPlot = (CombinedDomainXYPlot) serializedChart.getXYPlot();
         @SuppressWarnings("unchecked")
@@ -135,11 +148,11 @@ public final class ChartView extends ChartPanel implements Observable {
 
         oldStrokePlot = parentPlot.getOutlineStroke();
 
-        setRangeZoomable(false);
-        setDomainZoomable(true);
+        this.chartPanel.setRangeZoomable(false);
+        this.chartPanel.setDomainZoomable(true);
 
-        addMouseListener(new MyChartMouseListener());
-        addMouseMotionListener(new MyChartMouseListener());
+        this.chartPanel.addMouseListener(new MyChartMouseListener());
+        this.chartPanel.addMouseMotionListener(new MyChartMouseListener());
     }
 
     private final class MyChartMouseListener extends MouseAdapter {
@@ -150,9 +163,9 @@ public final class ChartView extends ChartPanel implements Observable {
         @Override
         public void mouseMoved(MouseEvent e) {
 
-            Rectangle2D dataArea = getScreenDataArea();
+            Rectangle2D dataArea = chartPanel.getScreenDataArea();
 
-            Point2D p = translateScreenToJava2D(e.getPoint());
+            Point2D p = chartPanel.translateScreenToJava2D(e.getPoint());
 
             ValueAxis xAxis = parentPlot.getDomainAxis();
             double xMin = xAxis.java2DToValue(p.getX() - 2, dataArea, RectangleEdge.BOTTOM);
@@ -163,20 +176,20 @@ public final class ChartView extends ChartPanel implements Observable {
                 return;
             }
 
-            ChartEntity chartEntity = getEntityForPoint((int) p.getX(), (int) p.getY());
+            ChartEntity chartEntity = chartPanel.getEntityForPoint((int) p.getX(), (int) p.getY());
 
             if (chartEntity instanceof AxisEntity && getDatasetType() == 1) {
                 setCursor(new Cursor(Cursor.HAND_CURSOR));
             } else {
                 setCursor(Cursor.getDefaultCursor());
-                setPopupMenu(createChartMenu());
+                chartPanel.setPopupMenu(createChartMenu());
             }
         }
 
         @Override
         public void mousePressed(MouseEvent e) {
 
-            plot = parentPlot.findSubplot(getChartRenderingInfo().getPlotInfo(), translateScreenToJava2D(e.getPoint()));
+            plot = parentPlot.findSubplot(chartPanel.getChartRenderingInfo().getPlotInfo(), chartPanel.translateScreenToJava2D(e.getPoint()));
 
             if (plot == null) {
                 return;
@@ -187,7 +200,7 @@ public final class ChartView extends ChartPanel implements Observable {
             }
 
             if (SwingUtilities.isLeftMouseButton(e)) {
-                setDomainZoomable(false);
+                chartPanel.setDomainZoomable(false);
             }
         }
 
@@ -198,9 +211,9 @@ public final class ChartView extends ChartPanel implements Observable {
             }
 
             if (e.getClickCount() == 2 && getDatasetType() == 1) {
-                Point2D p = translateScreenToJava2D(e.getPoint());
+                Point2D p = chartPanel.translateScreenToJava2D(e.getPoint());
 
-                ChartEntity chartEntity = getEntityForPoint((int) p.getX(), (int) p.getY());
+                ChartEntity chartEntity = chartPanel.getEntityForPoint((int) p.getX(), (int) p.getY());
 
                 if (chartEntity instanceof AxisEntity) {
                     AxisEntity axisEntity = (AxisEntity) chartEntity;
@@ -217,7 +230,7 @@ public final class ChartView extends ChartPanel implements Observable {
 
         @Override
         public void mouseReleased(MouseEvent e) {
-            setDomainZoomable(true);
+            chartPanel.setDomainZoomable(true);
 
             if (plot != null && !actualRanges.isEmpty()) {
                 for (int i = 0; i < plot.getRangeAxisCount(); i++) {
@@ -229,22 +242,22 @@ public final class ChartView extends ChartPanel implements Observable {
 
             actualRanges.clear();
 
-            popUpLocation = translateScreenToJava2D(e.getPoint());
+            popUpLocation = chartPanel.translateScreenToJava2D(e.getPoint());
 
-            ChartEntity chartEntity = getEntityForPoint((int) popUpLocation.getX(), (int) popUpLocation.getY());
+            ChartEntity chartEntity = chartPanel.getEntityForPoint((int) popUpLocation.getX(), (int) popUpLocation.getY());
 
             if (!(chartEntity instanceof PlotEntity)) {
-                getPopupMenu().setVisible(false);
+                chartPanel.getPopupMenu().setVisible(false);
             }
 
-            if (getPopupMenu().isVisible()) {
+            if (chartPanel.getPopupMenu().isVisible()) {
 
                 boolean visibleZScale = false;
                 if (getDatasetType() > 2) {
                     visibleZScale = true;
                 }
 
-                for (Component c : getPopupMenu().getComponents()) {
+                for (Component c : chartPanel.getPopupMenu().getComponents()) {
                     if ("Echelle_Z".equals(c.getName())) {
                         c.setVisible(visibleZScale);
                         break;
@@ -265,16 +278,10 @@ public final class ChartView extends ChartPanel implements Observable {
         }
     }
 
-    public final void scroll(double delta) {
-        Range xRange = this.parentPlot.getDomainAxis().getRange();
-        this.parentPlot.getDomainAxis().setRange(xRange.getLowerBound() + delta, xRange.getUpperBound() + delta);
-
-    }
-
     private final void updateTableValue(MouseEvent e) {
-        Rectangle2D dataArea = getScreenDataArea();
+        Rectangle2D dataArea = chartPanel.getScreenDataArea();
 
-        Point2D p = translateScreenToJava2D(e.getPoint());
+        Point2D p = chartPanel.translateScreenToJava2D(e.getPoint());
 
         if (getDatasetType() > 1) {
             return;
@@ -372,7 +379,7 @@ public final class ChartView extends ChartPanel implements Observable {
         Measure y = log.getMeasure(yLabel);
 
         if (getDatasetType() == 3) {
-            String zLabel = ((PaintScaleLegend) getChart().getSubtitle(0)).getAxis().getLabel();
+            String zLabel = ((PaintScaleLegend) chartPanel.getChart().getSubtitle(0)).getAxis().getLabel();
             Measure z = log.getMeasure(zLabel);
 
             final DefaultXYZDataset xyzDataset = new DefaultXYZDataset();
@@ -495,6 +502,7 @@ public final class ChartView extends ChartPanel implements Observable {
 
             if (parentPlot.getDomainAxis().getLabel() == null) {
                 parentPlot.setDomainAxis(new NumberAxis(time.getName()));
+                parentPlot.getDomainAxis().addChangeListener(this);
             }
 
             xValue = Double.NaN;
@@ -528,6 +536,7 @@ public final class ChartView extends ChartPanel implements Observable {
 
             if (parentPlot.getDomainAxis().getLabel() == null) {
                 parentPlot.setDomainAxis(new NumberAxis(time.getName()));
+                parentPlot.getDomainAxis().addChangeListener(this);
             }
             if (nbPoint > 1) {
                 xValue = temps.get(nbPoint / 2).doubleValue();
@@ -552,6 +561,13 @@ public final class ChartView extends ChartPanel implements Observable {
 
         parentPlot.add(plot, 1);
 
+        if (parentPlot.getSubplots().size() == 1) {
+            parentPlot.getDomainAxis().setDefaultAutoRange(parentPlot.getDomainAxis().getRange());
+            scrollBar.setMaximum((int) parentPlot.getDomainAxis().getRange().getUpperBound());
+            scrollBar.getModel().setExtent(scrollBar.getMaximum());
+            scrollBar.addAdjustmentListener(this);
+        }
+
         return plot;
     }
 
@@ -570,11 +586,13 @@ public final class ChartView extends ChartPanel implements Observable {
 
             final XYPlot plot = new XYPlot(dataset, xAxis, yAxis, renderer);
 
-            getChart().removeLegend();
+            chartPanel.getChart().removeLegend();
 
             parentPlot.setDomainAxis(xAxis);
 
             parentPlot.add(plot, 1);
+
+            scrollBar.setVisible(false);
         } else {
             JOptionPane.showMessageDialog(this, "Un seul graphique de ce type peut-etre pr\u00e9sent par fenetre", "Info",
                     JOptionPane.INFORMATION_MESSAGE);
@@ -602,11 +620,13 @@ public final class ChartView extends ChartPanel implements Observable {
             plot.getRenderer().setSeriesPaint(0, Utilitaire.parseRGBColor(shapeColor, 255));
             plot.setBackgroundPaint(Utilitaire.parseRGBColor(bckGroundColor, 255));
 
-            getChart().removeLegend();
+            chartPanel.getChart().removeLegend();
 
             parentPlot.setDomainAxis(xAxis);
 
             parentPlot.add(plot, 1);
+
+            scrollBar.setVisible(false);
         } else {
             JOptionPane.showMessageDialog(this, "Un seul graphique de ce type peut-etre pr\u00e9sent par fenetre", "Info",
                     JOptionPane.INFORMATION_MESSAGE);
@@ -655,12 +675,14 @@ public final class ChartView extends ChartPanel implements Observable {
             localPaintScaleLegend.setPosition(RectangleEdge.RIGHT);
             localPaintScaleLegend.setMargin(4.0D, 4.0D, 40.0D, 4.0D);
             localPaintScaleLegend.setAxisLocation(AxisLocation.BOTTOM_OR_RIGHT);
-            getChart().addSubtitle(localPaintScaleLegend);
-            getChart().removeLegend();
+            chartPanel.getChart().addSubtitle(localPaintScaleLegend);
+            chartPanel.getChart().removeLegend();
 
             parentPlot.setDomainAxis(xAxis);
 
             parentPlot.add(plot, 1);
+
+            scrollBar.setVisible(false);
         } else {
             JOptionPane.showMessageDialog(this, "Un seul graphique de ce type peut-etre pr\u00e9sent par fenetre", "Info",
                     JOptionPane.INFORMATION_MESSAGE);
@@ -713,12 +735,14 @@ public final class ChartView extends ChartPanel implements Observable {
             localPaintScaleLegend.setPosition(RectangleEdge.RIGHT);
             localPaintScaleLegend.setMargin(4.0D, 4.0D, 40.0D, 4.0D);
             localPaintScaleLegend.setAxisLocation(AxisLocation.BOTTOM_OR_RIGHT);
-            getChart().addSubtitle(localPaintScaleLegend);
-            getChart().removeLegend();
+            chartPanel.getChart().addSubtitle(localPaintScaleLegend);
+            chartPanel.getChart().removeLegend();
 
             parentPlot.setDomainAxis(xAxis);
 
             parentPlot.add(plot, 1);
+
+            scrollBar.setVisible(false);
         } else {
             JOptionPane.showMessageDialog(this, "Un seul graphique de ce type peut-etre pr\u00e9sent par fenetre", "Info",
                     JOptionPane.INFORMATION_MESSAGE);
@@ -781,6 +805,12 @@ public final class ChartView extends ChartPanel implements Observable {
         }
 
         plot.setOutlineStroke(oldStrokePlot);
+
+        if (parentPlot.getSubplots().size() == 1) {
+            scrollBar.setMaximum((int) parentPlot.getDomainAxis().getRange().getUpperBound());
+            scrollBar.getModel().setExtent(scrollBar.getMaximum());
+            scrollBar.addAdjustmentListener(this);
+        }
 
     }
 
@@ -866,7 +896,7 @@ public final class ChartView extends ChartPanel implements Observable {
 
     public final void highlightPlot(DropLocation dropLocation) {
 
-        ChartEntity chartEntity = getEntityForPoint(dropLocation.getDropPoint().x, dropLocation.getDropPoint().y);
+        ChartEntity chartEntity = chartPanel.getEntityForPoint(dropLocation.getDropPoint().x, dropLocation.getDropPoint().y);
         if (chartEntity instanceof PlotEntity) {
             PlotEntity plotEntity = (PlotEntity) chartEntity;
             plotEntity.getPlot().setOutlineStroke(new BasicStroke(2f));
@@ -1002,7 +1032,7 @@ public final class ChartView extends ChartPanel implements Observable {
                 String[] tabLabelXYZChart = new String[3];
                 tabLabelXYZChart[0] = xyPlot.getDomainAxis().getLabel();
                 tabLabelXYZChart[1] = xyPlot.getRangeAxis().getLabel();
-                tabLabelXYZChart[2] = ((PaintScaleLegend) this.getChart().getSubtitle(0)).getAxis().getLabel();
+                tabLabelXYZChart[2] = ((PaintScaleLegend) chartPanel.getChart().getSubtitle(0)).getAxis().getLabel();
 
                 int idx2 = Arrays.binarySearch(tabLabelXYZChart, signalName);
 
@@ -1079,7 +1109,7 @@ public final class ChartView extends ChartPanel implements Observable {
 
         String command = event.getActionCommand();
 
-        XYPlot plot = parentPlot.findSubplot(getChartRenderingInfo().getPlotInfo(), popUpLocation);
+        XYPlot plot = parentPlot.findSubplot(chartPanel.getChartRenderingInfo().getPlotInfo(), popUpLocation);
 
         if (plot == null && !command.equals("ECHELLE_Z")) {
             return;
@@ -1093,7 +1123,7 @@ public final class ChartView extends ChartPanel implements Observable {
                 int res = JOptionPane.showConfirmDialog(this, propertiesPanel, "Propri\u00e9t\u00e9s", 2, -1);
                 if (res == JOptionPane.OK_OPTION) {
                     propertiesPanel.updatePlot(this, plot);
-                    getChart().fireChartChanged();
+                    chartPanel.getChart().fireChartChanged();
                 }
             }
 
@@ -1119,12 +1149,12 @@ public final class ChartView extends ChartPanel implements Observable {
             parentPlot.remove(plot);
             if (plot.getRenderer() instanceof XYShapeRenderer) {
                 parentPlot.getDomainAxis().setLabel(null);
-                getChart().clearSubtitles();
+                chartPanel.getChart().clearSubtitles();
             }
             break;
         case "ECHELLE_Z":
             @SuppressWarnings("rawtypes")
-            Iterator iterator = getChart().getSubtitles().iterator();
+            Iterator iterator = chartPanel.getChart().getSubtitles().iterator();
             while (iterator.hasNext()) {
                 Object o = iterator.next();
                 if (o instanceof PaintScaleLegend) {
@@ -1142,7 +1172,7 @@ public final class ChartView extends ChartPanel implements Observable {
                             double zMax = Double.parseDouble(splitRange[1]);
                             colorScale.setBounds(zMin, zMax);
                             paintScale.getAxis().setRange(zMin, zMax);
-                            getChart().fireChartChanged();
+                            chartPanel.getChart().fireChartChanged();
                         } catch (NumberFormatException nfe) {
 
                         }
@@ -1154,6 +1184,74 @@ public final class ChartView extends ChartPanel implements Observable {
         default:
             break;
         }
+    }
+
+    public ChartPanel getChartPanel() {
+        return chartPanel;
+    }
+
+    public JFreeChart getChart() {
+        return this.chartPanel.getChart();
+    }
+
+    public DefaultBoundedRangeModel getScrollBarModel() {
+        return (DefaultBoundedRangeModel) scrollBar.getModel();
+    }
+
+    public final void setScrollBarProperties(DefaultBoundedRangeModel model) {
+        scrollBar.setModel(model);
+    }
+
+    public final void configureScrollbar() {
+        parentPlot.getDomainAxis().setDefaultAutoRange(parentPlot.getDomainAxis().getRange());
+        scrollBar.setMaximum((int) parentPlot.getDomainAxis().getRange().getUpperBound());
+        scrollBar.getModel().setExtent(scrollBar.getMaximum());
+        scrollBar.addAdjustmentListener(this);
+    }
+
+    public final void removeAxisSynchro(Measure time) {
+        DefaultBoundedRangeModel barModel = new DefaultBoundedRangeModel(this.getScrollBarModel().getValue(), this.getScrollBarModel().getExtent(),
+                this.getScrollBarModel().getMinimum(), this.getScrollBarModel().getMaximum());
+        setScrollBarProperties(barModel);
+        Range xAxisRange = this.getPlot().getDomainAxis().getRange();
+        Range defaultRange = this.getPlot().getDomainAxis().getDefaultAutoRange();
+        this.getPlot().setDomainAxis(new NumberAxis(time.getName()));
+        this.getPlot().getDomainAxis().setDefaultAutoRange(defaultRange);
+        this.getPlot().getDomainAxis().setRange(xAxisRange);
+        this.getPlot().getDomainAxis().addChangeListener(this);
+    }
+
+    @Override
+    public void adjustmentValueChanged(AdjustmentEvent e) {
+        ValueAxis axis = parentPlot.getDomainAxis();
+        Range range = axis.getRange();
+        axis.setRange(scrollBar.getValue(), scrollBar.getValue() + range.getLength());
+    }
+
+    @Override
+    public void axisChanged(AxisChangeEvent arg0) {
+
+        NumberAxis axis = (NumberAxis) arg0.getAxis();
+        Range axisRange = axis.getRange();
+
+        if (!axis.getDefaultAutoRange().equals(axisRange)) {
+            if (axisRange.getLowerBound() < axis.getDefaultAutoRange().getLowerBound()) {
+                axis.setLowerBound(axis.getDefaultAutoRange().getLowerBound());
+            }
+
+            if (axisRange.getUpperBound() > axis.getDefaultAutoRange().getUpperBound() && axisRange.getLowerBound() > 0) {
+                axis.setUpperBound(axis.getDefaultAutoRange().getUpperBound());
+            }
+        }
+
+        scrollBar.removeAdjustmentListener(this);
+
+        int value = Math.max((int) axis.getRange().getLowerBound(), 0);
+        int min = Math.max(scrollBar.getMinimum(), 0);
+
+        scrollBar.getModel().setRangeProperties(value, (int) axisRange.getLength(), min, scrollBar.getMaximum(), false);
+
+        scrollBar.addAdjustmentListener(this);
 
     }
 }

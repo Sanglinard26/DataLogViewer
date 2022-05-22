@@ -31,9 +31,7 @@ public final class Log {
             switch (extension) {
             case "txt":
                 timeName = "Time_ms";
-                long start = System.currentTimeMillis();
                 parseTxt(file);
-                System.out.println("log : " + (System.currentTimeMillis() - start) + "ms");
                 break;
             case "msl":
                 timeName = "Time";

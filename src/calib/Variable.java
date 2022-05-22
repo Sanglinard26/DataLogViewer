@@ -79,6 +79,11 @@ public final class Variable extends Observable implements Comparable<Variable> {
         return this.name;
     }
 
+    @Override
+    public boolean equals(Object obj) {
+        return this.name.equals(obj.toString());
+    }
+
     public boolean isTextValue() {
         return this.infos != null ? this.infos.getTypeVar() == 1 : false;
     }
@@ -462,6 +467,22 @@ public final class Variable extends Observable implements Comparable<Variable> {
         }
 
         return floatValues;
+    }
+
+    public final long getChecksum() {
+        long valCheck = 0;
+        Object value;
+
+        for (short y = 0; y < getDimY(); y++) {
+            for (short x = 0; x < getDimX(); x++) {
+                value = getValue(isModified(), y, x);
+                if (value != null) {
+                    valCheck += value.hashCode();
+                }
+            }
+        }
+
+        return valCheck;
     }
 
     public final double[][] toDouble2D(boolean modifiedVar) {

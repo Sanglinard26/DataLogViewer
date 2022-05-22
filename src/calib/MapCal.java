@@ -14,6 +14,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -68,8 +69,6 @@ public final class MapCal {
 
     private final void parseFile(File mapFile) {
 
-        long start = System.currentTimeMillis();
-
         final char crochet = '[';
 
         try {
@@ -105,9 +104,6 @@ public final class MapCal {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
-        System.out.println("build from Mdb : " + (System.currentTimeMillis() - start) + "ms");
-
     }
 
     public String getName() {
@@ -819,6 +815,112 @@ public final class MapCal {
                 sht.addCell(new Label(col, row, "", format));
             }
         }
+
+    }
+
+    public static final boolean compare(MapCal ref, MapCal work, final File file) {
+
+        int nbVariable = Math.min(ref.listVariable.size(), work.listVariable.size());
+        Variable varRef;
+        Variable varWork;
+
+        Map<Variable, Variable> listDiff = new LinkedHashMap<>();
+
+        for (int i = 0; i < nbVariable; i++) {
+            varRef = ref.listVariable.get(i);
+
+            int idxVarWork = work.listVariable.indexOf(varRef);
+
+            if (idxVarWork > -1) {
+                varWork = work.listVariable.get(idxVarWork);
+                if (varRef.getChecksum() != varWork.getChecksum()) {
+                    listDiff.put(varRef, varWork);
+                }
+            }
+        }
+
+        if (listDiff.size() > 0) {
+            return toHtml(ref.name, work.name, listDiff, file);
+        }
+        return false;
+    }
+
+    public static final boolean toHtml(String refMap, String workMap, Map<Variable, Variable> diffs, final File file) {
+
+        PrintWriter printWriter = null;
+
+        try {
+            printWriter = new PrintWriter(file);
+
+            printWriter.println("<!DOCTYPE html>");
+            printWriter.println("<html>");
+            printWriter.println("<head>");
+            printWriter.println("<title>DataLogViewer - Comparaison calibration</title>");
+            printWriter.println("<meta charset=utf-8/>");
+            printWriter.println("</head>");
+            printWriter.println("<body>");
+
+            printWriter.println("<h2 align=center>" + refMap + "</h2>");
+            printWriter.println("<h2 align=center><font color=red>" + workMap + "</font></h2>");
+
+            // Sommaire
+            printWriter.println("<h2 align=center><u>" + "Sommaire" + "</u></h2>");
+
+            for (Variable var : diffs.keySet()) {
+                printWriter.println("<p align=center><a href=#" + var.getName() + ">" + var.getName() + "</a></p>");
+            }
+            //
+            Variable workVar;
+            Object refValue;
+            Object workValue;
+
+            for (Variable var : diffs.keySet()) {
+
+                printWriter.println("<hr align=center size=1 width=90%>");
+                printWriter.println("<h2><font color=blue id=" + var.getName() + ">" + var.getName() + "</font></h2>");
+                printWriter.println("<blockquote>");
+                printWriter.println("<p>Valeur(s) :");
+                printWriter.println("<table border cellpadding=3>");
+
+                for (int y = 0; y < var.getDimY(); y++) {
+
+                    printWriter.println("<tr>"); // Debut d'une ligne
+
+                    for (int x = 0; x < var.getDimX(); x++) {
+
+                        refValue = var.getValue(false, y, x);
+                        workVar = diffs.get(var);
+
+                        if (x < workVar.getDimX() && y < workVar.getDimY()) {
+                            workValue = workVar.getValue(false, y, x);
+                        } else {
+                            workValue = Float.NaN;
+                        }
+
+                        if (refValue.toString().equals(workValue.toString())) {
+                            printWriter.println("<th align=center>" + refValue + "</th>");
+                        } else {
+                            printWriter.println("<th align=center>" + refValue + " | " + "<font color=red>" + workValue + "</font>" + "</th>");
+                        }
+                    }
+
+                    printWriter.println("</tr>"); // Fin d'une ligne
+                }
+
+                printWriter.println("</table>");
+                printWriter.println("</blockquote>");
+            }
+
+            printWriter.println("</body>");
+            printWriter.println("</html>");
+
+        } catch (FileNotFoundException e) {
+            return false;
+        } finally {
+            if (printWriter != null)
+                printWriter.close();
+        }
+        return true;
 
     }
 
