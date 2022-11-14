@@ -27,6 +27,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -39,6 +40,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import javax.swing.AbstractAction;
+import javax.swing.AbstractButton;
 import javax.swing.BorderFactory;
 import javax.swing.ButtonGroup;
 import javax.swing.ImageIcon;
@@ -53,6 +55,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JRadioButton;
+import javax.swing.JRadioButtonMenuItem;
 import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JToggleButton;
@@ -99,6 +102,7 @@ import calib.MapCal;
 import dialog.DialAddMeasure;
 import dialog.DialManageFormula;
 import dialog.DialManual;
+import dialog.DialMoveWindow;
 import dialog.DialNewChart;
 import dialog.DialNewFormula;
 import dialog.DialNews;
@@ -116,7 +120,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
     private static final long serialVersionUID = 1L;
 
-    private final static String VERSION = "v1.54";
+    private final static String VERSION = "v1.55";
     private final String DEMO = "demo";
 
     private final static String LOG_PANEL = "LOG";
@@ -198,6 +202,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         final String ICON_FORMULA = "/icon_formula_16.png";
         final String ICON_MANAGE_FORMULA = "/icon_manageFormula_16.png";
         final String ICON_COMPAR = "/icon_compar_16.png";
+        final String ICON_MOVE_WINDOW = "/icon_moveWindow_16.png";
 
         JMenuBar menuBar = new JMenuBar();
 
@@ -330,6 +335,16 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
             @Override
             public void actionPerformed(ActionEvent e) {
                 closeWindows();
+            }
+        });
+        menu.add(menuItem);
+
+        menuItem = new JMenuItem("Organiser", new ImageIcon(getClass().getResource(ICON_MOVE_WINDOW)));
+        menuItem.addActionListener(new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                new DialMoveWindow(Ihm.this, chartTabbedPane);
             }
         });
         menu.add(menuItem);
@@ -537,6 +552,35 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         });
         menuItem.setToolTipText(Preference.getPreference(Preference.KEY_CAL));
         subMenu.add(menuItem);
+        menu.add(subMenu);
+
+        subMenu = new JMenu("Themes");
+        ButtonGroup groupBis = new ButtonGroup();
+
+        JRadioButtonMenuItem radioMenuItem = new JRadioButtonMenuItem("Windows");
+        radioMenuItem.addActionListener(new ClickRadio());
+        groupBis.add(radioMenuItem);
+        subMenu.add(radioMenuItem);
+
+        radioMenuItem = new JRadioButtonMenuItem("Nimbus");
+        radioMenuItem.addActionListener(new ClickRadio());
+        groupBis.add(radioMenuItem);
+        subMenu.add(radioMenuItem);
+
+        radioMenuItem = new JRadioButtonMenuItem("Metal");
+        radioMenuItem.addActionListener(new ClickRadio());
+        groupBis.add(radioMenuItem);
+        subMenu.add(radioMenuItem);
+
+        final Enumeration<AbstractButton> enumAbBis = groupBis.getElements();
+        AbstractButton abBis;
+        while (enumAbBis.hasMoreElements()) {
+            abBis = enumAbBis.nextElement();
+            if (abBis.getActionCommand().equals(Preference.getPreference(Preference.KEY_LF))) {
+                abBis.setSelected(true);
+                break;
+            }
+        }
         menu.add(subMenu);
 
         menu = new JMenu("?");
@@ -1687,6 +1731,25 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
     }
 
+    private final class ClickRadio implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent action) {
+
+            for (LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
+                if (action.getActionCommand().equals(info.getName())) {
+                    try {
+                        UIManager.setLookAndFeel(info.getClassName());
+                        SwingUtilities.updateComponentTreeUI(Ihm.this);
+                        Preference.setPreference(Preference.KEY_LF, action.getActionCommand());
+                    } catch (Exception e1) {
+                        e1.printStackTrace();
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
     private final void saveConfig(File file) {
 
         int nbTab = chartTabbedPane.getTabCount();
@@ -1948,7 +2011,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         try {
 
             for (LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
-                if ("Windows".equals(info.getName())) {
+                if (Preference.getPreference(Preference.KEY_LF).equals(info.getName())) {
                     try {
                         UIManager.setLookAndFeel(info.getClassName());
                     } catch (ClassNotFoundException e1) {
@@ -1963,6 +2026,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                     break;
                 }
             }
+
         } catch (Exception e) {
             e.printStackTrace();
         }

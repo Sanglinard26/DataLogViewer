@@ -13,7 +13,7 @@ import org.jfree.ui.Drawable;
  * of the {@link org.jfree.chart.annotations.XYDrawableAnnotation} class. Used
  * by MarkerDemo1.java.
  */
-public final class CircleDrawer implements Drawable {
+public final class CircleDrawer implements org.jfree.chart.ui.Drawable {
 
     /** The outline paint. */
     private Paint outlinePaint;

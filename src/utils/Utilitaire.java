@@ -82,11 +82,11 @@ public abstract class Utilitaire {
         }
     }
 
-    public static final Number getNumberObject(Object o) {
+    public static final Number getNumberObject(String number) {
 
         Double doubleValue;
 
-        String number = o.toString();
+        // String number = o.toString();
 
         final int idx = number.indexOf(',');
 

@@ -57,16 +57,16 @@ import org.jfree.chart.renderer.xy.XYItemRenderer;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
 import org.jfree.chart.renderer.xy.XYShapeRenderer;
 import org.jfree.chart.title.PaintScaleLegend;
+import org.jfree.chart.ui.Layer;
+import org.jfree.chart.ui.RectangleEdge;
 import org.jfree.data.Range;
-import org.jfree.data.general.DatasetUtilities;
+import org.jfree.data.general.DatasetUtils;
 import org.jfree.data.xy.DefaultXYDataset;
 import org.jfree.data.xy.DefaultXYZDataset;
 import org.jfree.data.xy.XYDataset;
 import org.jfree.data.xy.XYSeries;
 import org.jfree.data.xy.XYSeriesCollection;
 import org.jfree.data.xy.XYZDataset;
-import org.jfree.ui.Layer;
-import org.jfree.ui.RectangleEdge;
 
 import dialog.DialogProperties;
 import log.Log;
@@ -137,6 +137,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         for (XYPlot plot : subPlots) {
             plot.addChangeListener(parentPlot);
 
+            // Collection<?> listMarker = plot.getDomainMarkers(Layer.FOREGROUND);
             Collection<?> listMarker = plot.getDomainMarkers(Layer.FOREGROUND);
             if (listMarker != null) {
                 marker = (ValueMarker) listMarker.iterator().next();
@@ -168,8 +169,8 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             Point2D p = chartPanel.translateScreenToJava2D(e.getPoint());
 
             ValueAxis xAxis = parentPlot.getDomainAxis();
-            double xMin = xAxis.java2DToValue(p.getX() - 2, dataArea, RectangleEdge.BOTTOM);
-            double xMax = xAxis.java2DToValue(p.getX() + 2, dataArea, RectangleEdge.BOTTOM);
+            double xMin = xAxis.java2DToValue(p.getX() - 2, dataArea, org.jfree.chart.ui.RectangleEdge.BOTTOM);
+            double xMax = xAxis.java2DToValue(p.getX() + 2, dataArea, org.jfree.chart.ui.RectangleEdge.BOTTOM);
 
             if (xValue >= xMin && xValue <= xMax) {
                 setCursor(new Cursor(Cursor.E_RESIZE_CURSOR));
@@ -287,7 +288,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             return;
         }
         ValueAxis xAxis = parentPlot.getDomainAxis();
-        xValue = xAxis.java2DToValue(p.getX(), dataArea, RectangleEdge.BOTTOM);
+        xValue = xAxis.java2DToValue(p.getX(), dataArea, org.jfree.chart.ui.RectangleEdge.BOTTOM);
 
         if (!xAxis.getRange().contains(xValue)) {
             xValue = Double.NaN;
@@ -307,7 +308,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
                 for (int j = 0; j < subplot.getDataset(i).getSeriesCount(); j++) {
 
                     if (i == 0 && j == 0) {
-                        int[] indices = DatasetUtilities.findItemIndicesForX(subplot.getDataset(i), j, xValue);
+                        int[] indices = DatasetUtils.findItemIndicesForX(subplot.getDataset(i), j, xValue);
 
                         if (indices[0] > -1 && indices[1] > -1 && !xValueUpdated) {
                             double x1 = subplot.getDataset(i).getXValue(j, indices[0]);
@@ -324,7 +325,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
                             xValueUpdated = true;
                         }
                     }
-                    tableValue.put(subplot.getDataset(i).getSeriesKey(j).toString(), DatasetUtilities.findYValue(subplot.getDataset(i), j, xValue));
+                    tableValue.put(subplot.getDataset(i).getSeriesKey(j).toString(), DatasetUtils.findYValue(subplot.getDataset(i), j, xValue));
                 }
             }
         }
@@ -356,7 +357,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         for (XYPlot subplot : subplots) {
             for (int i = 0; i < subplot.getDatasetCount(); i++) {
                 for (int j = 0; j < subplot.getDataset(i).getSeriesCount(); j++) {
-                    tableValue.put(subplot.getDataset(i).getSeriesKey(j).toString(), DatasetUtilities.findYValue(subplot.getDataset(i), j, xValue));
+                    tableValue.put(subplot.getDataset(i).getSeriesKey(j).toString(), DatasetUtils.findYValue(subplot.getDataset(i), j, xValue));
                 }
             }
         }
@@ -582,7 +583,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             final XYShapeRenderer renderer = new XYShapeRenderer();
 
             renderer.setDrawOutlines(true);
-            renderer.setBaseOutlinePaint(Color.BLACK);
+            renderer.setDefaultOutlinePaint(Color.BLACK);
 
             final XYPlot plot = new XYPlot(dataset, xAxis, yAxis, renderer);
 
@@ -610,13 +611,13 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             final XYShapeRenderer renderer = new XYShapeRenderer();
 
             renderer.setDrawOutlines(true);
-            renderer.setBaseOutlinePaint(Color.BLACK);
+            renderer.setDefaultOutlinePaint(Color.BLACK);
 
             final XYPlot plot = new XYPlot(dataset, xAxis, yAxis, renderer);
 
             double size = Double.parseDouble(shapeSize);
             Shape shape = new Ellipse2D.Double(-size / 2, -size / 2, size, size);
-            plot.getRenderer().setBaseShape(shape);
+            plot.getRenderer().setDefaultShape(shape);
             plot.getRenderer().setSeriesPaint(0, Utilitaire.parseRGBColor(shapeColor, 255));
             plot.setBackgroundPaint(Utilitaire.parseRGBColor(bckGroundColor, 255));
 
@@ -645,7 +646,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             final XYShapeRenderer renderer = new XYShapeRenderer();
 
             renderer.setDrawOutlines(true);
-            renderer.setBaseOutlinePaint(Color.BLACK);
+            renderer.setDefaultOutlinePaint(Color.BLACK);
 
             double delta = z.getMax() - z.getMin();
             double min;
@@ -672,7 +673,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             final NumberAxis zAxis = new NumberAxis(z.getName());
 
             PaintScaleLegend localPaintScaleLegend = new PaintScaleLegend(localLookupPaintScale, zAxis);
-            localPaintScaleLegend.setPosition(RectangleEdge.RIGHT);
+            localPaintScaleLegend.setPosition(org.jfree.chart.ui.RectangleEdge.RIGHT);
             localPaintScaleLegend.setMargin(4.0D, 4.0D, 40.0D, 4.0D);
             localPaintScaleLegend.setAxisLocation(AxisLocation.BOTTOM_OR_RIGHT);
             chartPanel.getChart().addSubtitle(localPaintScaleLegend);
@@ -700,7 +701,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             final XYShapeRenderer renderer = new XYShapeRenderer();
 
             renderer.setDrawOutlines(true);
-            renderer.setBaseOutlinePaint(Color.BLACK);
+            renderer.setDefaultOutlinePaint(Color.BLACK);
 
             ColorPaintScale localLookupPaintScale;
 
@@ -725,7 +726,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
             double size = Double.parseDouble(shapeSize);
             Shape shape = new Ellipse2D.Double(-size / 2, -size / 2, size, size);
-            plot.getRenderer().setBaseShape(shape);
+            plot.getRenderer().setDefaultShape(shape);
 
             plot.setBackgroundPaint(Utilitaire.parseRGBColor(bckGroundColor, 255));
 

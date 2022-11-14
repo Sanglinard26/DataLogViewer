@@ -6,9 +6,11 @@ package calib;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.List;
 import java.util.Map;
 import java.util.Vector;
 
@@ -34,9 +36,13 @@ public final class MdbData {
     private static final String VAL_MIN = "Valeur_mini"; //
     private static final String DETAIL = "Détail"; //
 
+    private static final String DATALOGCFG = "datalogcfg";
+
     private final String name;
     private Map<String, VariableInfo> infos;
     private Hashtable<String, Vector<String>> category;
+
+    private ConfigDatalogger configDatalogger;
 
     public MdbData(File mdbFile) {
         this.name = mdbFile.getName().replace(".mdb", "");
@@ -51,14 +57,21 @@ public final class MdbData {
         return infos != null ? infos : new HashMap<String, VariableInfo>();
     }
 
+    public ConfigDatalogger getConfigDatalogger() {
+        return this.configDatalogger;
+    }
+
     private final void readDatabase(File mdbFile) {
 
         try {
             Database db = DatabaseBuilder.open(mdbFile);
 
             Table tableCartos = db.getTable(CARTOS);
-
             this.infos = getVariableInfo(tableCartos);
+
+            Table tableDatalogCfg = db.getTable(DATALOGCFG);
+            this.configDatalogger = new ConfigDatalogger(tableDatalogCfg);
+
             db.close();
         } catch (IOException e) {
             if (e instanceof FileNotFoundException) {
@@ -193,6 +206,130 @@ public final class MdbData {
         @Override
         public String toString() {
             return "Var=f(" + varCol + "," + varLigne + ")" + "\n\t|_" + typeName + "\n\t\t|_" + sousType;
+        }
+
+    }
+
+    public class ConfigDatalogger {
+
+        private static final String NOM = "Nom";
+        private static final String VALEUR = "Valeur";
+
+        private boolean active;
+        private boolean cyclage;
+        private int freq;
+        private int cible;
+        private int nbCanaux;
+
+        private int varBegin;
+        private double varBeginValue;
+        private int varEnd;
+        private double varEndValue;
+
+        private List<Integer> canaux;
+
+        public ConfigDatalogger(Table table) {
+
+            canaux = new ArrayList<>();
+
+            for (Row row : table) {
+                String nom = row.getString(NOM);
+                // double adresse = row.getDouble(ADRESSE);
+                double valeur = row.getDouble(VALEUR);
+
+                switch (nom) {
+                case "Flag activation datalogger":
+                    active = valeur == 1 ? true : false;
+                    break;
+                case "Config data logger":
+                    decodeConfig((int) valeur);
+                    break;
+                case "Variable déclenchement":
+                    varBegin = (int) valeur;
+                    break;
+                case "valeur de déclenchement":
+                    varBeginValue = valeur;
+                    break;
+                case "Variable d'arrêt":
+                    varEnd = (int) valeur;
+                    break;
+                case "valeur d'arrêt":
+                    varEndValue = valeur;
+                default:
+                    if (nom.startsWith("Canal")) {
+                        canaux.add((int) valeur);
+                    }
+                    break;
+                }
+            }
+        }
+
+        private final void decodeConfig(int mot) {
+            String binMot = String.format("%16s", Integer.toBinaryString(mot)).replaceAll(" ", "0");
+
+            cyclage = (mot & 1) == 1 ? true : false;
+            freq = (0b0000000000011110 & mot);
+
+            nbCanaux = (0b11111111 & (Integer.parseInt(binMot.substring(0, 8), 2)));
+
+            cible = Integer.parseInt(binMot.substring(8, 10));
+        }
+
+        public boolean isActive() {
+            return active;
+        }
+
+        public boolean isCyclage() {
+            return cyclage;
+        }
+
+        public int getFreq() {
+            return freq;
+        }
+
+        public int getCible() {
+            return cible;
+        }
+
+        public int getNbCanaux() {
+            return nbCanaux;
+        }
+
+        public int getVarBegin() {
+            return varBegin;
+        }
+
+        public double getVarBeginValue() {
+            return varBeginValue;
+        }
+
+        public int getVarEnd() {
+            return varEnd;
+        }
+
+        public double getVarEndValue() {
+            return varEndValue;
+        }
+
+        public List<Integer> getCanaux() {
+            return canaux;
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder sb = new StringBuilder();
+
+            sb.append("Config datalogger:");
+            sb.append("\n" + "Actif = " + isActive());
+            sb.append("\n" + "Cyclage = " + isCyclage());
+            sb.append("\n" + "Fréquence = " + getFreq());
+            sb.append("\n" + "Cible = " + getCible());
+            sb.append("\n" + "Nb canaux = " + nbCanaux);
+            sb.append("\n" + "Variable de déclenchement = " + getVarBegin() + " à " + getVarBeginValue());
+            sb.append("\n" + "Variable d'arrêt = " + getVarEnd() + " à " + getVarEndValue());
+            sb.append("\n" + "Liste des canaux = " + canaux);
+
+            return sb.toString();
         }
 
     }

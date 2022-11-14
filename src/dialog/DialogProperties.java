@@ -196,8 +196,8 @@ public final class DialogProperties extends JPanel implements ActionListener
 
             XYShapeRenderer shapeRenderer = (XYShapeRenderer) renderer;
 
-            model.addRow(
-                    new Object[] { key, (Color) renderer.getSeriesPaint(0), ((Ellipse2D) shapeRenderer.getBaseShape()).getHeight(), Boolean.FALSE });
+            model.addRow(new Object[] { key, (Color) renderer.getSeriesPaint(0), ((Ellipse2D) shapeRenderer.getDefaultShape()).getHeight(),
+                    Boolean.FALSE });
         }
 
     }
@@ -256,7 +256,7 @@ public final class DialogProperties extends JPanel implements ActionListener
                 xyPlot.getRenderer().setSeriesPaint(0, color);
                 double size = Double.parseDouble(model.getValueAt(i, 2).toString());
                 Shape shape = new Ellipse2D.Double(-size / 2, -size / 2, size, size);
-                xyPlot.getRenderer().setBaseShape(shape);
+                xyPlot.getRenderer().setDefaultShape(shape);
 
                 if (delete) {
                     combinedplot.remove(xyPlot);

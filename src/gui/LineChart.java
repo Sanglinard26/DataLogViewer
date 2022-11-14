@@ -36,6 +36,7 @@ import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.renderer.xy.XYItemRenderer;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
+import org.jfree.chart.ui.Drawable;
 import org.jfree.data.xy.XYSeries;
 import org.jfree.data.xy.XYSeriesCollection;
 
@@ -64,7 +65,7 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
 
     private boolean onMove = false;
 
-    private static final CircleDrawer cd = new CircleDrawer(Color.BLACK, new BasicStroke(2.0f), null);
+    private static final Drawable cd = new CircleDrawer(Color.BLACK, new BasicStroke(2.0f), null);
     private static Shape shape2 = new Ellipse2D.Double(-3, -3, 6, 6);
 
     public LineChart(char type) {

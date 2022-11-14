@@ -213,7 +213,7 @@ public final class CalTable extends JPanel {
 
                     for (int col : cols) {
                         for (int row : rows) {
-                            actualVal = Utilitaire.getNumberObject(table.getValueAt(row, col)).doubleValue();
+                            actualVal = Utilitaire.getNumberObject(table.getValueAt(row, col).toString()).doubleValue();
                             table.setValueAt(actualVal + val, row, col);
                             table.editCellAt(row, col);
                         }
@@ -230,7 +230,7 @@ public final class CalTable extends JPanel {
 
                     for (int col : cols) {
                         for (int row : rows) {
-                            actualVal = Utilitaire.getNumberObject(table.getValueAt(row, col)).doubleValue();
+                            actualVal = Utilitaire.getNumberObject(table.getValueAt(row, col).toString()).doubleValue();
                             table.setValueAt(actualVal * val, row, col);
                             table.editCellAt(row, col);
                         }
@@ -247,7 +247,7 @@ public final class CalTable extends JPanel {
 
                     for (int col : cols) {
                         for (int row : rows) {
-                            actualVal = Utilitaire.getNumberObject(table.getValueAt(row, col)).doubleValue();
+                            actualVal = Utilitaire.getNumberObject(table.getValueAt(row, col).toString()).doubleValue();
                             table.setValueAt(actualVal / val, row, col);
                             table.editCellAt(row, col);
                         }

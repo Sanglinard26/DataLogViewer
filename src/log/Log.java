@@ -8,9 +8,12 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Stream;
 
 import utils.Utilitaire;
 
@@ -23,6 +26,9 @@ public final class Log {
     private String timeName = "";
 
     public Log(File file) {
+
+        long start = System.currentTimeMillis();
+
         if (file != null) {
 
             this.name = file.getName().substring(0, file.getName().length() - 4);
@@ -31,7 +37,7 @@ public final class Log {
             switch (extension) {
             case "txt":
                 timeName = "Time_ms";
-                parseTxt(file);
+                parseTxt_bis(file);
                 break;
             case "msl":
                 timeName = "Time";
@@ -43,6 +49,8 @@ public final class Log {
 
             Collections.sort(datas);
         }
+
+        System.out.println("log opened in : " + (System.currentTimeMillis() - start) + "ms");
     }
 
     private final void parseTxt(File file) {
@@ -228,5 +236,83 @@ public final class Log {
 
         return new Measure(nameWoutUnit);
 
+    }
+
+    private final void parseTxt_bis(File file) {
+
+        final String tabDelimiter = "\t";
+        final String commaDelimiter = ",";
+        String delimiter = "";
+
+        long nbLines = 0;
+
+        Stream<String> lines;
+        try {
+            lines = Files.lines(file.toPath(), StandardCharsets.ISO_8859_1);
+            nbLines = lines.count() - 2;
+            lines.close();
+        } catch (IOException e1) {
+        }
+
+        try (final BufferedReader bf = new BufferedReader(new FileReader(file))) {
+
+            String line;
+            String parsedValue;
+            String[] splitTab;
+            Number value;
+
+            int cntLine = 0;
+
+            while ((line = bf.readLine()) != null) {
+
+                if (cntLine == 1) {
+                    if (line.indexOf(commaDelimiter) > -1) {
+                        delimiter = commaDelimiter;
+                    } else {
+                        delimiter = tabDelimiter;
+                    }
+                }
+
+                splitTab = line.split(delimiter);
+
+                switch (cntLine) {
+                case 0:
+                    this.fnr = line.trim();
+                    break;
+                case 1:
+                    this.datas = new ArrayList<Measure>(splitTab.length);
+
+                    for (int idxCol = 0; idxCol < splitTab.length; idxCol++) {
+                        if (idxCol == 0) {
+                            this.timeName = splitTab[idxCol];
+                        }
+                        this.datas.add(new Measure(splitTab[idxCol]));
+                    }
+
+                    break;
+                default:
+                    if (splitTab.length == this.datas.size()) {
+                        for (int idxCol = 0; idxCol < this.datas.size(); idxCol++) {
+
+                            parsedValue = splitTab[idxCol];
+
+                            value = Utilitaire.getNumberObject(parsedValue.trim());
+
+                            this.datas.get(idxCol).addPoint(value);
+                        }
+
+                        this.nbPoints++;
+                    }
+                    break;
+                }
+
+                cntLine++;
+            }
+
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }

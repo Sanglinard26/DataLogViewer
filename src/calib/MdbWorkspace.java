@@ -84,6 +84,16 @@ public final class MdbWorkspace {
         return variablesECU != null ? variablesECU : new HashMap<String, VariableECU>();
     }
 
+    public VariableECU getVariableECUFromAdress(int adress) {
+        for (VariableECU var : variablesECU.values()) {
+            if (var.getOffset() == adress) {
+                return var;
+            }
+        }
+
+        return null;
+    }
+
     private final void readDatabase(File mdbFile) {
 
         try {
@@ -279,7 +289,7 @@ public final class MdbWorkspace {
 
     }
 
-    protected class VariableECU {
+    public class VariableECU {
         private String nom;
         private String unit;
         private int offset;
