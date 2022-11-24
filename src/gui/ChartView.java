@@ -20,7 +20,6 @@ import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -48,10 +47,11 @@ import org.jfree.chart.entity.PlotEntity;
 import org.jfree.chart.event.AxisChangeEvent;
 import org.jfree.chart.event.AxisChangeListener;
 import org.jfree.chart.event.PlotChangeEvent;
+import org.jfree.chart.panel.CrosshairOverlay;
 import org.jfree.chart.plot.CombinedDomainXYPlot;
+import org.jfree.chart.plot.Crosshair;
 import org.jfree.chart.plot.IntervalMarker;
 import org.jfree.chart.plot.PlotOrientation;
-import org.jfree.chart.plot.ValueMarker;
 import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.renderer.xy.XYItemRenderer;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
@@ -84,7 +84,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
     private static Stroke oldStrokePlot;
     private static Point2D popUpLocation;
 
-    private ValueMarker marker;
+    private Crosshair crosshair;
     private static double oldXValue = Double.NaN;
     private static double xValue = Double.NaN;
     private static final HashMap<String, Double> tableValue = new HashMap<String, Double>();
@@ -115,45 +115,20 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         chartPanel.setRangeZoomable(false);
         chartPanel.setDomainZoomable(true);
 
+        crosshair = new Crosshair(Double.NaN, Color.BLUE, new BasicStroke(2));
+        CrosshairOverlay crosshairOverlay = new CrosshairOverlay();
+        crosshairOverlay.addDomainCrosshair(crosshair);
+        chartPanel.addOverlay(crosshairOverlay);
+
+        // chartPanel.removeMouseListener(chartPanel); //Permet de supprimer le temps mort sur le click mais plus de popMenu...
+
         chartPanel.addMouseListener(new MyChartMouseListener());
         chartPanel.addMouseMotionListener(new MyChartMouseListener());
 
+        chartPanel.setPopupMenu(createChartMenu()); // Déplacé de mouseMoved à ici
+
         scrollBar = new JScrollBar(Scrollbar.HORIZONTAL);
-        // scrollBar.addAdjustmentListener(this);
         add(scrollBar, BorderLayout.SOUTH);
-    }
-
-    public ChartView(JFreeChart serializedChart) {
-
-        super(new BorderLayout(), true);
-        this.chartPanel = new ChartPanel(serializedChart, 680, 420, 300, 200, 1920, 1080, true, false, false, false, true, false);
-        add(this.chartPanel, BorderLayout.CENTER);
-
-        serializedChart.removeLegend();
-
-        this.parentPlot = (CombinedDomainXYPlot) serializedChart.getXYPlot();
-        @SuppressWarnings("unchecked")
-        List<XYPlot> subPlots = parentPlot.getSubplots();
-        for (XYPlot plot : subPlots) {
-            plot.addChangeListener(parentPlot);
-
-            // Collection<?> listMarker = plot.getDomainMarkers(Layer.FOREGROUND);
-            Collection<?> listMarker = plot.getDomainMarkers(Layer.FOREGROUND);
-            if (listMarker != null) {
-                marker = (ValueMarker) listMarker.iterator().next();
-                plot.clearDomainMarkers();
-                plot.addDomainMarker(marker);
-            }
-
-        }
-
-        oldStrokePlot = parentPlot.getOutlineStroke();
-
-        this.chartPanel.setRangeZoomable(false);
-        this.chartPanel.setDomainZoomable(true);
-
-        this.chartPanel.addMouseListener(new MyChartMouseListener());
-        this.chartPanel.addMouseMotionListener(new MyChartMouseListener());
     }
 
     private final class MyChartMouseListener extends MouseAdapter {
@@ -183,7 +158,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
                 setCursor(new Cursor(Cursor.HAND_CURSOR));
             } else {
                 setCursor(Cursor.getDefaultCursor());
-                chartPanel.setPopupMenu(createChartMenu());
+                // chartPanel.setPopupMenu(createChartMenu());
             }
         }
 
@@ -207,6 +182,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
         @Override
         public void mouseClicked(MouseEvent e) {
+
             if (SwingUtilities.isLeftMouseButton(e)) {
                 updateTableValue(e);
             }
@@ -231,9 +207,10 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
         @Override
         public void mouseReleased(MouseEvent e) {
+
             chartPanel.setDomainZoomable(true);
 
-            if (plot != null && !actualRanges.isEmpty()) {
+            if (plot != null && !actualRanges.isEmpty() && SwingUtilities.isRightMouseButton(e)) {
                 for (int i = 0; i < plot.getRangeAxisCount(); i++) {
                     if (!plot.getRangeAxis(i).getRange().equals(actualRanges.get(i))) {
                         plot.getRangeAxis(i).setRange(actualRanges.get(i));
@@ -284,7 +261,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
         Point2D p = chartPanel.translateScreenToJava2D(e.getPoint());
 
-        if (getDatasetType() > 1) {
+        if (getDatasetType() > 1 || !dataArea.contains(p)) {
             return;
         }
         ValueAxis xAxis = parentPlot.getDomainAxis();
@@ -331,8 +308,8 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         }
 
         if (xValue != oldXValue) {
-            marker.setValue(xValue);
             updateObservateur("values", tableValue);
+            crosshair.setValue(xValue);
         }
 
         oldXValue = xValue;
@@ -363,7 +340,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         }
 
         if (getDatasetType() < 2) {
-            marker.setValue(xValue);
+            crosshair.setValue(xValue);
         }
 
         updateObservateur("values", tableValue);
@@ -389,7 +366,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
                 double[][] filterdXYZarray = { x.getDoubleValue(bitCondition), y.getDoubleValue(bitCondition), z.getDoubleValue(bitCondition) };
                 xyzDataset.addSeries("Series 1", filterdXYZarray);
             } else {
-                double[][] xYZarray = { x.getDoubleValue(), y.getDoubleValue(), z.getDoubleValue() };
+                double[][] xYZarray = { x.getData(), y.getData(), z.getData() };
                 xyzDataset.addSeries("Series 1", xYZarray);
             }
 
@@ -401,7 +378,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
                 double[][] filterdXYarray = { x.getDoubleValue(bitCondition), y.getDoubleValue(bitCondition) };
                 xyDataset.addSeries("Series 1", filterdXYarray);
             } else {
-                double[][] xYarray = { x.getDoubleValue(), y.getDoubleValue() };
+                double[][] xYarray = { x.getData(), y.getData() };
                 xyDataset.addSeries("Series 1", xYarray);
             }
 
@@ -420,7 +397,6 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         List<XYPlot> subplots = parentPlot.getSubplots();
         for (XYPlot subplot : subplots) {
             subplot.clearDomainMarkers();
-            subplot.addDomainMarker(marker);
 
             if (((XYSeriesCollection) subplot.getDataset()).getSeries(0).getItemCount() > 0 && serie == null) {
                 serie = ((XYSeriesCollection) subplot.getDataset()).getSeries(0);
@@ -465,7 +441,6 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         List<XYPlot> subplots = parentPlot.getSubplots();
         for (XYPlot subplot : subplots) {
             subplot.clearDomainMarkers();
-            subplot.addDomainMarker(marker);
 
             for (IntervalMarker zone : listZone) {
                 subplot.addDomainMarker(zone, Layer.BACKGROUND);
@@ -484,10 +459,6 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             }
 
             subplot.clearDomainMarkers();
-            if (marker != null) {
-                subplot.addDomainMarker(marker);
-            }
-
         }
     }
 
@@ -507,13 +478,9 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             }
 
             xValue = Double.NaN;
-
-            marker = new ValueMarker(xValue, Color.BLUE, new BasicStroke(1.5f));
         }
 
         plot.setBackgroundPaint(Utilitaire.parseRGBColor(backGroundColor, 255));
-
-        plot.addDomainMarker(0, marker, Layer.FOREGROUND);
 
         parentPlot.add(plot, 1);
 
@@ -529,9 +496,9 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         renderer.setSeriesStroke(0, new BasicStroke(1.5f));
         final XYPlot plot = new XYPlot(collections, null, yAxis, renderer);
 
-        final List<Number> temps = time.getData();
-        final int nbPoint = temps.size();
-        final int sizeData = measure.getData().size();
+        final double[] temps = time.getData();
+        final int nbPoint = temps.length;
+        final int sizeData = measure.getDataLength();
 
         if (parentPlot.getSubplots().size() == 0) {
 
@@ -540,21 +507,16 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
                 parentPlot.getDomainAxis().addChangeListener(this);
             }
             if (nbPoint > 1) {
-                xValue = temps.get(nbPoint / 2).doubleValue();
+                xValue = temps[nbPoint / 2];
             } else {
                 xValue = Double.NaN;
             }
-
-            marker = new ValueMarker(xValue, Color.BLUE, new BasicStroke(1.5f));
-
         }
-
-        plot.addDomainMarker(0, marker, Layer.FOREGROUND);
 
         for (int n = 0; n < nbPoint; n++) {
 
             if (n < sizeData) {
-                series.add(temps.get(n), measure.getData().get(n), false);
+                series.add(temps[n], measure.getData()[n], false);
             }
         }
 
@@ -576,7 +538,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
         if (parentPlot.getSubplots().size() == 0) {
             final DefaultXYDataset dataset = new DefaultXYDataset();
-            double[][] arrayOfDouble = { x.getDoubleValue(), y.getDoubleValue() };
+            double[][] arrayOfDouble = { x.getData(), y.getData() };
             dataset.addSeries("Series 1", arrayOfDouble);
             final NumberAxis xAxis = new NumberAxis(x.getName());
             final NumberAxis yAxis = new NumberAxis(y.getName());
@@ -604,7 +566,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
         if (parentPlot.getSubplots().size() == 0) {
             final DefaultXYDataset dataset = new DefaultXYDataset();
-            double[][] arrayOfDouble = { x.getDoubleValue(), y.getDoubleValue() };
+            double[][] arrayOfDouble = { x.getData(), y.getData() };
             dataset.addSeries("Series 1", arrayOfDouble);
             final NumberAxis xAxis = new NumberAxis(x.getName());
             final NumberAxis yAxis = new NumberAxis(y.getName());
@@ -638,7 +600,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
         if (parentPlot.getSubplots().size() == 0) {
             final DefaultXYZDataset dataset = new DefaultXYZDataset();
-            double[][] arrayOfDouble = { x.getDoubleValue(), y.getDoubleValue(), z.getDoubleValue() };
+            double[][] arrayOfDouble = { x.getData(), y.getData(), z.getData() };
             dataset.addSeries("Series 1", arrayOfDouble);
             final NumberAxis xAxis = new NumberAxis(x.getName());
             final NumberAxis yAxis = new NumberAxis(y.getName());
@@ -694,7 +656,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
         if (parentPlot.getSubplots().size() == 0) {
             final DefaultXYZDataset dataset = new DefaultXYZDataset();
-            double[][] arrayOfDouble = { x.getDoubleValue(), y.getDoubleValue(), z.getDoubleValue() };
+            double[][] arrayOfDouble = { x.getData(), y.getData(), z.getData() };
             dataset.addSeries("Series 1", arrayOfDouble);
             final NumberAxis xAxis = new NumberAxis(x.getName());
             final NumberAxis yAxis = new NumberAxis(y.getName());
@@ -783,10 +745,10 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         }
 
         final XYSeries newSerie = new XYSeries(measure.getName());
-        final int nbPoint = measure.getData().size();
+        final int nbPoint = measure.getDataLength();
 
         for (int n = 0; n < nbPoint; n++) {
-            newSerie.add(time.getData().get(n), measure.getData().get(n), false);
+            newSerie.add(time.getData()[n], measure.getData()[n], false);
         }
 
         if (!newAxis) {
@@ -848,10 +810,10 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         }
 
         final XYSeries newSerie = new XYSeries(measure.getName());
-        final int nbPoint = measure.getData().size();
+        final int nbPoint = measure.getDataLength();
 
         for (int n = 0; n < nbPoint; n++) {
-            newSerie.add(time.getData().get(n), measure.getData().get(n), false);
+            newSerie.add(time.getData()[n], measure.getData()[n], false);
         }
 
         if (!newAxis) {

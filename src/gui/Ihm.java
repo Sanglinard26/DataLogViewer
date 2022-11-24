@@ -18,10 +18,7 @@ import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.ObjectInputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
@@ -33,7 +30,6 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -120,7 +116,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
     private static final long serialVersionUID = 1L;
 
-    private final static String VERSION = "v1.55";
+    private final static String VERSION = "v1.56";
     private final String DEMO = "demo";
 
     private final static String LOG_PANEL = "LOG";
@@ -229,7 +225,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
                     @Override
                     public String getDescription() {
-                        return "Fichier de configuration graphique (*.cfg, *.xml)";
+                        return "Fichier de configuration graphique (*.xml)";
                     }
 
                     @Override
@@ -237,7 +233,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                         if (f.isDirectory()) {
                             return true;
                         }
-                        return f.getName().toLowerCase().endsWith("cfg") || f.getName().toLowerCase().endsWith("xml");
+                        return f.getName().toLowerCase().endsWith("xml");
                     }
                 });
                 final int reponse = fc.showOpenDialog(Ihm.this);
@@ -1440,6 +1436,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
             @Override
             public void chartProgress(ChartProgressEvent var1) {
+
                 if (var1.getType() == ChartProgressEvent.DRAWING_FINISHED) {
                     final Color colorMeasure = chartView.getMeasureColor(plot, listLogMeasure.getSelectedValue().getName());
                     tableCursorValues.getModel().addElement(listLogMeasure.getSelectedValue().getName(), colorMeasure);
@@ -1474,7 +1471,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
             Measure y = pickMeasureFromList(yLabel);
             Measure z = pickMeasureFromList(zLabel);
 
-            if (z.getData().isEmpty()) {
+            if (z.isEmpty()) {
                 chartView.add2DScatterPlot(x, y);
             } else {
                 chartView.add3DScatterPlot(x, y, z);
@@ -1565,8 +1562,8 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         @Override
         public void run() {
 
-            final List<Number> temps = log.getTime().getData();
-            final int nbPoint = temps.size();
+            final double[] temps = log.getTime().getData();
+            final int nbPoint = temps.length;
 
             XYPlot xyPlot;
             XYSeries serie;
@@ -1593,12 +1590,12 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
                                 measure = pickMeasureFromList(key.toString());
 
-                                final int sizeData = measure.getData().size();
+                                final int sizeData = measure.getDataLength();
 
                                 for (int n1 = 0; n1 < nbPoint; n1++) {
 
                                     if (n1 < sizeData) {
-                                        serie.add(temps.get(n1), measure.getData().get(n1), false);
+                                        serie.add(temps[n1], measure.getData()[n1], false);
                                     }
                                 }
 
@@ -1617,7 +1614,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                             Measure zMeasure = pickMeasureFromList(zLabel);
 
                             ((DefaultXYZDataset) xyPlot.getDataset()).addSeries(serieKey,
-                                    new double[][] { xMeasure.getDoubleValue(), yMeasure.getDoubleValue(), zMeasure.getDoubleValue() });
+                                    new double[][] { xMeasure.getData(), yMeasure.getData(), zMeasure.getData() });
 
                         } else {
                             Comparable<?> serieKey = ((DefaultXYDataset) xyPlot.getDataset()).getSeriesKey(nSerie);
@@ -1628,8 +1625,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                             Measure xMeasure = pickMeasureFromList(xLabel);
                             Measure yMeasure = pickMeasureFromList(yLabel);
 
-                            ((DefaultXYDataset) xyPlot.getDataset()).addSeries(serieKey,
-                                    new double[][] { xMeasure.getDoubleValue(), yMeasure.getDoubleValue() });
+                            ((DefaultXYDataset) xyPlot.getDataset()).addSeries(serieKey, new double[][] { xMeasure.getData(), yMeasure.getData() });
 
                         }
                     }
@@ -1660,8 +1656,8 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
             return;
         }
 
-        final List<Number> temps = log.getTime().getData();
-        final int nbPoint = temps.size();
+        final double[] temps = log.getTime().getData();
+        final int nbPoint = temps.length;
 
         for (int n = 0; n < nbTab; n++) {
             chartView = (ChartView) chartTabbedPane.getComponentAt(n);
@@ -1687,12 +1683,12 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
                         measure = pickMeasureFromList(key.toString());
 
-                        final int sizeData = measure.getData().size();
+                        final int sizeData = measure.getDataLength();
 
                         for (int n1 = 0; n1 < nbPoint; n1++) {
 
                             if (n1 < sizeData) {
-                                serie.add(temps.get(n1), measure.getData().get(n1), false);
+                                serie.add(temps[n1], measure.getData()[n1], false);
                             }
                         }
 
@@ -1710,7 +1706,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                         Measure zMeasure = pickMeasureFromList(zLabel);
 
                         ((DefaultXYZDataset) xyPlot.getDataset()).addSeries(serieKey,
-                                new double[][] { xMeasure.getDoubleValue(), yMeasure.getDoubleValue(), zMeasure.getDoubleValue() });
+                                new double[][] { xMeasure.getData(), yMeasure.getData(), zMeasure.getData() });
 
                     } else {
                         Comparable<?> serieKey = ((DefaultXYDataset) xyPlot.getDataset()).getSeriesKey(0);
@@ -1721,8 +1717,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                         Measure xMeasure = pickMeasureFromList(xLabel);
                         Measure yMeasure = pickMeasureFromList(yLabel);
 
-                        ((DefaultXYDataset) xyPlot.getDataset()).addSeries(serieKey,
-                                new double[][] { xMeasure.getDoubleValue(), yMeasure.getDoubleValue() });
+                        ((DefaultXYDataset) xyPlot.getDataset()).addSeries(serieKey, new double[][] { xMeasure.getData(), yMeasure.getData() });
 
                     }
                 }
@@ -1775,25 +1770,141 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
     private final void openConfig(File file) {
 
-        if (file.getName().endsWith("cfg") || file.getName().endsWith("tmp")) {
-            try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
-                @SuppressWarnings("unchecked")
-                Map<String, JFreeChart> charts = (LinkedHashMap<String, JFreeChart>) ois.readObject();
+        DocumentBuilder builder;
+        Document document = null;
+        DocumentBuilderFactory factory;
+        factory = DocumentBuilderFactory.newInstance();
+        factory.setIgnoringElementContentWhitespace(true);
+        factory.setValidating(false);
 
-                for (Entry<String, JFreeChart> entry : charts.entrySet()) {
-                    ChartView chartView = new ChartView(entry.getValue());
-                    chartView.addObservateur(tableCursorValues);
-                    chartView.setTransferHandler(new MeasureHandler());
-                    chartTabbedPane.addTab(entry.getKey(), chartView);
-                    chartTabbedPane.setTabComponentAt(chartTabbedPane.getTabCount() - 1, new ButtonTabComponent(chartTabbedPane));
-                    chartTabbedPane.setSelectedIndex(chartTabbedPane.getTabCount() - 1);
+        try {
+            builder = factory.newDocumentBuilder();
+            document = builder.parse(new File(file.toURI()));
+
+            final Element racine = document.getDocumentElement();
+            ChartView chartView;
+
+            if ("Configuration".equals(racine.getNodeName())) {
+
+                NodeList listWindow = racine.getElementsByTagName("Window");
+                int nbWindow = listWindow.getLength();
+
+                for (int i = 0; i < nbWindow; i++) {
+                    Element window = (Element) listWindow.item(i);
+                    String nameWindow = window.getElementsByTagName("Name").item(0).getTextContent();
+                    int typeWindow = Integer.parseInt(window.getElementsByTagName("Type").item(0).getTextContent());
+                    chartView = addChartWindow(nameWindow);
+
+                    NodeList listPlot = window.getElementsByTagName("Plot");
+                    int nbPlot = listPlot.getLength();
+
+                    for (int j = 0; j < nbPlot; j++) {
+
+                        Element plot = (Element) listPlot.item(j);
+
+                        String bckGrndColor = plot.getElementsByTagName("Background").item(0).getTextContent();
+
+                        switch (typeWindow) {
+                        case 1:
+
+                            String timeBase = plot.getElementsByTagName("TimeBase").item(0).getTextContent();
+
+                            chartView.addPlot(new Measure(timeBase), bckGrndColor);
+
+                            NodeList listAxis = plot.getElementsByTagName("Axis");
+
+                            for (int k = 0; k < listAxis.getLength(); k++) {
+                                Element axisNode = (Element) listAxis.item(k);
+                                String nameAxis = axisNode.getElementsByTagName("Name").item(0).getTextContent();
+
+                                String rangeText = axisNode.getElementsByTagName("Range").item(0).getTextContent();
+
+                                if (rangeText.indexOf(',') > -1) {
+                                    rangeText = rangeText.replace(',', '.');
+                                }
+
+                                String[] splitRange = rangeText.split(";");
+
+                                NodeList listSeries = axisNode.getElementsByTagName("Serie");
+
+                                for (int l = 0; l < listSeries.getLength(); l++) {
+
+                                    Element serieNode = (Element) listSeries.item(l);
+                                    String nameSerie = serieNode.getElementsByTagName("Name").item(0).getTextContent();
+                                    String colorSerie = serieNode.getElementsByTagName("Color").item(0).getTextContent();
+                                    String widthSerie = serieNode.getElementsByTagName("Width").item(0).getTextContent();
+                                    chartView.addMeasure((XYPlot) chartView.getPlot().getSubplots().get(j), new Measure("Time_ms"),
+                                            new Measure(nameSerie), colorSerie, widthSerie, nameAxis);
+                                }
+
+                                if (splitRange.length == 2) {
+                                    try {
+                                        ValueAxis axis = ((XYPlot) chartView.getPlot().getSubplots().get(j)).getRangeAxis(k);
+                                        double lowerBound = Double.parseDouble(splitRange[0]);
+                                        double upperBound = Double.parseDouble(splitRange[1]);
+                                        Range newRange = new Range(lowerBound, upperBound);
+                                        axis.setRange(newRange);
+
+                                    } catch (NumberFormatException e) {
+                                    }
+                                }
+                            }
+
+                            break;
+                        case 2:
+
+                            Element serie2D = (Element) plot.getElementsByTagName("Serie").item(0);
+
+                            String x = serie2D.getElementsByTagName("X").item(0).getTextContent();
+                            String y = serie2D.getElementsByTagName("Y").item(0).getTextContent();
+                            String colorSerie = serie2D.getElementsByTagName("Color").item(0).getTextContent();
+                            String shapeSize2D = serie2D.getElementsByTagName("Shape_size").item(0).getTextContent();
+
+                            chartView.add2DScatterPlot(new Measure(x), new Measure(y), bckGrndColor, shapeSize2D, colorSerie);
+
+                            break;
+                        case 3:
+
+                            Element serie3D = (Element) plot.getElementsByTagName("Serie").item(0);
+
+                            String x3D = serie3D.getElementsByTagName("X").item(0).getTextContent();
+                            String y3D = serie3D.getElementsByTagName("Y").item(0).getTextContent();
+                            String z3D = serie3D.getElementsByTagName("Z").item(0).getTextContent();
+
+                            String shapeSize3D = serie3D.getElementsByTagName("Shape_size").item(0).getTextContent();
+                            String zRange = plot.getElementsByTagName("Z_Range").item(0).getTextContent();
+
+                            chartView.add3DScatterPlot(new Measure(x3D), new Measure(y3D), new Measure(z3D), bckGrndColor, shapeSize3D, zRange);
+
+                            break;
+                        }
+                    }
+
                 }
 
-                @SuppressWarnings("unchecked")
-                Set<Measure> list = (Set<Measure>) ois.readObject();
+                NodeList listFormulas = racine.getElementsByTagName("Formula");
+                int nbFormula = listFormulas.getLength();
+
+                for (int i = 0; i < nbFormula; i++) {
+                    Element formula = (Element) listFormulas.item(i);
+                    String nameFormula = formula.getElementsByTagName("Name").item(0).getTextContent();
+                    String unitFormula = formula.getElementsByTagName("Unit").item(0).getTextContent();
+                    String expressionFormula = formula.getElementsByTagName("Expression").item(0).getTextContent();
+
+                    // Tâche longue, 90% de la fonction openConfig : voir pour optimiser
+                    if (log != null) {
+                        listFormula.add(new Formula(nameFormula, unitFormula, expressionFormula, log, getSelectedCal()));
+                    } else {
+                        listFormula.add(new Formula(nameFormula, unitFormula, expressionFormula));
+                    }
+                    // *****
+                }
 
                 if (log != null) {
-                    for (Measure formule : list) {
+
+                    btSynchro.setEnabled(true);
+
+                    for (Measure formule : listFormula) {
                         log.getMeasures().add(formule);
                         int idx = listModel.indexOf(formule);
                         if (idx < 0) {
@@ -1802,201 +1913,42 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                     }
                 }
 
-                for (Measure formule : list) {
-                    ((Formula) formule).deserialize();
-                    ((Formula) formule).setOutdated();
-                    ((Formula) formule).calculate(log, getSelectedCal());
-                    listFormula.add(formule);
+                NodeList listConditons = racine.getElementsByTagName("Condition");
+                int nbCondition = listConditons.getLength();
+
+                List<Condition> conditions = new ArrayList<>(nbCondition);
+
+                for (int i = 0; i < nbCondition; i++) {
+                    Element condition = (Element) listConditons.item(i);
+                    String nameCondition = condition.getElementsByTagName("Name").item(0).getTextContent();
+                    String expressionCondition = condition.getElementsByTagName("Expression").item(0).getTextContent();
+                    String colorCondition = condition.getElementsByTagName("Color").item(0).getTextContent();
+
+                    conditions.add(new Condition(nameCondition, expressionCondition, Utilitaire.parseRGBColor(colorCondition, 70)));
                 }
 
-                @SuppressWarnings("unchecked")
-                List<Condition> conditions = (List<Condition>) ois.readObject();
                 panelCondition.getTableCondition().getModel().setConditions(conditions);
 
-            } catch (FileNotFoundException e) {
-            } catch (IOException e) {
-            } catch (ClassNotFoundException e) {
-            } finally {
-                reloadLogData(log);
-            }
-        } else {
-
-            DocumentBuilder builder;
-            Document document = null;
-            DocumentBuilderFactory factory;
-            factory = DocumentBuilderFactory.newInstance();
-            factory.setIgnoringElementContentWhitespace(true);
-            factory.setValidating(false);
-
-            try {
-                builder = factory.newDocumentBuilder();
-                document = builder.parse(new File(file.toURI()));
-
-                final Element racine = document.getDocumentElement();
-                ChartView chartView;
-
-                if ("Configuration".equals(racine.getNodeName())) {
-
-                    NodeList listWindow = racine.getElementsByTagName("Window");
-                    int nbWindow = listWindow.getLength();
-
-                    for (int i = 0; i < nbWindow; i++) {
-                        Element window = (Element) listWindow.item(i);
-                        String nameWindow = window.getElementsByTagName("Name").item(0).getTextContent();
-                        int typeWindow = Integer.parseInt(window.getElementsByTagName("Type").item(0).getTextContent());
-                        chartView = addChartWindow(nameWindow);
-
-                        NodeList listPlot = window.getElementsByTagName("Plot");
-                        int nbPlot = listPlot.getLength();
-
-                        for (int j = 0; j < nbPlot; j++) {
-
-                            Element plot = (Element) listPlot.item(j);
-
-                            String bckGrndColor = plot.getElementsByTagName("Background").item(0).getTextContent();
-
-                            switch (typeWindow) {
-                            case 1:
-
-                                String timeBase = plot.getElementsByTagName("TimeBase").item(0).getTextContent();
-
-                                chartView.addPlot(new Measure(timeBase), bckGrndColor);
-
-                                NodeList listAxis = plot.getElementsByTagName("Axis");
-
-                                for (int k = 0; k < listAxis.getLength(); k++) {
-                                    Element axisNode = (Element) listAxis.item(k);
-                                    String nameAxis = axisNode.getElementsByTagName("Name").item(0).getTextContent();
-
-                                    String rangeText = axisNode.getElementsByTagName("Range").item(0).getTextContent();
-
-                                    if (rangeText.indexOf(',') > -1) {
-                                        rangeText = rangeText.replace(',', '.');
-                                    }
-
-                                    String[] splitRange = rangeText.split(";");
-
-                                    NodeList listSeries = axisNode.getElementsByTagName("Serie");
-
-                                    for (int l = 0; l < listSeries.getLength(); l++) {
-
-                                        Element serieNode = (Element) listSeries.item(l);
-                                        String nameSerie = serieNode.getElementsByTagName("Name").item(0).getTextContent();
-                                        String colorSerie = serieNode.getElementsByTagName("Color").item(0).getTextContent();
-                                        String widthSerie = serieNode.getElementsByTagName("Width").item(0).getTextContent();
-                                        chartView.addMeasure((XYPlot) chartView.getPlot().getSubplots().get(j), new Measure("Time_ms"),
-                                                new Measure(nameSerie), colorSerie, widthSerie, nameAxis);
-                                    }
-
-                                    if (splitRange.length == 2) {
-                                        try {
-                                            ValueAxis axis = ((XYPlot) chartView.getPlot().getSubplots().get(j)).getRangeAxis(k);
-                                            double lowerBound = Double.parseDouble(splitRange[0]);
-                                            double upperBound = Double.parseDouble(splitRange[1]);
-                                            Range newRange = new Range(lowerBound, upperBound);
-                                            axis.setRange(newRange);
-
-                                        } catch (NumberFormatException e) {
-                                        }
-                                    }
-                                }
-
-                                break;
-                            case 2:
-
-                                Element serie2D = (Element) plot.getElementsByTagName("Serie").item(0);
-
-                                String x = serie2D.getElementsByTagName("X").item(0).getTextContent();
-                                String y = serie2D.getElementsByTagName("Y").item(0).getTextContent();
-                                String colorSerie = serie2D.getElementsByTagName("Color").item(0).getTextContent();
-                                String shapeSize2D = serie2D.getElementsByTagName("Shape_size").item(0).getTextContent();
-
-                                chartView.add2DScatterPlot(new Measure(x), new Measure(y), bckGrndColor, shapeSize2D, colorSerie);
-
-                                break;
-                            case 3:
-
-                                Element serie3D = (Element) plot.getElementsByTagName("Serie").item(0);
-
-                                String x3D = serie3D.getElementsByTagName("X").item(0).getTextContent();
-                                String y3D = serie3D.getElementsByTagName("Y").item(0).getTextContent();
-                                String z3D = serie3D.getElementsByTagName("Z").item(0).getTextContent();
-
-                                String shapeSize3D = serie3D.getElementsByTagName("Shape_size").item(0).getTextContent();
-                                String zRange = plot.getElementsByTagName("Z_Range").item(0).getTextContent();
-
-                                chartView.add3DScatterPlot(new Measure(x3D), new Measure(y3D), new Measure(z3D), bckGrndColor, shapeSize3D, zRange);
-
-                                break;
-                            }
-                        }
-
+                int idx = chartTabbedPane.getSelectedIndex();
+                if (idx > -1) {
+                    if (chartTabbedPane.getComponentAt(idx) instanceof ChartView) {
+                        chartView = (ChartView) chartTabbedPane.getComponentAt(idx);
+                        tableCursorValues.getModel().changeList(chartView.getMeasuresColors());
                     }
-
-                    NodeList listFormulas = racine.getElementsByTagName("Formula");
-                    int nbFormula = listFormulas.getLength();
-
-                    for (int i = 0; i < nbFormula; i++) {
-                        Element formula = (Element) listFormulas.item(i);
-                        String nameFormula = formula.getElementsByTagName("Name").item(0).getTextContent();
-                        String unitFormula = formula.getElementsByTagName("Unit").item(0).getTextContent();
-                        String expressionFormula = formula.getElementsByTagName("Expression").item(0).getTextContent();
-
-                        // Tâche longue, 90% de la fonction openConfig : voir pour optimiser
-                        listFormula.add(new Formula(nameFormula, unitFormula, expressionFormula, log, getSelectedCal()));
-                        // *****
-                    }
-
-                    if (log != null) {
-
-                        btSynchro.setEnabled(true);
-
-                        for (Measure formule : listFormula) {
-                            log.getMeasures().add(formule);
-                            int idx = listModel.indexOf(formule);
-                            if (idx < 0) {
-                                listModel.addElement(formule);
-                            }
-                        }
-                    }
-
-                    NodeList listConditons = racine.getElementsByTagName("Condition");
-                    int nbCondition = listConditons.getLength();
-
-                    List<Condition> conditions = new ArrayList<>(nbCondition);
-
-                    for (int i = 0; i < nbCondition; i++) {
-                        Element condition = (Element) listConditons.item(i);
-                        String nameCondition = condition.getElementsByTagName("Name").item(0).getTextContent();
-                        String expressionCondition = condition.getElementsByTagName("Expression").item(0).getTextContent();
-                        String colorCondition = condition.getElementsByTagName("Color").item(0).getTextContent();
-
-                        conditions.add(new Condition(nameCondition, expressionCondition, Utilitaire.parseRGBColor(colorCondition, 70)));
-                    }
-
-                    panelCondition.getTableCondition().getModel().setConditions(conditions);
-
-                    int idx = chartTabbedPane.getSelectedIndex();
-                    if (idx > -1) {
-                        if (chartTabbedPane.getComponentAt(idx) instanceof ChartView) {
-                            chartView = (ChartView) chartTabbedPane.getComponentAt(idx);
-                            tableCursorValues.getModel().changeList(chartView.getMeasuresColors());
-                        }
-                    }
-
-                    document = null;
-
-                } else {
-
-                    return;
                 }
 
-            } catch (ParserConfigurationException | SAXException | IOException e) {
-                e.printStackTrace();
-            } finally {
+                document = null;
 
-                reloadLogData(log);
+            } else {
+
+                return;
             }
+
+        } catch (ParserConfigurationException | SAXException | IOException e) {
+            e.printStackTrace();
+        } finally {
+
+            reloadLogData(log);
         }
 
     }
@@ -2083,7 +2035,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
             double min = serie.getMinY();
             for (int i = 0; i < serie.getItemCount(); i++) {
                 if (serie.getY(i).doubleValue() == min) {
-                    chartView.moveMarker(time.getData().get(i).doubleValue());
+                    chartView.moveMarker(time.getData()[i]);
                     return;
                 }
             }
@@ -2093,7 +2045,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
             double max = serie.getMaxY();
             for (int i = 0; i < serie.getItemCount(); i++) {
                 if (serie.getY(i).doubleValue() == max) {
-                    chartView.moveMarker(time.getData().get(i).doubleValue());
+                    chartView.moveMarker(time.getData()[i]);
                     return;
                 }
             }

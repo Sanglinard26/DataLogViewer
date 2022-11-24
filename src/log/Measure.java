@@ -4,23 +4,29 @@
 package log;
 
 import java.io.Serializable;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.BitSet;
-import java.util.List;
 
 public class Measure implements Comparable<Measure>, Serializable {
 
     private static final long serialVersionUID = 1L;
     protected String name;
     protected String unit;
-    protected List<Number> data;
+    protected double[] data;
     protected double min = Double.POSITIVE_INFINITY;
     protected double max = Double.NEGATIVE_INFINITY;
+    protected int idx;
 
     public Measure(String name) {
+        this(name, 0);
+    }
+
+    public Measure(String name, int dataSize) {
         this.name = name;
         this.unit = "";
-        this.data = new ArrayList<Number>();
+        this.idx = 0;
+        this.data = new double[dataSize];
+        Arrays.fill(data, Double.NaN);
     }
 
     public final String getName() {
@@ -47,25 +53,25 @@ public class Measure implements Comparable<Measure>, Serializable {
         return max;
     }
 
-    public final void addPoint(Number value) {
-        this.data.add(value);
-        if (Double.isNaN(value.doubleValue())) {
+    public final void addPoint(double value) {
+        this.data[idx++] = value;
+        if (Double.isNaN(value)) {
             return;
         }
-        this.min = Math.min(min, value.doubleValue());
-        this.max = Math.max(max, value.doubleValue());
+        this.min = Math.min(min, value);
+        this.max = Math.max(max, value);
     }
 
-    public final List<Number> getData() {
+    public final double[] getData() {
         return this.data;
     }
 
-    public final double[] getDoubleValue() {
-        final double[] result = new double[data.size()];
-        for (int i = 0; i < data.size(); i++) {
-            result[i] = data.get(i).doubleValue();
-        }
-        return result;
+    public final int getDataLength() {
+        return this.data.length;
+    }
+
+    public final boolean isEmpty() {
+        return this.idx == 0;
     }
 
     public final double[] getDoubleValue(BitSet bitCondition) {
@@ -74,14 +80,15 @@ public class Measure implements Comparable<Measure>, Serializable {
         int cnt = 0;
         for (int i = 0; i < bitCondition.size(); i++) {
             if (bitCondition.get(i)) {
-                result[cnt++] = data.get(i).doubleValue();
+                result[cnt++] = data[i];
             }
         }
         return result;
     }
 
     public final void clearData() {
-        data.clear();
+        this.idx = 0;
+        Arrays.fill(data, Double.NaN);
         min = Double.POSITIVE_INFINITY;
         max = Double.NEGATIVE_INFINITY;
     }

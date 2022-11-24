@@ -832,7 +832,7 @@ public final class CalTable extends JPanel {
         case COURBE:
             xMeasure = log.getMeasureWoutUnit(args[0]);
 
-            if (xMeasure.getData().isEmpty()) {
+            if (xMeasure.isEmpty()) {
                 return;
             }
 
@@ -842,9 +842,9 @@ public final class CalTable extends JPanel {
 
             xIndex = new int[2];
 
-            for (int i = 0; i < log.getTime().getData().size(); i++) {
+            for (int i = 0; i < log.getTime().getDataLength(); i++) {
 
-                float x = xMeasure.getData().get(i).floatValue();
+                float x = (float) xMeasure.getData()[i];
 
                 int xIdx = Arrays.binarySearch(xBrkPt, x);
 
@@ -863,7 +863,7 @@ public final class CalTable extends JPanel {
             xMeasure = log.getMeasureWoutUnit(args[0]);
             yMeasure = log.getMeasureWoutUnit(args[1]);
 
-            if (xMeasure.getData().isEmpty() || yMeasure.getData().isEmpty()) {
+            if (xMeasure.getDataLength() == 0 || yMeasure.getDataLength() == 0) {
                 return;
             }
 
@@ -875,10 +875,10 @@ public final class CalTable extends JPanel {
             xIndex = new int[2];
             yIndex = new int[2];
 
-            for (int i = 0; i < log.getTime().getData().size(); i++) {
+            for (int i = 0; i < log.getTime().getDataLength(); i++) {
 
-                float x = xMeasure.getData().get(i).floatValue();
-                float y = yMeasure.getData().get(i).floatValue();
+                float x = (float) xMeasure.getData()[i];
+                float y = (float) yMeasure.getData()[i];
 
                 int xIdx = Arrays.binarySearch(xBrkPt, x);
                 int yIdx = Arrays.binarySearch(yBrkPt, y);

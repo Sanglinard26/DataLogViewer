@@ -38,7 +38,7 @@ public final class Formula extends Measure {
     }
 
     public Formula(String name, String unit, String baseExpression, Log log, MapCal calib) {
-        super(name);
+        super(name, log.getNbPoints());
 
         this.unit = unit;
 
@@ -51,6 +51,25 @@ public final class Formula extends Measure {
 
         if (valid) {
             calculate(log, calib);
+        } else {
+            JOptionPane.showMessageDialog(null, "V\u00e9rifiez la synthaxe svp", "Erreur", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    public Formula(String name, String unit, String baseExpression) {
+        super(name);
+
+        this.unit = unit;
+
+        if ("".equals(baseExpression)) {
+            return;
+        }
+        this.literalExpression = baseExpression;
+
+        build();
+
+        if (valid) {
+            upToDate = false;
         } else {
             JOptionPane.showMessageDialog(null, "V\u00e9rifiez la synthaxe svp", "Erreur", JOptionPane.ERROR_MESSAGE);
         }
@@ -147,6 +166,10 @@ public final class Formula extends Measure {
         }
     }
 
+    public final void changeData(Log log) {
+        this.data = new double[log.getNbPoints()];
+    }
+
     public final void calculate(Log log, MapCal calib) {
 
         Argument arg;
@@ -157,8 +180,10 @@ public final class Formula extends Measure {
             return;
         }
 
-        if (!data.isEmpty()) {
+        if (data.length > 0) {
             clearData();
+        } else {
+            changeData(log);
         }
 
         if (log != null) {
@@ -185,13 +210,13 @@ public final class Formula extends Measure {
 
             }
 
-            for (int i = 0; i < log.getTime().getData().size(); i++) {
+            for (int i = 0; i < log.getTime().getDataLength(); i++) {
                 for (int j = 0; j < expression.getArgumentsNumber(); j++) {
                     arg = expression.getArgument(j);
-                    if (measures[j].getData().isEmpty()) {
+                    if (measures[j].isEmpty()) {
                         break;
                     }
-                    arg.setArgumentValue(measures[j].getData().get(i).doubleValue());
+                    arg.setArgumentValue(measures[j].getData()[i]);
                 }
                 double res = expression.calculate();
                 this.addPoint(res);
@@ -240,20 +265,20 @@ public final class Formula extends Measure {
         if (cal != null) {
             variable = cal.getVariable(splitParams[0]);
             if (variable != null) {
-                z = new Measure(variable.getName());
+                z = new Measure(variable.getName(), log.getNbPoints());
             } else {
-                z = new Measure(splitParams[0]);
+                z = new Measure(splitParams[0], log.getNbPoints());
                 nbParams = 0;
             }
         } else {
-            z = new Measure(splitParams[0]);
+            z = new Measure(splitParams[0], log.getNbPoints());
             nbParams = 0;
         }
 
         switch (nbParams) {
         case 1:
 
-            for (int i = 0; i < log.getTime().getData().size(); i++) {
+            for (int i = 0; i < log.getTime().getDataLength(); i++) {
                 double res = Double.parseDouble(variable.getValue(true, 0, 0).toString());
                 z.addPoint(res);
             }
@@ -262,8 +287,8 @@ public final class Formula extends Measure {
         case 2:
             x = log.getMeasure(splitParams[1]);
 
-            for (int i = 0; i < log.getTime().getData().size(); i++) {
-                double res = Interpolation.interpLinear1D(variable.toDouble2D(true), x.getData().get(i).doubleValue());
+            for (int i = 0; i < log.getTime().getDataLength(); i++) {
+                double res = Interpolation.interpLinear1D(variable.toDouble2D(true), x.getData()[i]);
                 z.addPoint(res);
             }
 
@@ -272,15 +297,14 @@ public final class Formula extends Measure {
             x = log.getMeasure(splitParams[1]);
             y = log.getMeasure(splitParams[2]);
 
-            for (int i = 0; i < log.getTime().getData().size(); i++) {
-                double res = Interpolation.interpLinear2D(variable.toDouble2D(true), x.getData().get(i).doubleValue(),
-                        y.getData().get(i).doubleValue());
+            for (int i = 0; i < log.getTime().getDataLength(); i++) {
+                double res = Interpolation.interpLinear2D(variable.toDouble2D(true), x.getData()[i], y.getData()[i]);
                 z.addPoint(res);
             }
             return z;
         default:
 
-            for (int i = 0; i < log.getTime().getData().size(); i++) {
+            for (int i = 0; i < log.getTime().getDataLength(); i++) {
                 double res = Double.NaN;
                 z.addPoint(res);
             }

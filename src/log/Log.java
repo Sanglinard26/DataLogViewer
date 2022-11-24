@@ -27,7 +27,7 @@ public final class Log {
 
     public Log(File file) {
 
-        long start = System.currentTimeMillis();
+        // long start = System.currentTimeMillis();
 
         if (file != null) {
 
@@ -37,7 +37,7 @@ public final class Log {
             switch (extension) {
             case "txt":
                 timeName = "Time_ms";
-                parseTxt_bis(file);
+                parseTxt(file);
                 break;
             case "msl":
                 timeName = "Time";
@@ -49,76 +49,9 @@ public final class Log {
 
             Collections.sort(datas);
         }
+        // System.out.println("Nb points = " + nbPoints);
 
-        System.out.println("log opened in : " + (System.currentTimeMillis() - start) + "ms");
-    }
-
-    private final void parseTxt(File file) {
-
-        final String tabDelimiter = "\t";
-        final String commaDelimiter = ",";
-        String delimiter = "";
-
-        try (final BufferedReader bf = new BufferedReader(new FileReader(file))) {
-
-            String line;
-            String parsedValue;
-            String[] splitTab;
-            Number value;
-
-            int cntLine = 0;
-
-            while ((line = bf.readLine()) != null) {
-
-                if (cntLine == 1) {
-                    if (line.indexOf(commaDelimiter) > -1) {
-                        delimiter = commaDelimiter;
-                    } else {
-                        delimiter = tabDelimiter;
-                    }
-                }
-
-                splitTab = line.split(delimiter);
-
-                switch (cntLine) {
-                case 0:
-                    this.fnr = line.trim();
-                    break;
-                case 1:
-                    this.datas = new ArrayList<Measure>(splitTab.length);
-
-                    for (int idxCol = 0; idxCol < splitTab.length; idxCol++) {
-                        if (idxCol == 0) {
-                            this.timeName = splitTab[idxCol];
-                        }
-                        this.datas.add(new Measure(splitTab[idxCol]));
-                    }
-
-                    break;
-                default:
-                    if (splitTab.length == this.datas.size()) {
-                        for (int idxCol = 0; idxCol < this.datas.size(); idxCol++) {
-
-                            parsedValue = splitTab[idxCol];
-
-                            value = Utilitaire.getNumberObject(parsedValue.trim());
-
-                            this.datas.get(idxCol).addPoint(value);
-                        }
-
-                        this.nbPoints++;
-                    }
-                    break;
-                }
-
-                cntLine++;
-            }
-
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        // System.out.println("log opened in : " + (System.currentTimeMillis() - start) + "ms");
     }
 
     private final void parseMsl(File file) {
@@ -172,7 +105,7 @@ public final class Log {
                                 double value = Double.parseDouble(parsedValue.trim());
                                 this.datas.get(idxCol).addPoint(value);
                             } catch (NumberFormatException e) {
-                                this.datas.get(idxCol).getData().add(Double.NaN);
+                                this.datas.get(idxCol).addPoint(Double.NaN);
                             }
                         }
                     }
@@ -183,7 +116,7 @@ public final class Log {
             }
 
             for (Measure measure : this.datas) {
-                this.nbPoints = Math.max(this.nbPoints, measure.getData().size());
+                this.nbPoints = Math.max(this.nbPoints, measure.getDataLength());
             }
 
         } catch (FileNotFoundException e) {
@@ -203,6 +136,10 @@ public final class Log {
 
     public final String getFnr() {
         return this.fnr;
+    }
+
+    public int getNbPoints() {
+        return nbPoints;
     }
 
     public final Measure getTime() {
@@ -238,29 +175,30 @@ public final class Log {
 
     }
 
-    private final void parseTxt_bis(File file) {
+    private final void parseTxt(File file) {
 
         final String tabDelimiter = "\t";
         final String commaDelimiter = ",";
         String delimiter = "";
 
-        long nbLines = 0;
+        int nbLines = 0;
 
         Stream<String> lines;
         try {
             lines = Files.lines(file.toPath(), StandardCharsets.ISO_8859_1);
-            nbLines = lines.count() - 2;
+            nbLines = (int) (lines.count() - 2);
             lines.close();
         } catch (IOException e1) {
         }
+
+        // System.out.println("Nb lines = " + nbLines);
 
         try (final BufferedReader bf = new BufferedReader(new FileReader(file))) {
 
             String line;
             String parsedValue;
             String[] splitTab;
-            Number value;
-
+            double value = 0;
             int cntLine = 0;
 
             while ((line = bf.readLine()) != null) {
@@ -286,7 +224,7 @@ public final class Log {
                         if (idxCol == 0) {
                             this.timeName = splitTab[idxCol];
                         }
-                        this.datas.add(new Measure(splitTab[idxCol]));
+                        this.datas.add(new Measure(splitTab[idxCol], nbLines));
                     }
 
                     break;
@@ -296,16 +234,14 @@ public final class Log {
 
                             parsedValue = splitTab[idxCol];
 
-                            value = Utilitaire.getNumberObject(parsedValue.trim());
+                            value = Utilitaire.getDoubleFromString(parsedValue.trim());
 
                             this.datas.get(idxCol).addPoint(value);
                         }
-
                         this.nbPoints++;
                     }
                     break;
                 }
-
                 cntLine++;
             }
 

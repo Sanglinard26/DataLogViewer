@@ -82,6 +82,30 @@ public abstract class Utilitaire {
         }
     }
 
+    public static final double getDoubleFromString(String number) {
+        final int idx = number.indexOf(',');
+        try {
+            if (idx == -1) {
+                return Double.parseDouble(number);
+            }
+            return Double.parseDouble(number.replace(',', '.'));
+        } catch (NumberFormatException e) {
+            return Float.NaN;
+        }
+    }
+
+    public static final float getFloatFromString(String number) {
+        final int idx = number.indexOf(',');
+        try {
+            if (idx == -1) {
+                return Float.parseFloat(number);
+            }
+            return Float.parseFloat(number.replace(',', '.'));
+        } catch (NumberFormatException e) {
+            return Float.NaN;
+        }
+    }
+
     public static final Number getNumberObject(String number) {
 
         Double doubleValue;

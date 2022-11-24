@@ -235,8 +235,8 @@ public final class DialNewFormula extends JDialog {
                     XYSeries serie = dataset.getSeries(0);
                     serie.clear();
                     Measure time = ihm.getLog().getTime();
-                    for (int i = 0; i < time.getData().size(); i++) {
-                        serie.add(time.getData().get(i), newFormula.getData().get(i), false);
+                    for (int i = 0; i < time.getDataLength(); i++) {
+                        serie.add(time.getData()[i], newFormula.getData()[i], false);
                     }
                     serie.fireSeriesChanged();
                     chartPanel.restoreAutoBounds();

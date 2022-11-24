@@ -80,7 +80,7 @@ public final class Condition implements Serializable {
     }
 
     public BitSet applyCondition(Log log) {
-        BitSet bitCondition = new BitSet(log.getTime().getData().size());
+        BitSet bitCondition = new BitSet(log.getTime().getDataLength());
 
         if ("".equals(expression) || !active) {
             return bitCondition;
@@ -130,13 +130,13 @@ public final class Condition implements Serializable {
             measures[j] = log.getMeasure(var);
         }
 
-        for (int i = 0; i < log.getTime().getData().size(); i++) {
+        for (int i = 0; i < log.getTime().getDataLength(); i++) {
             for (int j = 0; j < conditionExpression.getArgumentsNumber(); j++) {
                 arg = conditionExpression.getArgument(j);
-                if (measures[j].getData().isEmpty()) {
+                if (measures[j].getDataLength() == 0) {
                     break;
                 }
-                arg.setArgumentValue(measures[j].getData().get(i).doubleValue());
+                arg.setArgumentValue(measures[j].getData()[i]);
             }
             double res = conditionExpression.calculate();
             if (res == 1) {
