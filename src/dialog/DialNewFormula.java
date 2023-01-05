@@ -14,20 +14,34 @@ import java.awt.datatransfer.Transferable;
 import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.io.IOException;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JDialog;
+import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JSeparator;
-import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.JTextPane;
 import javax.swing.SwingConstants;
 import javax.swing.TransferHandler;
+import javax.swing.border.LineBorder;
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.Element;
+import javax.swing.text.StyleConstants;
+import javax.swing.text.StyledDocument;
 
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartPanel;
@@ -36,11 +50,11 @@ import org.jfree.data.xy.XYSeries;
 import org.jfree.data.xy.XYSeriesCollection;
 
 import calib.MapCal;
-import calib.Variable;
 import gui.Ihm;
 import gui.MapView;
 import log.Formula;
 import log.Measure;
+import sun.awt.datatransfer.ClipboardTransferable;
 
 public final class DialNewFormula extends JDialog {
 
@@ -48,7 +62,7 @@ public final class DialNewFormula extends JDialog {
 
     private final JTextField txtName;
     private final JTextField txtUnit;
-    private final JTextArea formulaText;
+    private final JTextPane formulaTextPane;
     private ChartPanel chartPanel;
 
     public DialNewFormula(final Ihm ihm) {
@@ -94,27 +108,25 @@ public final class DialNewFormula extends JDialog {
         gbc.fill = GridBagConstraints.BOTH;
         gbc.gridx = 0;
         gbc.gridy = 1;
-        gbc.gridwidth = 4;
+        gbc.gridwidth = 5;
         gbc.gridheight = 1;
         gbc.weightx = 1;
         gbc.weighty = 1;
         gbc.insets = new Insets(0, 5, 0, 5);
         gbc.anchor = GridBagConstraints.CENTER;
-        formulaText = new JTextArea(5, 60);
-        formulaText.setBorder(BorderFactory.createTitledBorder("Expression :"));
-        formulaText.setFont(formulaText.getFont().deriveFont(14f));
-        formulaText.setLineWrap(true);
-        formulaText.setWrapStyleWord(true);
-        formulaText.setTransferHandler(new TransferHandler("measure") {
+        formulaTextPane = new JTextPane();
+        formulaTextPane.setBorder(BorderFactory.createTitledBorder("Expression :"));
+        formulaTextPane.setFont(formulaTextPane.getFont().deriveFont(14f));
+        formulaTextPane.setTransferHandler(new TransferHandler("measure") {
             private static final long serialVersionUID = 1L;
 
             @Override
             public void exportToClipboard(JComponent comp, Clipboard clip, int action) throws IllegalStateException {
-                StringSelection selection = new StringSelection(formulaText.getSelectedText());
+                StringSelection selection = new StringSelection(iterateOverContent(formulaTextPane));
                 clip.setContents(selection, selection);
 
                 if (action == TransferHandler.MOVE) {
-                    formulaText.setText(null);
+                    formulaTextPane.setText(null);
                 }
             }
 
@@ -128,66 +140,60 @@ public final class DialNewFormula extends JDialog {
                 Transferable t = supp.getTransferable();
 
                 String data = "";
+
                 try {
                     data = (String) t.getTransferData(DataFlavor.stringFlavor);
 
-                    MapView mapView = ((Ihm) DialNewFormula.this.getParent()).getMapView();
+                    if (t instanceof ClipboardTransferable) {
+                        parseFormula(data);
+                        return true;
+                    }
 
-                    Variable var = null;
+                    MapView mapView = ((Ihm) DialNewFormula.this.getParent()).getMapView();
 
                     if (mapView != null && mapView.isVisible()) {
 
                         MapCal calib = mapView.findSelectedCal();
 
-                        if (calib != null && calib.isUsedByFormula()) {
-                            var = calib.getVariable(data);
-                        } else {
+                        if (calib != null && !calib.isUsedByFormula()) {
+
                             int res = JOptionPane.showConfirmDialog(null,
                                     "La fichier \"" + calib + "\"" + " n'a pas \u00e9t\u00e9 défini comme r\u00e9f\u00e9rence, le faire?", "INFO",
                                     JOptionPane.YES_NO_OPTION);
                             if (res == JOptionPane.YES_OPTION) {
                                 mapView.setCalForFormula(calib.getName());
-                                var = calib.getVariable(data);
                             } else {
                                 return false;
                             }
                         }
                     }
-
-                    if (!data.equals(Toolkit.getDefaultToolkit().getSystemClipboard().getContents(null).getTransferData(DataFlavor.stringFlavor))
-                            && var == null) {
-                        data = "#" + data + "#";
-                    }
-
-                } catch (UnsupportedFlavorException e) {
-                    if (!"".equals(data)) {
-                        data = "#" + data + "#";
-                    }
-                } catch (IOException e) {
+                } catch (UnsupportedFlavorException | IOException e) {
                     e.printStackTrace();
                 }
 
-                int caretPosition = formulaText.getCaretPosition();
+                int caretPosition = formulaTextPane.getCaretPosition();
 
                 if (checkAccolades(caretPosition)) {
-                    formulaText.insert(data.replace("#", ""), formulaText.getCaretPosition());
+                    formulaTextPane.insertComponent(createLabel(data, Color.BLUE));
                 } else {
-                    formulaText.insert(data, formulaText.getCaretPosition());
+                    formulaTextPane.insertComponent(createLabel(data, Color.RED));
                 }
 
+                DialNewFormula.this.toFront();
                 DialNewFormula.this.requestFocus();
-                formulaText.requestFocusInWindow();
-                formulaText.setCaretPosition(formulaText.getText().length());
+                formulaTextPane.requestFocusInWindow();
+                formulaTextPane.setCaretPosition(formulaTextPane.getText().length());
 
                 return true;
             }
         });
-        add(formulaText, gbc);
+        add(formulaTextPane, gbc);
 
         if (formula != null) {
             txtName.setText(formula.getName());
             txtUnit.setText(formula.getUnit());
-            formulaText.setText(formula.getExpression());
+
+            parseFormula(formula.getExpression());
         }
 
         gbc.fill = GridBagConstraints.VERTICAL;
@@ -229,17 +235,22 @@ public final class DialNewFormula extends JDialog {
             @Override
             public void actionPerformed(ActionEvent arg0) {
 
-                Formula newFormula = new Formula(txtName.getText(), txtUnit.getText(), formulaText.getText(), ihm.getLog(), ihm.getSelectedCal());
-                if (ihm.getLog() != null && newFormula.isValid()) {
-                    XYSeriesCollection dataset = (XYSeriesCollection) chartPanel.getChart().getXYPlot().getDataset();
-                    XYSeries serie = dataset.getSeries(0);
-                    serie.clear();
-                    Measure time = ihm.getLog().getTime();
-                    for (int i = 0; i < time.getDataLength(); i++) {
-                        serie.add(time.getData()[i], newFormula.getData()[i], false);
+                if (ihm.getLog() != null) {
+                    Formula newFormula = new Formula(txtName.getText(), txtUnit.getText(), iterateOverContent(formulaTextPane), ihm.getLog(),
+                            ihm.getSelectedCal());
+                    if (newFormula.isSyntaxOK()) {
+                        XYSeriesCollection dataset = (XYSeriesCollection) chartPanel.getChart().getXYPlot().getDataset();
+                        XYSeries serie = dataset.getSeries(0);
+                        serie.clear();
+                        Measure time = ihm.getLog().getTime();
+                        for (int i = 0; i < time.getDataLength(); i++) {
+                            serie.add(time.get(i), newFormula.get(i), false);
+                        }
+                        serie.fireSeriesChanged();
+                        chartPanel.restoreAutoBounds();
                     }
-                    serie.fireSeriesChanged();
-                    chartPanel.restoreAutoBounds();
+                } else {
+                    JOptionPane.showMessageDialog(DialNewFormula.this.getParent(), "Il faut charger un log!", "Erreur", JOptionPane.ERROR_MESSAGE);
                 }
 
             }
@@ -262,9 +273,10 @@ public final class DialNewFormula extends JDialog {
             public void actionPerformed(ActionEvent arg0) {
 
                 if (formula == null) {
-                    Formula newFormula = new Formula(txtName.getText(), txtUnit.getText(), formulaText.getText(), ihm.getLog(), ihm.getSelectedCal());
+                    Formula newFormula = new Formula(txtName.getText(), txtUnit.getText(), iterateOverContent(formulaTextPane), ihm.getLog(),
+                            ihm.getSelectedCal());
                     if (!ihm.getListFormula().contains(newFormula)) {
-                        if (newFormula.isValid()) {
+                        if (newFormula.isSyntaxOK()) {
                             ihm.addMeasure(newFormula);
                             dispose();
                         }
@@ -274,10 +286,32 @@ public final class DialNewFormula extends JDialog {
                 } else {
                     formula.setName(txtName.getText());
                     formula.setUnit(txtUnit.getText());
-                    formula.setExpression(formulaText.getText());
+                    formula.setExpression(iterateOverContent(formulaTextPane));
                     dispose();
                 }
 
+            }
+        }), gbc);
+
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.gridx = 4;
+        gbc.gridy = 2;
+        gbc.gridwidth = 1;
+        gbc.gridheight = 1;
+        gbc.weightx = 0;
+        gbc.weighty = 0;
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.anchor = GridBagConstraints.WEST;
+        add(new JButton(new AbstractAction("Copier dans le presse papier") {
+
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public void actionPerformed(ActionEvent arg0) {
+                String txtFormule = iterateOverContent(formulaTextPane);
+                Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+                StringSelection stringSelection = new StringSelection(txtFormule);
+                clipboard.setContents(stringSelection, null);
             }
         }), gbc);
 
@@ -295,7 +329,7 @@ public final class DialNewFormula extends JDialog {
         gbc.fill = GridBagConstraints.BOTH;
         gbc.gridx = 2;
         gbc.gridy = 3;
-        gbc.gridwidth = 2;
+        gbc.gridwidth = 3;
         gbc.gridheight = 1;
         gbc.weightx = 0;
         gbc.weighty = 0;
@@ -310,12 +344,102 @@ public final class DialNewFormula extends JDialog {
         setVisible(true);
     }
 
+    private final String iterateOverContent(JTextPane tp) {
+
+        StringBuilder sb = new StringBuilder();
+
+        for (int i = 0; i < tp.getDocument().getLength(); i++) {
+            Element elem = ((StyledDocument) tp.getDocument()).getCharacterElement(i);
+            AttributeSet as = elem.getAttributes();
+            if (as.containsAttribute(AbstractDocument.ElementNameAttribute, StyleConstants.ComponentElementName)) {
+                if (StyleConstants.getComponent(as) instanceof JLabel) {
+                    JLabel myLabel = (JLabel) StyleConstants.getComponent(as);
+                    Color type = ((LineBorder) myLabel.getBorder()).getLineColor();
+                    if (type == Color.RED) {
+                        sb.append("#" + myLabel.getText() + "#");
+                    } else {
+                        sb.append(myLabel.getText());
+                    }
+                    continue;
+                }
+            }
+            try {
+                String s = ((StyledDocument) tp.getDocument()).getText(i, 1);
+                if (!s.isEmpty()) {
+                    sb.append(s);
+                }
+            } catch (BadLocationException e) {
+
+            }
+        }
+
+        return sb.toString().trim();
+    }
+
+    private final void parseFormula(String txtformula) {
+
+        Pattern pattern = Pattern.compile("\\#(.*?)\\#");
+        Matcher regexMatcher = pattern.matcher(txtformula);
+
+        String matchedMeasure;
+        int idxLabel = -1;
+
+        try {
+            formulaTextPane.setText(txtformula);
+
+            while (regexMatcher.find()) {
+                matchedMeasure = regexMatcher.group(1);
+
+                String measureText = "#" + matchedMeasure + "#";
+                idxLabel = formulaTextPane.getText().indexOf(measureText);
+
+                formulaTextPane.getDocument().remove(idxLabel, measureText.length());
+                formulaTextPane.setCaretPosition(idxLabel);
+                formulaTextPane.insertComponent(createLabel(matchedMeasure, Color.RED));
+            }
+            // *****
+
+            // Traitement des paramètres de calibration
+            String matchedParam;
+            String[] splitParam = null;
+            Set<Entry<String, String>> entries = Formula.mapRegexCal.entrySet();
+
+            for (Entry<String, String> entryRegex : entries) {
+
+                pattern = Pattern.compile(entryRegex.getValue());
+                regexMatcher = pattern.matcher(txtformula);
+
+                while (regexMatcher.find()) {
+                    matchedParam = regexMatcher.group(0);
+
+                    int idxAccolade = matchedParam.indexOf('{');
+                    if (idxAccolade > 6) {
+                        splitParam = matchedParam.substring(idxAccolade + 1).replace("}", "").split(",");
+                    }
+
+                    for (String sParam : splitParam) {
+                        idxLabel = formulaTextPane.getText().indexOf(sParam);
+
+                        formulaTextPane.getDocument().remove(idxLabel, sParam.length());
+                        formulaTextPane.setCaretPosition(idxLabel);
+                        formulaTextPane.insertComponent(createLabel(sParam, Color.BLUE));
+                    }
+
+                }
+            }
+            // *****
+        } catch (BadLocationException e) {
+            e.printStackTrace();
+        }
+
+    }
+
     private boolean checkAccolades(int caretPosition) {
 
         final char accoladeOuvrante = '{';
         final char accoladeFermante = '}';
 
-        final String text = formulaText.getText();
+        final String text = formulaTextPane.getText();
         final int textLength = text.length();
 
         if (text.isEmpty() || textLength == caretPosition || caretPosition == 0) {
@@ -361,16 +485,40 @@ public final class DialNewFormula extends JDialog {
         @Override
         public void actionPerformed(ActionEvent e) {
             String str = ((JButton) e.getSource()).getText();
-            formulaText.insert(str, formulaText.getCaretPosition());
+            try {
+                formulaTextPane.getDocument().insertString(formulaTextPane.getCaretPosition(), str, null);
+            } catch (BadLocationException e1) {
+                e1.printStackTrace();
+            }
 
-            int caretPosition = formulaText.getCaretPosition();
+            int caretPosition = formulaTextPane.getCaretPosition();
 
             if (str.indexOf('(') > -1 || str.indexOf('{') > -1) {
                 caretPosition--;
             }
-            formulaText.requestFocusInWindow();
-            formulaText.setCaretPosition(caretPosition);
+            formulaTextPane.requestFocusInWindow();
+            formulaTextPane.setCaretPosition(caretPosition);
         }
+
+    }
+
+    private final JLabel createLabel(String text, Color color) {
+        JLabel label = new JLabel(text);
+        label.setFont(formulaTextPane.getFont());
+        label.setBorder(new LineBorder(color, 1));
+        label.setAlignmentY(0.8f);
+        label.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                label.setForeground(color);
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                label.setForeground(Color.BLACK);
+            }
+        });
+        return label;
 
     }
 

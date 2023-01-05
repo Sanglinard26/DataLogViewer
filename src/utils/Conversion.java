@@ -109,7 +109,7 @@ public class Conversion {
         final String DEFR = "DEFR";
         final Pattern HEX_PATTERN = Pattern.compile("\\b(\\p{XDigit}+h)\\b");
         final String SECTION_DATA = "SECTION DATA";
-        final String AT = "AT";
+        // final String AT = "AT";
         final String ENDS = "ENDS";
 
         List<Variable> listVar = new ArrayList<Variable>();

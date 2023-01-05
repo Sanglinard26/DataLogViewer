@@ -8,8 +8,11 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.RenderingHints;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.ActionEvent;
@@ -19,7 +22,9 @@ import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Vector;
 
 import javax.swing.AbstractAction;
@@ -42,7 +47,6 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
-import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
 import javax.swing.table.TableCellRenderer;
@@ -53,6 +57,7 @@ import calib.Type;
 import calib.Variable;
 import log.Log;
 import log.Measure;
+import utils.CopyPasteAdapter;
 import utils.Interpolation;
 import utils.Utilitaire;
 
@@ -75,6 +80,11 @@ public final class CalTable extends JPanel {
 
     private JToggleButton btTrace;
     private boolean[][] flagInLog;
+    private boolean[][] cursorValues;
+
+    float xFraction = Float.NaN;
+    float yFraction = Float.NaN;
+    int[] coordFraction;
 
     final String ICON_MARKER = "/icon_marker_12.png";
     private final ImageIcon iconMarker = new ImageIcon(getClass().getResource(ICON_MARKER));
@@ -113,6 +123,7 @@ public final class CalTable extends JPanel {
         }
 
         table = new JTable(nbRow, nbCol);
+        new CopyPasteAdapter(table);
         table.addMouseListener(new MouseAdapter() {
 
             @Override
@@ -141,7 +152,7 @@ public final class CalTable extends JPanel {
                                 }
                             }
 
-                            populate(selectedVariable);
+                            // populate(selectedVariable); // Utilité à revoir
 
                         }
                     });
@@ -152,27 +163,7 @@ public final class CalTable extends JPanel {
             }
         });
 
-        table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
-            private static final long serialVersionUID = 1L;
-
-            @Override
-            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-
-                JLabel c = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-
-                if (flagInLog != null) {
-                    if (flagInLog[row][column]) {
-                        c.setIcon(iconMarker);
-                    } else {
-                        c.setIcon(null);
-                    }
-                } else {
-                    c.setIcon(null);
-                }
-
-                return c;
-            }
-        });
+        table.setDefaultRenderer(Object.class, new MyTableRenderer());
 
         table.addKeyListener(new KeyAdapter() {
 
@@ -267,6 +258,7 @@ public final class CalTable extends JPanel {
 
             @Override
             public void tableChanged(TableModelEvent e) {
+
                 if (e.getType() == TableModelEvent.UPDATE) {
 
                     int row = e.getFirstRow();
@@ -296,6 +288,13 @@ public final class CalTable extends JPanel {
 
                     if (actValue != null) {
                         CalTable.this.selectedVariable.saveNewValue(row + offsetRow, col + offsetCol, actValue);
+                    }
+
+                    int[] cols = table.getSelectedColumns();
+                    int[] rows = table.getSelectedRows();
+
+                    if ((cols.length > 0 && rows.length > 0) && row == rows[rows.length - 1] && col == cols[cols.length - 1]) {
+                        mapView.fireMapCalChange();
                     }
                 }
 
@@ -427,7 +426,7 @@ public final class CalTable extends JPanel {
         return dataHeight + control.getPreferredSize().height;
     }
 
-    public class CustomTableHeader extends JTableHeader {
+    public final class CustomTableHeader extends JTableHeader {
 
         private static final long serialVersionUID = 1L;
 
@@ -448,7 +447,7 @@ public final class CalTable extends JPanel {
 
     }
 
-    public class SimpleHeaderRenderer extends JLabel implements TableCellRenderer {
+    public final class SimpleHeaderRenderer extends JLabel implements TableCellRenderer {
 
         private static final long serialVersionUID = 1L;
 
@@ -713,6 +712,7 @@ public final class CalTable extends JPanel {
         final String ICON_MATH = "/icon_math_24.png";
         final String ICON_RESET = "/icon_backRef_24.png";
         final String ICON_TRACE = "/icon_traceMap_24.png";
+        final String ICON_CURSOR_TRACK = "/icon_cursorTrack_24.png";
 
         public BarControl() {
             super();
@@ -774,6 +774,7 @@ public final class CalTable extends JPanel {
                     }
                     selectedVariable.backToRefValue();
                     populate(selectedVariable);
+                    mapView.fireMapCalChange();
 
                 }
             });
@@ -805,19 +806,181 @@ public final class CalTable extends JPanel {
                 }
             });
             add(btTrace);
+
+            JToggleButton btShowCursorValue = new JToggleButton(new ImageIcon(getClass().getResource(ICON_CURSOR_TRACK)));
+            btShowCursorValue.setToolTipText("Affichage du point courant du curseur dans le log");
+            btShowCursorValue.addActionListener(new ActionListener() {
+
+                @Override
+                public void actionPerformed(ActionEvent e) {
+
+                }
+            });
+
+            add(btShowCursorValue);
+
         }
+    }
+
+    public final void showCursorValues(int cursorIndex) {
+
+        String[] args = selectedVariable.getInputsVar();
+
+        List<Measure> measures = new ArrayList<>();
+        List<String> missingMeasures = new ArrayList<>();
+
+        for (String s : args) {
+            if (!s.isEmpty()) {
+                Measure measure = mapView.getLog().getMeasureWoutUnit(s);
+                if (!measure.isEmpty()) {
+                    measures.add(measure);
+                } else {
+                    missingMeasures.add(s);
+                }
+            }
+
+        }
+
+        if (!missingMeasures.isEmpty()) {
+            // JOptionPane.showMessageDialog(null, "Il manque les grandeurs suivantes dans le log : " + missingMeasures);
+        }
+
+        Measure xMeasure = null;
+        Measure yMeasure = null;
+        float xValue = 0;
+        float yValue = 0;
+
+        if (measures.size() == 1) {
+            xMeasure = measures.get(0);
+            if (xMeasure != null) {
+                xValue = (float) measures.get(0).get(cursorIndex);
+            }
+
+        } else if (measures.size() == 2) {
+            xMeasure = measures.get(0);
+            yMeasure = measures.get(1);
+            if (xMeasure != null && yMeasure != null) {
+                xValue = (float) measures.get(0).get(cursorIndex);
+                yValue = (float) measures.get(1).get(cursorIndex);
+            }
+        } else {
+            return;
+        }
+
+        float[] xBrkPt;
+        float[] yBrkPt;
+
+        int[] xIndex;
+        int[] yIndex;
+
+        float x1 = Float.NaN;
+        float x2 = Float.NaN;
+        float y1 = Float.NaN;
+        float y2 = Float.NaN;
+
+        switch (selectedVariable.getType()) {
+        case COURBE:
+
+            xBrkPt = selectedVariable.getXAxis(true);
+
+            cursorValues = new boolean[1][xBrkPt.length];
+
+            xIndex = new int[2];
+
+            int xIdx = Arrays.binarySearch(xBrkPt, xValue);
+
+            if (xIdx < 0) {
+                xIndex[0] = Math.max(-(xIdx + 1) - 1, 0);
+                xIndex[1] = Math.min(-(xIdx + 1), xBrkPt.length - 1);
+            } else {
+                Arrays.fill(xIndex, xIdx);
+            }
+
+            cursorValues[0][xIndex[0]] = true;
+            cursorValues[0][xIndex[1]] = true;
+
+            x1 = xBrkPt[xIndex[0]];
+            x2 = xBrkPt[xIndex[1]];
+
+            xFraction = (xValue - x1) / (x2 - x1);
+            coordFraction = new int[1];
+            if (xFraction <= 0.5) {
+                coordFraction[0] = xIndex[0];
+            } else {
+                coordFraction[0] = xIndex[1];
+            }
+
+            break;
+        case MAP:
+
+            xBrkPt = selectedVariable.getXAxis(true);
+            yBrkPt = selectedVariable.getYAxis(true);
+
+            cursorValues = new boolean[yBrkPt.length][xBrkPt.length];
+
+            xIndex = new int[2];
+            yIndex = new int[2];
+
+            int xIdx2 = Arrays.binarySearch(xBrkPt, xValue);
+            int yIdx = Arrays.binarySearch(yBrkPt, yValue);
+
+            if (xIdx2 < 0) {
+                xIndex[0] = Math.max(-(xIdx2 + 1) - 1, 0);
+                xIndex[1] = Math.min(-(xIdx2 + 1), xBrkPt.length - 1);
+            } else {
+                Arrays.fill(xIndex, xIdx2);
+            }
+
+            if (yIdx < 0) {
+                yIndex[0] = Math.max(-(yIdx + 1) - 1, 0);
+                yIndex[1] = Math.min(-(yIdx + 1), yBrkPt.length - 1);
+            } else {
+                Arrays.fill(yIndex, yIdx);
+            }
+
+            cursorValues[yIndex[0]][xIndex[0]] = true;
+            cursorValues[yIndex[0]][xIndex[1]] = true;
+            cursorValues[yIndex[1]][xIndex[0]] = true;
+            cursorValues[yIndex[1]][xIndex[1]] = true;
+
+            x1 = xBrkPt[xIndex[0]];
+            x2 = xBrkPt[xIndex[1]];
+            y1 = yBrkPt[yIndex[0]];
+            y2 = yBrkPt[yIndex[1]];
+
+            xFraction = (xValue - x1) / (x2 - x1);
+            yFraction = (yValue - y1) / (y2 - y1);
+
+            coordFraction = new int[2];
+            if (xFraction <= 0.5) {
+                coordFraction[0] = xIndex[0];
+            } else {
+                coordFraction[0] = xIndex[1];
+            }
+            if (yFraction <= 0.5) {
+                coordFraction[1] = yIndex[0];
+            } else {
+                coordFraction[1] = yIndex[1];
+            }
+
+            break;
+        default:
+            return;
+        }
+
+        table.repaint();
     }
 
     public final void setTrackFlag() {
 
-        if (selectedVariable == null || !btTrace.isSelected()) {
+        if (this.selectedVariable == null || !btTrace.isSelected()) {
             flagInLog = null;
             return;
         }
 
         Log log = mapView.getLog();
 
-        String[] args = selectedVariable.getInputsVar();
+        String[] args = this.selectedVariable.getInputsVar();
 
         Measure xMeasure;
         Measure yMeasure;
@@ -828,7 +991,7 @@ public final class CalTable extends JPanel {
         int[] xIndex;
         int[] yIndex;
 
-        switch (selectedVariable.getType()) {
+        switch (this.selectedVariable.getType()) {
         case COURBE:
             xMeasure = log.getMeasureWoutUnit(args[0]);
 
@@ -836,7 +999,7 @@ public final class CalTable extends JPanel {
                 return;
             }
 
-            xBrkPt = selectedVariable.getXAxis(true);
+            xBrkPt = this.selectedVariable.getXAxis(true);
 
             flagInLog = new boolean[1][xBrkPt.length];
 
@@ -844,7 +1007,7 @@ public final class CalTable extends JPanel {
 
             for (int i = 0; i < log.getTime().getDataLength(); i++) {
 
-                float x = (float) xMeasure.getData()[i];
+                float x = (float) xMeasure.get(i);
 
                 int xIdx = Arrays.binarySearch(xBrkPt, x);
 
@@ -863,12 +1026,12 @@ public final class CalTable extends JPanel {
             xMeasure = log.getMeasureWoutUnit(args[0]);
             yMeasure = log.getMeasureWoutUnit(args[1]);
 
-            if (xMeasure.getDataLength() == 0 || yMeasure.getDataLength() == 0) {
+            if (xMeasure.isEmpty() || yMeasure.isEmpty()) {
                 return;
             }
 
-            xBrkPt = selectedVariable.getXAxis(true);
-            yBrkPt = selectedVariable.getYAxis(true);
+            xBrkPt = this.selectedVariable.getXAxis(true);
+            yBrkPt = this.selectedVariable.getYAxis(true);
 
             flagInLog = new boolean[yBrkPt.length][xBrkPt.length];
 
@@ -877,8 +1040,8 @@ public final class CalTable extends JPanel {
 
             for (int i = 0; i < log.getTime().getDataLength(); i++) {
 
-                float x = (float) xMeasure.getData()[i];
-                float y = (float) yMeasure.getData()[i];
+                float x = (float) xMeasure.get(i);
+                float y = (float) yMeasure.get(i);
 
                 int xIdx = Arrays.binarySearch(xBrkPt, x);
                 int yIdx = Arrays.binarySearch(yBrkPt, y);
@@ -908,5 +1071,155 @@ public final class CalTable extends JPanel {
         }
 
         table.repaint();
+    }
+
+    private final class MyTableRenderer extends JLabel implements TableCellRenderer {
+
+        private static final long serialVersionUID = 1L;
+
+        private Color unselectedBackground;
+        private boolean flagPaint = false;
+
+        public MyTableRenderer() {
+            setOpaque(true);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            if (flagPaint) {
+                Graphics2D g2d = (Graphics2D) g;
+                g2d.setColor(Color.RED);
+
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                int x = (int) (getWidth() * xFraction) - 3;
+
+                switch (coordFraction.length) {
+                case 1:
+                    if (xFraction <= 0.5) {
+                        x += (getWidth() / 2);
+                    } else {
+                        x -= (getWidth() / 2);
+                    }
+                    g2d.fillOval(x, getHeight() / 2 - 3, 6, 6);
+                    break;
+                case 2:
+                    int y = (int) (getHeight() * yFraction) - 3;
+                    if (xFraction <= 0.5) {
+                        x += (getWidth() / 2);
+                    } else {
+                        x -= (getWidth() / 2);
+                    }
+
+                    if (yFraction <= 0.5) {
+                        y += (getHeight() / 2);
+                    } else {
+                        y -= (getHeight() / 2);
+                    }
+
+                    g2d.fillOval(x, y, 6, 6);
+                    break;
+                default:
+                    break;
+                }
+
+            }
+
+        }
+
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+
+            if (flagInLog != null) {
+                if (flagInLog[row][column]) {
+                    setIcon(iconMarker);
+                } else {
+                    setIcon(null);
+                }
+            } else {
+                setIcon(null);
+            }
+
+            if (cursorValues != null) {
+                if (cursorValues[row][column]) {
+                    setBorder(BorderFactory.createLineBorder(Color.RED));
+
+                    switch (coordFraction.length) {
+                    case 1:
+                        if (column == coordFraction[0]) {
+                            flagPaint = true;
+                        } else {
+                            flagPaint = false;
+                        }
+                        break;
+                    case 2:
+                        if (column == coordFraction[0] && row == coordFraction[1]) {
+                            flagPaint = true;
+                        } else {
+                            flagPaint = false;
+                        }
+                        break;
+                    default:
+                        break;
+                    }
+                } else {
+                    setBorder(null);
+                    flagPaint = false;
+                }
+            } else {
+                setBorder(null);
+            }
+
+            int offsetRow = 0;
+            int offsetCol = 0;
+
+            switch (CalTable.this.selectedVariable.getType()) {
+
+            case COURBE:
+                offsetRow = 1;
+                break;
+            case MAP:
+                offsetRow = 1;
+                offsetCol = 1;
+                break;
+            default:
+                break;
+            }
+
+            Object oValue1 = selectedVariable.getValue(false, row + offsetRow, column + offsetCol);
+            Object oValue2 = selectedVariable.getValue(true, row + offsetRow, column + offsetCol);
+
+            double oldValue = 0;
+            double newValue = 0;
+            double diff = 0;
+
+            if (oValue1 instanceof Number && oValue2 instanceof Number) {
+                oldValue = ((Number) oValue1).doubleValue();
+                newValue = ((Number) oValue2).doubleValue();
+                diff = newValue - oldValue;
+            }
+
+            if (isSelected) {
+                // super.setBackground(table.getSelectionBackground());
+                super.setBackground(Color.LIGHT_GRAY);
+            } else {
+                Color background = unselectedBackground != null ? unselectedBackground : table.getBackground();
+                super.setBackground(background);
+            }
+
+            if (diff > 0) {
+                setForeground(Color.RED);
+            } else if (diff < 0) {
+                setForeground(Color.BLUE);
+            } else {
+                setForeground(Color.BLACK);
+            }
+
+            setText((value == null) ? "" : value.toString());
+
+            return this;
+        }
+
     }
 }

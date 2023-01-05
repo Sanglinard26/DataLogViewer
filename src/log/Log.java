@@ -27,7 +27,7 @@ public final class Log {
 
     public Log(File file) {
 
-        // long start = System.currentTimeMillis();
+        long start = System.currentTimeMillis();
 
         if (file != null) {
 
@@ -51,7 +51,7 @@ public final class Log {
         }
         // System.out.println("Nb points = " + nbPoints);
 
-        // System.out.println("log opened in : " + (System.currentTimeMillis() - start) + "ms");
+        System.out.println("log opened in : " + (System.currentTimeMillis() - start) + "ms");
     }
 
     private final void parseMsl(File file) {
@@ -196,7 +196,6 @@ public final class Log {
         try (final BufferedReader bf = new BufferedReader(new FileReader(file))) {
 
             String line;
-            String parsedValue;
             String[] splitTab;
             double value = 0;
             int cntLine = 0;
@@ -231,15 +230,14 @@ public final class Log {
                 default:
                     if (splitTab.length == this.datas.size()) {
                         for (int idxCol = 0; idxCol < this.datas.size(); idxCol++) {
-
-                            parsedValue = splitTab[idxCol];
-
-                            value = Utilitaire.getDoubleFromString(parsedValue.trim());
-
+                            value = Utilitaire.getDoubleFromString(splitTab[idxCol]);
                             this.datas.get(idxCol).addPoint(value);
                         }
                         this.nbPoints++;
+                    } else {
+                        // System.out.println("erreur ligne " + this.nbPoints);
                     }
+
                     break;
                 }
                 cntLine++;

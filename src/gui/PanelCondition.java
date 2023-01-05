@@ -71,7 +71,7 @@ public final class PanelCondition extends JPanel {
         return tableListCondition;
     }
 
-    static class DecimalFormatRenderer extends DefaultTableCellRenderer {
+    static final class DecimalFormatRenderer extends DefaultTableCellRenderer {
 
         private static final long serialVersionUID = 1L;
         private static final DecimalFormat formatter = new DecimalFormat();

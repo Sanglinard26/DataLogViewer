@@ -51,11 +51,12 @@ import calib.MdbWorkspace;
 import calib.Variable;
 import log.Log;
 import net.ericaro.surfaceplotter.surface.JSurface;
+import observer.CursorObservateur;
 import observer.MapCalEvent;
 import observer.MapCalListener;
 import utils.Preference;
 
-public final class MapView extends JPanel implements Observer, ListSelectionListener {
+public final class MapView extends JPanel implements Observer, ListSelectionListener, CursorObservateur {
 
     private static final long serialVersionUID = 1L;
 
@@ -189,6 +190,10 @@ public final class MapView extends JPanel implements Observer, ListSelectionList
         return null;
     }
 
+    public Variable getSelectedVariable() {
+        return selectedVariable;
+    }
+
     public final MapCal getCalForFormula() {
 
         if (listCal == null || listCal.isEmpty()) {
@@ -262,7 +267,7 @@ public final class MapView extends JPanel implements Observer, ListSelectionList
 
         treeModel.reload();
 
-        fireMapCalChange();
+        // fireMapCalChange();
     }
 
     private final void removeCalFromTree(DefaultMutableTreeNode nodeCal) {
@@ -319,6 +324,9 @@ public final class MapView extends JPanel implements Observer, ListSelectionList
         return null;
     }
 
+    /**
+     * Est appelé par le changement de sélection sur l'arbre des variables
+     */
     private final void updateChart(Variable variable) {
 
         JSurface jSurface = surfaceChart.getSurface();
@@ -375,8 +383,7 @@ public final class MapView extends JPanel implements Observer, ListSelectionList
             series[x - 1] = new XYSeries(variable.getValue(modifiedVar, 0, x).toString());
 
             for (int y = 1; y < variable.getDimY(); y++) {
-                series[x - 1].add(Double.parseDouble(variable.getValue(modifiedVar, y, 0).toString()),
-                        Double.parseDouble(variable.getValue(modifiedVar, y, x).toString()), false);
+                series[x - 1].add(variable.getDoubleValue(modifiedVar, y, 0), variable.getDoubleValue(modifiedVar, y, x), false);
             }
         }
 
@@ -393,8 +400,7 @@ public final class MapView extends JPanel implements Observer, ListSelectionList
             series[y - 1] = new XYSeries(variable.getValue(modifiedVar, y, 0).toString());
 
             for (int x = 1; x < variable.getDimX(); x++) {
-                series[y - 1].add(Double.parseDouble(variable.getValue(modifiedVar, 0, x).toString()),
-                        Double.parseDouble(variable.getValue(modifiedVar, y, x).toString()), false);
+                series[y - 1].add(variable.getDoubleValue(modifiedVar, 0, x), variable.getDoubleValue(modifiedVar, y, x), false);
             }
         }
 
@@ -408,9 +414,7 @@ public final class MapView extends JPanel implements Observer, ListSelectionList
         boolean modifiedVar = variable.isModified();
 
         for (int x = 0; x < variable.getDimX(); x++) {
-
-            series[0].add(Double.parseDouble(variable.getValue(modifiedVar, 0, x).toString()),
-                    Double.parseDouble(variable.getValue(modifiedVar, 1, x).toString()), false);
+            series[0].add(variable.getDoubleValue(modifiedVar, 0, x), variable.getDoubleValue(modifiedVar, 1, x), false);
         }
 
         return series;
@@ -475,7 +479,7 @@ public final class MapView extends JPanel implements Observer, ListSelectionList
         this.listeners.remove(listener);
     }
 
-    private final void fireMapCalChange() {
+    public final void fireMapCalChange() {
         for (MapCalListener l : listeners) {
             l.MapCalChanged(new MapCalEvent(this));
         }
@@ -530,7 +534,7 @@ public final class MapView extends JPanel implements Observer, ListSelectionList
                         @Override
                         public void actionPerformed(ActionEvent e) {
 
-                            final JFileChooser fc = new JFileChooser(Preference.getPreference(Preference.KEY_LOG));
+                            final JFileChooser fc = new JFileChooser(Preference.getPreference(Preference.KEY_CAL));
                             fc.setMultiSelectionEnabled(false);
                             fc.setFileSelectionMode(JFileChooser.OPEN_DIALOG);
                             fc.setFileFilter(new FileFilter() {
@@ -767,6 +771,7 @@ public final class MapView extends JPanel implements Observer, ListSelectionList
     public void valueChanged(ListSelectionEvent e) {
 
         if (!e.getValueIsAdjusting()) {
+
             int[] cols = dataTable.getTable().getSelectedColumns();
             int[] rows = dataTable.getTable().getSelectedRows();
 
@@ -780,5 +785,18 @@ public final class MapView extends JPanel implements Observer, ListSelectionList
 
         }
 
+    }
+
+    @Override
+    public void updateCursorValue(int cursorIndex) {
+        if (this.selectedVariable != null) {
+            MapCal cal = findSelectedCal();
+            if (cal != null && cal.hasWorkspaceLinked()) {
+                dataTable.showCursorValues(cursorIndex);
+            } else {
+                // JOptionPane.showMessageDialog(null, "Il faut associer un workspace à la calibration");
+            }
+
+        }
     }
 }

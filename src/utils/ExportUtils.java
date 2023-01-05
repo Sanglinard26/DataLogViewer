@@ -7,9 +7,6 @@ import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.geom.Ellipse2D;
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.PrintWriter;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -42,10 +39,6 @@ import org.jfree.data.xy.XYZDataset;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
-import calib.MdbData;
-import calib.MdbData.ConfigDatalogger;
-import calib.MdbWorkspace;
-import calib.MdbWorkspace.VariableECU;
 import gui.ColorPaintScale;
 import gui.Condition;
 import log.Formula;
@@ -53,7 +46,7 @@ import log.Measure;
 
 public abstract class ExportUtils {
 
-    public static final boolean ConfigToXml(File file, Map<String, JFreeChart> listChart, Set<Measure> listFormula, List<Condition> listConditions) {
+    public static final boolean ConfigToXml(File file, Map<String, JFreeChart> listChart, Set<Formula> listFormula, List<Condition> listConditions) {
 
         DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
         DocumentBuilder docBuilder;
@@ -255,9 +248,7 @@ public abstract class ExportUtils {
                             axisYRangeNode_.appendChild(doc.createTextNode(txtYRange_));
                             plotNode.appendChild(axisYRangeNode_);
 
-                            Iterator iterator = chart.getSubtitles().iterator();
-                            while (iterator.hasNext()) {
-                                Object o = iterator.next();
+                            for (Object o : chart.getSubtitles()) {
                                 if (o instanceof PaintScaleLegend) {
 
                                     PaintScaleLegend paintScale = (PaintScaleLegend) o;
@@ -323,7 +314,6 @@ public abstract class ExportUtils {
                     noeudObject.appendChild(attribut);
 
                     attribut = doc.createElement("Expression");
-                    // attribut.appendChild(doc.createTextNode(formula.getExpression()));
                     attribut.appendChild(doc.createCDATASection(formula.getExpression()));
                     noeudObject.appendChild(attribut);
                 }
@@ -343,7 +333,6 @@ public abstract class ExportUtils {
                     noeudObject.appendChild(attribut);
 
                     attribut = doc.createElement("Expression");
-                    // attribut.appendChild(doc.createTextNode(condition.getExpression()));
                     attribut.appendChild(doc.createCDATASection(condition.getExpression()));
                     noeudObject.appendChild(attribut);
 
@@ -374,77 +363,6 @@ public abstract class ExportUtils {
         }
 
         return false;
-    }
-
-    public static final void createDbcFile(File f, MdbData mdbData, MdbWorkspace mdbWorkspace) {
-
-        ConfigDatalogger configDatalogger = mdbData.getConfigDatalogger();
-
-        try (PrintWriter pw = new PrintWriter(f)) {
-            pw.println("VERSION \"\"");
-            pw.println();
-            pw.println("NS_ : ");
-            pw.println();
-            pw.println("BS_:");
-            pw.println();
-            pw.println("BU_: ECU");
-
-            int nbCanaux = configDatalogger.getCanaux().size();
-            int nbMessage = (int) Math.ceil(nbCanaux / 4.0);
-
-            int canId = 256;
-
-            for (int numMessage = 0; numMessage < nbMessage; numMessage++) {
-                pw.println();
-                pw.println("BO_ " + canId + " logger_" + Integer.toHexString(canId) + "h: 8 ECU");
-
-                VariableECU var;
-                int startBit = 0;
-                String type;
-
-                for (int numCanal = 0; numCanal < 4; numCanal++) {
-
-                    int idxCanal = numCanal + (4 * numMessage);
-
-                    if (idxCanal >= nbCanaux) {
-                        break;
-                    }
-
-                    int adressCanal = configDatalogger.getCanaux().get(idxCanal);
-                    var = mdbWorkspace.getVariableECUFromAdress(adressCanal);
-                    if (var != null) {
-
-                        type = var.getSigned() == 1 ? "-" : "+";
-
-                        int maxUnSigned = 65535;
-                        int minUnSigned = 0;
-                        int maxSigned = 32767;
-                        int minSigned = -32768;
-
-                        double minValue = 0;
-                        double maxValue = 0;
-
-                        if ("+".equals(type)) // Unsigned
-                        {
-                            maxValue = maxUnSigned * var.getFconv();
-                        } else { // Signed
-                            minValue = minSigned * var.getFconv();
-                            maxValue = maxSigned * var.getFconv();
-                        }
-
-                        pw.println(" SG_ " + var.getNom() + " : " + startBit + "|16@1" + type + " (" + var.getFconv() + ",0) " + "[" + minValue + "|"
-                                + maxValue + "] " + "\"" + var.getUnit() + "\"" + " Vector__XXX");
-                        startBit += 16;
-                    }
-                }
-
-                canId++;
-            }
-
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        }
-
     }
 
 }

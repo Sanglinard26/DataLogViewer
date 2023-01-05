@@ -2,15 +2,11 @@ package gui;
 
 import java.awt.Color;
 import java.awt.Paint;
-import java.io.Serializable;
 
 import org.jfree.chart.HashUtils;
 import org.jfree.chart.renderer.PaintScale;
-import org.jfree.util.PublicCloneable;
 
-public class ColorPaintScale implements PaintScale, PublicCloneable, Serializable {
-
-    private static final long serialVersionUID = 1L;
+public final class ColorPaintScale implements PaintScale {
 
     private double lowerBound;
     private double upperBound;

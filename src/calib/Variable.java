@@ -50,6 +50,7 @@ public final class Variable extends Observable implements Comparable<Variable> {
         }
 
         inputsVar = new String[nbInput];
+        Arrays.fill(inputsVar, "");
     }
 
     public String getName() {
@@ -123,6 +124,10 @@ public final class Variable extends Observable implements Comparable<Variable> {
         return this.infos != null ? this.infos.getMin() : Short.MIN_VALUE;
     }
 
+    /**
+     * @param modifiedVar : true to get the modified values if exist
+     * @param coord : first arg for row and second for colum breakpoint
+     */
     public final Object getValue(boolean modifiedVar, int... coord) {
         int idx = coord[1] + dimX * coord[0];
         if (!modifiedVar) {
@@ -134,7 +139,19 @@ public final class Variable extends Observable implements Comparable<Variable> {
         }
 
         return this.newValues[idx] != null ? this.newValues[idx] : Float.NaN;
+    }
 
+    public final double getDoubleValue(boolean modifiedVar, int... coord) {
+        int idx = coord[1] + dimX * coord[0];
+        if (!modifiedVar) {
+            return this.values[idx] != null && this.values[idx] instanceof Number ? ((Number) this.values[idx]).doubleValue() : Float.NaN;
+        }
+
+        if (newValues == null) {
+            newValues = Arrays.copyOf(values, values.length);
+        }
+
+        return this.newValues[idx] != null && this.newValues[idx] instanceof Number ? ((Number) this.newValues[idx]).doubleValue() : Float.NaN;
     }
 
     public final void setValue(boolean newVal, Object value, int... coord) {
@@ -401,7 +418,7 @@ public final class Variable extends Observable implements Comparable<Variable> {
 
         setValue(true, saturateValue(newValue), y, x);
         setChanged();
-        notifyObservers();
+        notifyObservers(); // Mise à jour des graphiques
     }
 
     public final float[] getXAxis(boolean modifiedVar) {

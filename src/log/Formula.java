@@ -19,17 +19,16 @@ import utils.Interpolation;
 
 public final class Formula extends Measure {
 
-    private static final long serialVersionUID = 1L;
-
     private String literalExpression;
     private String internExpression;
-    private transient Expression expression;
+    private Expression expression;
     private Map<Character, String> variables;
-    private boolean valid = false;
+    private boolean syntaxOK = false;
+    private boolean valid = true; // init premier calcul
     private boolean mapCalBased = false;
     private boolean upToDate = false;
 
-    public static Map<String, String> mapRegexCal;
+    public static final Map<String, String> mapRegexCal;
     static {
         mapRegexCal = new HashMap<>();
         mapRegexCal.put("TABLE2D", "TABLE2D\\{.*?,.*?,.*?\\}");
@@ -49,7 +48,7 @@ public final class Formula extends Measure {
 
         build();
 
-        if (valid) {
+        if (syntaxOK) {
             calculate(log, calib);
         } else {
             JOptionPane.showMessageDialog(null, "V\u00e9rifiez la synthaxe svp", "Erreur", JOptionPane.ERROR_MESSAGE);
@@ -68,7 +67,7 @@ public final class Formula extends Measure {
 
         build();
 
-        if (valid) {
+        if (syntaxOK) {
             upToDate = false;
         } else {
             JOptionPane.showMessageDialog(null, "V\u00e9rifiez la synthaxe svp", "Erreur", JOptionPane.ERROR_MESSAGE);
@@ -88,16 +87,12 @@ public final class Formula extends Measure {
         }
 
         this.expression = new Expression(this.internExpression, args);
-        valid = expression.checkSyntax();
+        syntaxOK = expression.checkSyntax();
 
-    }
-
-    public final void deserialize() {
-        build();
     }
 
     private final void renameVariables() {
-        // char � = 101
+
         int charDec = 97;
 
         // Traitement des variables issues du log
@@ -134,7 +129,7 @@ public final class Formula extends Measure {
                 if (charDec == 101) {
                     charDec++;
                 }
-                variables.put((char) charDec++, matchedParam);
+                variables.put((char) charDec++, matchedParam.trim());
                 compteurArgCal++;
             }
         }
@@ -152,11 +147,15 @@ public final class Formula extends Measure {
 
     }
 
-    public boolean isMapCalBased() {
+    public final boolean isMapCalBased() {
         return mapCalBased;
     }
 
-    public boolean isUpToDate() {
+    public final boolean needUpdate() {
+        return valid && !upToDate;
+    }
+
+    public final boolean isUpToDate() {
         return upToDate;
     }
 
@@ -167,28 +166,33 @@ public final class Formula extends Measure {
     }
 
     public final void changeData(Log log) {
-        this.data = new double[log.getNbPoints()];
+        if (log.getNbPoints() != this.getDataLength()) {
+            this.data = new double[log.getNbPoints()];
+            // Arrays.fill(data, Double.NaN);
+            min = Double.POSITIVE_INFINITY;
+            max = Double.NEGATIVE_INFINITY;
+        }
+        this.idx = 0;
+
     }
 
-    public final void calculate(Log log, MapCal calib) {
+    public final void calculate(final Log log, final MapCal calib) {
 
         Argument arg;
         Measure[] measures = new Measure[expression.getArgumentsNumber()];
         String var;
 
-        if (isUpToDate() && !isMapCalBased()) {
+        if (!needUpdate() && !isMapCalBased()) {
             return;
         }
 
-        if (data.length > 0) {
-            clearData();
-        } else {
-            changeData(log);
-        }
+        changeData(log);
 
         if (log != null) {
 
-            for (int j = 0; j < expression.getArgumentsNumber(); j++) {
+            int argNumber = expression.getArgumentsNumber();
+
+            for (int j = 0; j < argNumber; j++) {
                 arg = expression.getArgument(j);
                 var = variables.get(arg.getArgumentName().charAt(0));
 
@@ -208,24 +212,29 @@ public final class Formula extends Measure {
                     }
                 }
 
+                if (measures[j].isEmpty()) {
+                    valid = false;
+                    upToDate = false;
+                    return;
+                }
             }
 
-            for (int i = 0; i < log.getTime().getDataLength(); i++) {
-                for (int j = 0; j < expression.getArgumentsNumber(); j++) {
+            for (int i = 0, dataSize = log.getTime().getDataLength(); i < dataSize; i++) {
+                for (int j = 0; j < argNumber; j++) {
                     arg = expression.getArgument(j);
-                    if (measures[j].isEmpty()) {
-                        break;
-                    }
-                    arg.setArgumentValue(measures[j].getData()[i]);
+                    arg.setArgumentValue(measures[j].get(i));
                 }
                 double res = expression.calculate();
                 this.addPoint(res);
             }
+
             if (Double.isInfinite(min) && Double.isInfinite(max)) {
                 upToDate = false;
             } else {
                 upToDate = true;
             }
+
+            valid = true;
         } else {
             double res = expression.calculate();
             this.addPoint(res);
@@ -234,15 +243,15 @@ public final class Formula extends Measure {
         }
     }
 
-    public final boolean isValid() {
-        return valid;
+    public final boolean isSyntaxOK() {
+        return syntaxOK;
     }
 
     public final String getExpression() {
         return this.literalExpression;
     }
 
-    public void setExpression(String expression) {
+    public final void setExpression(String expression) {
         if (expression != null && !expression.isEmpty() && !expression.equals(literalExpression)) {
             this.literalExpression = expression;
             upToDate = false;
@@ -262,6 +271,8 @@ public final class Formula extends Measure {
         Measure y;
         Measure z = null;
 
+        final int dataSize = log.getTime().getDataLength();
+
         if (cal != null) {
             variable = cal.getVariable(splitParams[0]);
             if (variable != null) {
@@ -277,38 +288,37 @@ public final class Formula extends Measure {
 
         switch (nbParams) {
         case 1:
-
-            for (int i = 0; i < log.getTime().getDataLength(); i++) {
-                double res = Double.parseDouble(variable.getValue(true, 0, 0).toString());
+            for (int i = 0; i < dataSize; i++) {
+                double res = variable.getDoubleValue(true, 0, 0);
                 z.addPoint(res);
             }
-
             return z;
         case 2:
             x = log.getMeasure(splitParams[1]);
 
-            for (int i = 0; i < log.getTime().getDataLength(); i++) {
-                double res = Interpolation.interpLinear1D(variable.toDouble2D(true), x.getData()[i]);
+            double[][] courbe = variable.toDouble2D(true);
+
+            for (int i = 0; i < dataSize; i++) {
+                double res = Interpolation.interpLinear1D(courbe, x.get(i));
                 z.addPoint(res);
             }
-
             return z;
         case 3:
             x = log.getMeasure(splitParams[1]);
             y = log.getMeasure(splitParams[2]);
 
-            for (int i = 0; i < log.getTime().getDataLength(); i++) {
-                double res = Interpolation.interpLinear2D(variable.toDouble2D(true), x.getData()[i], y.getData()[i]);
+            double[][] table = variable.toDouble2D(true);
+
+            for (int i = 0; i < dataSize; i++) {
+                double res = Interpolation.interpLinear2D(table, x.get(i), y.get(i));
                 z.addPoint(res);
             }
             return z;
         default:
-
-            for (int i = 0; i < log.getTime().getDataLength(); i++) {
+            for (int i = 0; i < dataSize; i++) {
                 double res = Double.NaN;
                 z.addPoint(res);
             }
-
             return z;
         }
 

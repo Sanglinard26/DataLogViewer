@@ -3,13 +3,10 @@
  */
 package log;
 
-import java.io.Serializable;
-import java.util.Arrays;
 import java.util.BitSet;
 
-public class Measure implements Comparable<Measure>, Serializable {
+public class Measure implements Comparable<Measure> {
 
-    private static final long serialVersionUID = 1L;
     protected String name;
     protected String unit;
     protected double[] data;
@@ -26,7 +23,7 @@ public class Measure implements Comparable<Measure>, Serializable {
         this.unit = "";
         this.idx = 0;
         this.data = new double[dataSize];
-        Arrays.fill(data, Double.NaN);
+        // Arrays.fill(data, Double.NaN);
     }
 
     public final String getName() {
@@ -66,6 +63,10 @@ public class Measure implements Comparable<Measure>, Serializable {
         return this.data;
     }
 
+    public final double get(int index) {
+        return this.data[index];
+    }
+
     public final int getDataLength() {
         return this.data.length;
     }
@@ -84,13 +85,6 @@ public class Measure implements Comparable<Measure>, Serializable {
             }
         }
         return result;
-    }
-
-    public final void clearData() {
-        this.idx = 0;
-        Arrays.fill(data, Double.NaN);
-        min = Double.POSITIVE_INFINITY;
-        max = Double.NEGATIVE_INFINITY;
     }
 
     @Override

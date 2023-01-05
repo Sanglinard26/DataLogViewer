@@ -204,6 +204,8 @@ public final class DialogProperties extends JPanel implements ActionListener
 
     public final void updatePlot(ChartView chartView, XYPlot xyPlot) {
 
+        chartView.getChart().setNotify(false);
+
         CombinedDomainXYPlot combinedplot = chartView.getPlot();
         String serieName;
 
@@ -299,6 +301,8 @@ public final class DialogProperties extends JPanel implements ActionListener
 
             }
         }
+
+        chartView.getChart().setNotify(true);
 
     }
 

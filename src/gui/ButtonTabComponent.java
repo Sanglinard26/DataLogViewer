@@ -62,7 +62,11 @@ import javax.swing.plaf.basic.BasicButtonUI;
  */
 public class ButtonTabComponent extends JPanel {
     private static final long serialVersionUID = 1L;
+
     private final JTabbedPane pane;
+    private final CardLayout cl = new CardLayout();
+    private final JPanel panel = new JPanel(cl);
+    private boolean onEditing = false;
 
     public ButtonTabComponent(final JTabbedPane pane) {
         // unset default FlowLayout' gaps
@@ -88,8 +92,6 @@ public class ButtonTabComponent extends JPanel {
 
         final JTextField textfield = new JTextField();
 
-        final CardLayout cl = new CardLayout();
-        final JPanel panel = new JPanel(cl);
         panel.setOpaque(false);
 
         panel.add(label, "label component");
@@ -101,6 +103,7 @@ public class ButtonTabComponent extends JPanel {
                 if (e.getClickCount() > 1) {
                     textfield.setText(label.getText());
                     cl.show(panel, "textfield component");
+                    onEditing = true;
                 } else {
                     int idx = pane.indexOfTabComponent(ButtonTabComponent.this);
                     if (idx != -1) {
@@ -121,6 +124,7 @@ public class ButtonTabComponent extends JPanel {
                         if (idx == -1 || idx == i) {
                             pane.setTitleAt(i, textfield.getText());
                             cl.show(panel, "label component");
+                            onEditing = false;
                         } else {
                             JOptionPane.showMessageDialog(null, "Il existe d\u00e9j\u00e0 une fen\u00eatre avec ce nom", "INFO",
                                     JOptionPane.INFORMATION_MESSAGE);
@@ -131,6 +135,7 @@ public class ButtonTabComponent extends JPanel {
 
                 if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
                     cl.show(panel, "label component");
+                    onEditing = false;
                 }
             }
         });
@@ -144,6 +149,13 @@ public class ButtonTabComponent extends JPanel {
         // add more space to the top of the component
         setBorder(BorderFactory.createEmptyBorder(2, 0, 0, 0));
         setToolTipText("Double click pour renommer");
+    }
+
+    public final void stopEditing() {
+        if (onEditing) {
+            cl.show(panel, "label component");
+            onEditing = false;
+        }
     }
 
     private class TabButton extends JButton implements ActionListener {

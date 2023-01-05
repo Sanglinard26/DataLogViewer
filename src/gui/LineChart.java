@@ -14,6 +14,7 @@ import java.awt.event.MouseMotionListener;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
+import java.util.Arrays;
 import java.util.List;
 
 import javax.swing.JPanel;
@@ -30,7 +31,6 @@ import org.jfree.chart.JFreeChart;
 import org.jfree.chart.annotations.XYDrawableAnnotation;
 import org.jfree.chart.entity.ChartEntity;
 import org.jfree.chart.entity.EntityCollection;
-import org.jfree.chart.entity.PlotEntity;
 import org.jfree.chart.entity.XYItemEntity;
 import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.chart.plot.XYPlot;
@@ -64,9 +64,11 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
     private final JScrollPane sp;
 
     private boolean onMove = false;
+    private long oldTime = 0;
+    private long time = 0;
 
     private static final Drawable cd = new CircleDrawer(Color.BLACK, new BasicStroke(2.0f), null);
-    private static Shape shape2 = new Ellipse2D.Double(-3, -3, 6, 6);
+    private static final Shape shape2 = new Ellipse2D.Double(-3, -3, 6, 6);
 
     public LineChart(char type) {
 
@@ -87,6 +89,8 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
         chartPanel = new ChartPanel(chart);
         chartPanel.addChartMouseListener(this);
         chartPanel.addMouseMotionListener(this);
+        chartPanel.setDomainZoomable(false);
+        chartPanel.setRangeZoomable(false);
 
         listSeries = new ListLegend(new XYSeries[1]);
 
@@ -95,6 +99,7 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
             @Override
             public void valueChanged(ListSelectionEvent e) {
                 if (!e.getValueIsAdjusting()) {
+
                     List<XYSeries> selectedKey = listSeries.getSelectedValuesList();
 
                     if (selectedKey.size() == listSeries.getModel().getSize()) {
@@ -115,7 +120,6 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
                             } else {
                                 renderer.setSeriesVisible(idx, true);
                             }
-
                         }
                     }
                 }
@@ -131,6 +135,10 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
 
     public final void setTable(CalTable table) {
         this.dataTable = table;
+    }
+
+    public final boolean isOnMove() {
+        return this.onMove;
     }
 
     public final void changeSeries(XYSeries[] series, double min, double max) {
@@ -171,15 +179,47 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
     @Override
     public void chartMouseClicked(ChartMouseEvent paramChartMouseEvent) {
 
-        ChartEntity entity = paramChartMouseEvent.getEntity();
+        Point pt = paramChartMouseEvent.getTrigger().getPoint();
+        XYPlot plot = chart.getXYPlot();
 
-        if (entity instanceof PlotEntity) {
-            PlotEntity plotEntity = (PlotEntity) entity;
-            XYPlot xyPlot = (XYPlot) plotEntity.getPlot();
-            xyPlot.handleClick(paramChartMouseEvent.getTrigger().getX(), paramChartMouseEvent.getTrigger().getY(),
-                    chartPanel.getChartRenderingInfo().getPlotInfo());
+        if (plot != null && plot.getDatasetCount() > 0) {
+
+            Point2D p2d = chartPanel.translateScreenToJava2D(pt);
+
+            EntityCollection entities = chartPanel.getChartRenderingInfo().getEntityCollection();
+
+            ChartEntity entity = entities.getEntity(p2d.getX(), p2d.getY());
+
+            if ((entity != null) && (entity instanceof XYItemEntity)) {
+                xyItemEntity = (XYItemEntity) entity;
+            } else if (!(entity instanceof XYItemEntity)) {
+                xyItemEntity = null;
+                setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+                return;
+            }
+            if (xyItemEntity == null) {
+                setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+                return; // return if not pressed on any series point
+            }
+
+            int serieIndex = xyItemEntity.getSeriesIndex();
+
+            initialMovePointY = xyItemEntity.getDataset().getY(serieIndex, xyItemEntity.getItem()).floatValue();
+
+            setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+            int itemIndex = xyItemEntity.getItem();
+
+            if (dataset.getSeriesCount() > 1) {
+                if (type == 'x') {
+                    this.dataTable.getTable().changeSelection(itemIndex, serieIndex, false, false);
+                } else {
+                    this.dataTable.getTable().changeSelection(serieIndex, itemIndex, false, false);
+                }
+            } else {
+                this.dataTable.getTable().changeSelection(0, itemIndex, false, false);
+            }
         }
-
     }
 
     @Override
@@ -200,13 +240,13 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
                 xyItemEntity = (XYItemEntity) entity;
             } else if (!(entity instanceof XYItemEntity)) {
                 xyItemEntity = null;
-                chartPanel.setDomainZoomable(true);
                 setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+                // onMove = false;
                 return;
             }
             if (xyItemEntity == null) {
-                chartPanel.setDomainZoomable(true);
                 setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+                // onMove = false;
                 return; // return if not pressed on any series point
             }
 
@@ -215,20 +255,6 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
             initialMovePointY = xyItemEntity.getDataset().getY(serieIndex, xyItemEntity.getItem()).floatValue();
 
             setCursor(new Cursor(Cursor.HAND_CURSOR));
-
-            int itemIndex = xyItemEntity.getItem();
-
-            if (dataset.getSeriesCount() > 1) {
-
-                if (type == 'x') {
-                    this.dataTable.getTable().changeSelection(itemIndex, serieIndex, false, false);
-                } else {
-                    this.dataTable.getTable().changeSelection(serieIndex, itemIndex, false, false);
-                }
-
-            } else {
-                this.dataTable.getTable().changeSelection(0, itemIndex, false, false);
-            }
         }
 
     }
@@ -238,42 +264,85 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
         XYPlot plot = chart.getXYPlot();
         plot.clearAnnotations();
 
+        int[] itemIndex;
+        int[] serieIndex;
+
         if (dataset.getSeriesCount() > 1) {
-
             if (type == 'x') {
-
-                listSeries.setSelectedIndices(cols);
-
-                for (int col : cols) {
-                    for (int row : rows) {
-                        double xVal = dataset.getXValue(col, row);
-                        double yVal = dataset.getYValue(col, row);
-                        plot.addAnnotation(new XYDrawableAnnotation(xVal, yVal, 11, 11, cd));
-                    }
-                }
-
+                serieIndex = cols;
+                itemIndex = rows;
             } else {
-
-                listSeries.setSelectedIndices(rows);
-
-                for (int col : cols) {
-                    for (int row : rows) {
-                        double xVal = dataset.getXValue(row, col);
-                        double yVal = dataset.getYValue(row, col);
-                        plot.addAnnotation(new XYDrawableAnnotation(xVal, yVal, 11, 11, cd));
-                    }
-                }
-
+                serieIndex = rows;
+                itemIndex = cols;
             }
-
         } else {
-            for (int col : cols) {
-                double xVal = dataset.getXValue(0, col);
-                double yVal = dataset.getYValue(0, col);
-                plot.addAnnotation(new XYDrawableAnnotation(xVal, yVal, 11, 11, cd));
+            serieIndex = new int[1];
+            itemIndex = cols;
+        }
+
+        int[] actualIndex = listSeries.getSelectedIndices();
+
+        if (!Arrays.equals(actualIndex, serieIndex)) {
+            listSeries.setSelectedIndices(serieIndex);
+        }
+
+        for (int col : serieIndex) {
+            for (int row : itemIndex) {
+                double xVal = dataset.getXValue(col, row);
+                double yVal = dataset.getYValue(col, row);
+                plot.addAnnotation(new XYDrawableAnnotation(xVal, yVal, 8, 8, cd));
             }
         }
 
+    }
+
+    public final void updatePoints(MouseEvent e, int[] rows, int[] cols) {
+
+        int itemIndex;
+        int serieIndex;
+
+        XYPlot xy = chart.getXYPlot();
+        if (xy == null) {
+            return;
+        }
+
+        Point2D p = chartPanel.translateScreenToJava2D(e.getPoint());
+        Rectangle2D dataArea = chartPanel.getChartRenderingInfo().getPlotInfo().getDataArea();
+
+        for (int col : cols) {
+            for (int row : rows) {
+                if (dataset.getSeriesCount() > 1) {
+                    if (type == 'x') { // itemIndex = row, serieIndex = col
+                        itemIndex = row;
+                        serieIndex = col;
+                    } else { // itemIndex = col, serieIndex = row
+                        itemIndex = col;
+                        serieIndex = row;
+                    }
+                } else { // itemIndex = col, serieIndex = 0
+                    itemIndex = col;
+                    serieIndex = 0;
+                }
+
+                XYSeries series = ((XYSeriesCollection) xyItemEntity.getDataset()).getSeries(serieIndex);
+
+                finalMovePointY = (float) xy.getRangeAxis().java2DToValue(p.getY(), dataArea, xy.getRangeAxisEdge());
+
+                if (finalMovePointY >= this.zMax) {
+                    finalMovePointY = (float) this.zMax;
+                } else if (finalMovePointY <= this.zMin) {
+                    finalMovePointY = (float) this.zMin;
+                }
+
+                float difference = finalMovePointY - initialMovePointY;
+
+                double targetPoint = series.getY(itemIndex).floatValue() + difference;
+
+                series.updateByIndex(itemIndex, targetPoint);
+
+                dataTable.setValue(targetPoint, row, col);
+            }
+        }
     }
 
     @Override
@@ -283,54 +352,28 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
 
             onMove = true;
 
-            setCursor(new Cursor(Cursor.N_RESIZE_CURSOR));
-
-            chartPanel.setDomainZoomable(false);
-            chartPanel.setRangeZoomable(false);
-
-            int itemIndex = xyItemEntity.getItem();
-
-            int serieIndex = xyItemEntity.getSeriesIndex();
-
-            Point pt = e.getPoint();
-            XYPlot xy = chart.getXYPlot();
-            if (xy == null) {
+            if (oldTime == 0 && time == 0) {
+                time = System.currentTimeMillis();
+                oldTime = time;
                 return;
             }
-            XYSeries series = ((XYSeriesCollection) xyItemEntity.getDataset()).getSeries(serieIndex);
-            Point2D p = chartPanel.translateScreenToJava2D(pt);
 
-            Rectangle2D dataArea = chartPanel.getChartRenderingInfo().getPlotInfo().getDataArea();
+            time = System.currentTimeMillis();
 
-            finalMovePointY = (float) xy.getRangeAxis().java2DToValue(p.getY(), dataArea, xy.getRangeAxisEdge());
+            if (time - oldTime > 20) {
+                setCursor(new Cursor(Cursor.N_RESIZE_CURSOR));
 
-            if (finalMovePointY >= this.zMax) {
-                finalMovePointY = (float) this.zMax;
-            } else if (finalMovePointY <= this.zMin) {
-                finalMovePointY = (float) this.zMin;
+                int[] cols = dataTable.getTable().getSelectedColumns();
+                int[] rows = dataTable.getTable().getSelectedRows();
+
+                updatePoints(e, rows, cols);
+                updateAnnotation(rows, cols);
+
+                onMove = false;
+
+                initialMovePointY = finalMovePointY;
+                oldTime = time;
             }
-
-            float difference = finalMovePointY - initialMovePointY;
-
-            double targetPoint = series.getY(itemIndex).floatValue() + difference;
-
-            series.updateByIndex(itemIndex, Double.valueOf(targetPoint));
-
-            if (dataset.getSeriesCount() > 1) {
-
-                if (type == 'x') {
-                    dataTable.setValue(targetPoint, itemIndex, serieIndex);
-                } else {
-                    dataTable.setValue(targetPoint, serieIndex, itemIndex);
-                }
-
-            } else {
-                dataTable.setValue(targetPoint, 0, itemIndex);
-            }
-
-            onMove = false;
-
-            initialMovePointY = finalMovePointY;
 
         }
 

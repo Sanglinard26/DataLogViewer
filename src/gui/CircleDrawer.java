@@ -6,7 +6,7 @@ import java.awt.Stroke;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Rectangle2D;
 
-import org.jfree.ui.Drawable;
+import org.jfree.chart.ui.Drawable;
 
 /**
  * An implementation of the {@link Drawable} interface, to illustrate the use

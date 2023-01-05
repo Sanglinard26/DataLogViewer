@@ -7,7 +7,6 @@ import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Scrollbar;
 import java.awt.Shape;
-import java.awt.Stroke;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.AdjustmentEvent;
@@ -34,7 +33,6 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollBar;
 import javax.swing.SwingUtilities;
-import javax.swing.TransferHandler.DropLocation;
 
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
@@ -46,6 +44,8 @@ import org.jfree.chart.entity.ChartEntity;
 import org.jfree.chart.entity.PlotEntity;
 import org.jfree.chart.event.AxisChangeEvent;
 import org.jfree.chart.event.AxisChangeListener;
+import org.jfree.chart.event.ChartChangeEvent;
+import org.jfree.chart.event.ChartChangeListener;
 import org.jfree.chart.event.PlotChangeEvent;
 import org.jfree.chart.panel.CrosshairOverlay;
 import org.jfree.chart.plot.CombinedDomainXYPlot;
@@ -71,17 +71,18 @@ import org.jfree.data.xy.XYZDataset;
 import dialog.DialogProperties;
 import log.Log;
 import log.Measure;
+import observer.CursorObservable;
+import observer.CursorObservateur;
 import observer.Observable;
 import observer.Observateur;
 import utils.Utilitaire;
 
-public final class ChartView extends JPanel implements ActionListener, AdjustmentListener, AxisChangeListener, Observable {
+public final class ChartView extends JPanel implements ActionListener, AdjustmentListener, AxisChangeListener, Observable, CursorObservable {
 
     private static final long serialVersionUID = 1L;
 
-    private final ChartPanel chartPanel;
+    private final MyChartPanel chartPanel;
     private final CombinedDomainXYPlot parentPlot;
-    private static Stroke oldStrokePlot;
     private static Point2D popUpLocation;
 
     private Crosshair crosshair;
@@ -90,6 +91,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
     private static final HashMap<String, Double> tableValue = new HashMap<String, Double>();
 
     private List<Observateur> listObservateur = new ArrayList<Observateur>();
+    private List<CursorObservateur> listCursorObservateur = new ArrayList<CursorObservateur>();
 
     private JScrollBar scrollBar;
 
@@ -97,7 +99,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
         super(new BorderLayout(), true);
 
-        this.chartPanel = new ChartPanel(null, 680, 420, 300, 200, 1920, 1080, true, false, false, false, false, false);
+        this.chartPanel = new MyChartPanel(null, 680, 420, 300, 200, 1920, 1080, true, false, false, false, false, false);
         add(this.chartPanel, BorderLayout.CENTER);
 
         parentPlot = new CombinedDomainXYPlot();
@@ -105,8 +107,6 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         parentPlot.setDomainPannable(true);
         parentPlot.setOrientation(PlotOrientation.VERTICAL);
         parentPlot.setGap(10);
-
-        oldStrokePlot = parentPlot.getOutlineStroke();
 
         JFreeChart chart = new JFreeChart(parentPlot);
         chart.removeLegend();
@@ -120,7 +120,14 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         crosshairOverlay.addDomainCrosshair(crosshair);
         chartPanel.addOverlay(crosshairOverlay);
 
-        // chartPanel.removeMouseListener(chartPanel); //Permet de supprimer le temps mort sur le click mais plus de popMenu...
+        chart.addChangeListener(new ChartChangeListener() {
+
+            @Override
+            public void chartChanged(ChartChangeEvent var1) {
+                // System.out.println("chartChanged : " + var1.getSource());
+
+            }
+        });
 
         chartPanel.addMouseListener(new MyChartMouseListener());
         chartPanel.addMouseMotionListener(new MyChartMouseListener());
@@ -158,7 +165,6 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
                 setCursor(new Cursor(Cursor.HAND_CURSOR));
             } else {
                 setCursor(Cursor.getDefaultCursor());
-                // chartPanel.setPopupMenu(createChartMenu());
             }
         }
 
@@ -279,6 +285,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         }
 
         boolean xValueUpdated = false;
+        int cursorIndex = 0;
 
         for (XYPlot subplot : subplots) {
             for (int i = 0; i < subplot.getDatasetCount(); i++) {
@@ -295,8 +302,10 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
                             if (xValue < moy) {
                                 xValue = x1;
+                                cursorIndex = indices[0];
                             } else {
                                 xValue = x2;
+                                cursorIndex = indices[1];
                             }
 
                             xValueUpdated = true;
@@ -309,6 +318,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
         if (xValue != oldXValue) {
             updateObservateur("values", tableValue);
+            updateCursorObservateur(cursorIndex);
             crosshair.setValue(xValue);
         }
 
@@ -421,9 +431,10 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             }
 
             for (XYPlot subplot : subplots) {
-                for (IntervalMarker zone : listZone) {
-                    subplot.addDomainMarker(zone, Layer.BACKGROUND);
+                for (int i = 0; i < listZone.size(); i++) {
+                    subplot.addDomainMarker(0, listZone.get(i), Layer.BACKGROUND, false);
                 }
+                this.parentPlot.plotChanged(new PlotChangeEvent(subplot));
             }
         }
 
@@ -442,10 +453,11 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         for (XYPlot subplot : subplots) {
             subplot.clearDomainMarkers();
 
-            for (IntervalMarker zone : listZone) {
-                subplot.addDomainMarker(zone, Layer.BACKGROUND);
+            for (int i = 0; i < listZone.size(); i++) {
+                subplot.addDomainMarker(0, listZone.get(i), Layer.BACKGROUND, false);
             }
 
+            this.parentPlot.plotChanged(new PlotChangeEvent(subplot));
         }
     }
 
@@ -492,6 +504,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         final XYSeries series = new XYSeries(measure.getName());
         final XYSeriesCollection collections = new XYSeriesCollection(series);
         final NumberAxis yAxis = new NumberAxis(measure.getName());
+
         final XYItemRenderer renderer = new XYLineAndShapeRenderer(true, false);
         renderer.setSeriesStroke(0, new BasicStroke(1.5f));
         final XYPlot plot = new XYPlot(collections, null, yAxis, renderer);
@@ -499,6 +512,8 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         final double[] temps = time.getData();
         final int nbPoint = temps.length;
         final int sizeData = measure.getDataLength();
+
+        parentPlot.setNotify(false);
 
         if (parentPlot.getSubplots().size() == 0) {
 
@@ -516,7 +531,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         for (int n = 0; n < nbPoint; n++) {
 
             if (n < sizeData) {
-                series.add(temps[n], measure.getData()[n], false);
+                series.add(temps[n], measure.get(n), false);
             }
         }
 
@@ -531,12 +546,17 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             scrollBar.addAdjustmentListener(this);
         }
 
+        parentPlot.setNotify(true);
+
         return plot;
     }
 
     public final void add2DScatterPlot(Measure x, Measure y) {
 
         if (parentPlot.getSubplots().size() == 0) {
+
+            chartPanel.getChart().setNotify(false);
+
             final DefaultXYDataset dataset = new DefaultXYDataset();
             double[][] arrayOfDouble = { x.getData(), y.getData() };
             dataset.addSeries("Series 1", arrayOfDouble);
@@ -556,6 +576,8 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             parentPlot.add(plot, 1);
 
             scrollBar.setVisible(false);
+
+            chartPanel.getChart().setNotify(true);
         } else {
             JOptionPane.showMessageDialog(this, "Un seul graphique de ce type peut-etre pr\u00e9sent par fenetre", "Info",
                     JOptionPane.INFORMATION_MESSAGE);
@@ -599,6 +621,9 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
     public final void add3DScatterPlot(Measure x, Measure y, Measure z) {
 
         if (parentPlot.getSubplots().size() == 0) {
+
+            chartPanel.getChart().setNotify(false);
+
             final DefaultXYZDataset dataset = new DefaultXYZDataset();
             double[][] arrayOfDouble = { x.getData(), y.getData(), z.getData() };
             dataset.addSeries("Series 1", arrayOfDouble);
@@ -646,6 +671,8 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             parentPlot.add(plot, 1);
 
             scrollBar.setVisible(false);
+
+            chartPanel.getChart().setNotify(true);
         } else {
             JOptionPane.showMessageDialog(this, "Un seul graphique de ce type peut-etre pr\u00e9sent par fenetre", "Info",
                     JOptionPane.INFORMATION_MESSAGE);
@@ -655,6 +682,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
     public final void add3DScatterPlot(Measure x, Measure y, Measure z, String bckGroundColor, String shapeSize, String zRange) {
 
         if (parentPlot.getSubplots().size() == 0) {
+
             final DefaultXYZDataset dataset = new DefaultXYZDataset();
             double[][] arrayOfDouble = { x.getData(), y.getData(), z.getData() };
             dataset.addSeries("Series 1", arrayOfDouble);
@@ -748,7 +776,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         final int nbPoint = measure.getDataLength();
 
         for (int n = 0; n < nbPoint; n++) {
-            newSerie.add(time.getData()[n], measure.getData()[n], false);
+            newSerie.add(time.get(n), measure.get(n), false);
         }
 
         if (!newAxis) {
@@ -767,17 +795,16 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             plot.mapDatasetToRangeAxis(nbDataset, nbDataset);
         }
 
-        plot.setOutlineStroke(oldStrokePlot);
-
         if (parentPlot.getSubplots().size() == 1) {
             scrollBar.setMaximum((int) parentPlot.getDomainAxis().getRange().getUpperBound());
             scrollBar.getModel().setExtent(scrollBar.getMaximum());
             scrollBar.addAdjustmentListener(this);
         }
-
     }
 
     public final void addMeasure(XYPlot plot, Measure time, Measure measure, String axisName) {
+
+        parentPlot.setNotify(false);
 
         final int nbDataset = plot.getDatasetCount();
 
@@ -813,7 +840,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         final int nbPoint = measure.getDataLength();
 
         for (int n = 0; n < nbPoint; n++) {
-            newSerie.add(time.getData()[n], measure.getData()[n], false);
+            newSerie.add(time.get(n), measure.get(n), false);
         }
 
         if (!newAxis) {
@@ -830,8 +857,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             plot.mapDatasetToRangeAxis(nbDataset, nbDataset);
         }
 
-        plot.setOutlineStroke(oldStrokePlot);
-
+        parentPlot.setNotify(true);
     }
 
     public final void removeMeasure(String measureName) {
@@ -855,22 +881,6 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         }
 
         updateObservateur("remove", measureName);
-    }
-
-    public final void highlightPlot(DropLocation dropLocation) {
-
-        ChartEntity chartEntity = chartPanel.getEntityForPoint(dropLocation.getDropPoint().x, dropLocation.getDropPoint().y);
-        if (chartEntity instanceof PlotEntity) {
-            PlotEntity plotEntity = (PlotEntity) chartEntity;
-            plotEntity.getPlot().setOutlineStroke(new BasicStroke(2f));
-        } else {
-            @SuppressWarnings("unchecked")
-            List<XYPlot> subPlots = parentPlot.getSubplots();
-            for (XYPlot plot : subPlots) {
-                plot.setOutlineStroke(oldStrokePlot);
-            }
-
-        }
     }
 
     private final JPopupMenu createChartMenu() {
@@ -1086,7 +1096,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
                 int res = JOptionPane.showConfirmDialog(this, propertiesPanel, "Propri\u00e9t\u00e9s", 2, -1);
                 if (res == JOptionPane.OK_OPTION) {
                     propertiesPanel.updatePlot(this, plot);
-                    chartPanel.getChart().fireChartChanged();
+                    // chartPanel.getChart().fireChartChanged();
                 }
             }
 
@@ -1094,12 +1104,12 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         case "Y_AUTO":
             plot.getRangeAxis().setAutoRange(true);
             plot.configureRangeAxes();
-            parentPlot.plotChanged(new PlotChangeEvent(plot));
+            // parentPlot.plotChanged(new PlotChangeEvent(plot));
             break;
         case "X_AUTO":
             plot.getDomainAxis().setAutoRange(true);
             plot.getDomainAxis().configure();
-            parentPlot.plotChanged(new PlotChangeEvent(plot));
+            // parentPlot.plotChanged(new PlotChangeEvent(plot));
             break;
         case "DELETE_PLOT":
 
@@ -1130,12 +1140,11 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
                     if (range != null && !range.trim().isEmpty()) {
                         String[] splitRange = range.split(";", 2);
                         try {
-                            ;
                             double zMin = Double.parseDouble(splitRange[0]);
                             double zMax = Double.parseDouble(splitRange[1]);
                             colorScale.setBounds(zMin, zMax);
                             paintScale.getAxis().setRange(zMin, zMax);
-                            chartPanel.getChart().fireChartChanged();
+                            // chartPanel.getChart().fireChartChanged();
                         } catch (NumberFormatException nfe) {
 
                         }
@@ -1155,6 +1164,10 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
     public JFreeChart getChart() {
         return this.chartPanel.getChart();
+    }
+
+    public static final HashMap<String, Double> getTableValue() {
+        return tableValue;
     }
 
     public DefaultBoundedRangeModel getScrollBarModel() {
@@ -1178,10 +1191,15 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         setScrollBarProperties(barModel);
         Range xAxisRange = this.getPlot().getDomainAxis().getRange();
         Range defaultRange = this.getPlot().getDomainAxis().getDefaultAutoRange();
+
+        this.parentPlot.setNotify(false);
+
         this.getPlot().setDomainAxis(new NumberAxis(time.getName()));
         this.getPlot().getDomainAxis().setDefaultAutoRange(defaultRange);
         this.getPlot().getDomainAxis().setRange(xAxisRange);
         this.getPlot().getDomainAxis().addChangeListener(this);
+
+        this.parentPlot.setNotify(true);
     }
 
     @Override
@@ -1193,7 +1211,6 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
     @Override
     public void axisChanged(AxisChangeEvent arg0) {
-
         NumberAxis axis = (NumberAxis) arg0.getAxis();
         Range axisRange = axis.getRange();
 
@@ -1216,5 +1233,22 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
         scrollBar.addAdjustmentListener(this);
 
+    }
+
+    @Override
+    public void addCursorObservateur(CursorObservateur obs) {
+        this.listCursorObservateur.add(obs);
+    }
+
+    @Override
+    public void updateCursorObservateur(int cursorIndex) {
+        for (CursorObservateur cursorObservateur : listCursorObservateur) {
+            cursorObservateur.updateCursorValue(cursorIndex);
+        }
+    }
+
+    @Override
+    public void delCursorObservateur() {
+        this.listCursorObservateur = new ArrayList<CursorObservateur>();
     }
 }

@@ -52,15 +52,10 @@ public final class FilteredListMeasure extends JPanel {
 
     public final Measure getSelectedValue() {
         return listMeasure.getSelectedValue();
-
     }
 
     public FilteredListModel getModel() {
         return (FilteredListModel) listMeasure.getModel();
-    }
-
-    public final FilterField getFilterField() {
-        return filterField;
     }
 
     protected final class FilterField extends JComponent implements DocumentListener {
@@ -72,20 +67,26 @@ public final class FilteredListMeasure extends JPanel {
         private final JButton delSearchBt;
 
         final String ICON_CLEAR = "/icon_clearText_24.png";
+        final String ICON_CLEAR_PRESSED = "/icon_clearTextPressed_24.png";
 
         public FilterField() {
             super();
             setLayout(new BorderLayout());
+
             setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
 
             panelBt = new JPanel(new GridLayout(1, 2));
+            panelBt.setBackground(Color.WHITE);
 
             txtFiltre = new JTextField(15);
             txtFiltre.setBorder(BorderFactory.createEmptyBorder());
             txtFiltre.getDocument().addDocumentListener(this);
 
             delSearchBt = new JButton(new ImageIcon(getClass().getResource(ICON_CLEAR)));
-            delSearchBt.setPreferredSize(new Dimension(32, 24));
+            delSearchBt.setPreferredSize(new Dimension(24, 24));
+            delSearchBt.setFocusable(false);
+            delSearchBt.setContentAreaFilled(false);
+            delSearchBt.setPressedIcon(new ImageIcon(getClass().getResource(ICON_CLEAR_PRESSED)));
             delSearchBt.addActionListener(new ActionListener() {
 
                 @Override

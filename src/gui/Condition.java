@@ -4,7 +4,6 @@
 package gui;
 
 import java.awt.Color;
-import java.io.Serializable;
 import java.util.BitSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -18,9 +17,7 @@ import org.mariuszgromada.math.mxparser.Expression;
 import log.Log;
 import log.Measure;
 
-public final class Condition implements Serializable {
-
-    private static final long serialVersionUID = 1L;
+public final class Condition {
 
     private String name;
     private String expression;
@@ -136,7 +133,7 @@ public final class Condition implements Serializable {
                 if (measures[j].getDataLength() == 0) {
                     break;
                 }
-                arg.setArgumentValue(measures[j].getData()[i]);
+                arg.setArgumentValue(measures[j].get(i));
             }
             double res = conditionExpression.calculate();
             if (res == 1) {
