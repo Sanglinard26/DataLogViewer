@@ -63,6 +63,7 @@ public final class MdbWorkspace {
 
     private final String name;
     private Map<String, Afficheur> afficheurs;
+    @SuppressWarnings("unused")
     private Map<Integer, VariableDisplay> comVarList;
     private Map<String, VariableECU> variablesECU;
 

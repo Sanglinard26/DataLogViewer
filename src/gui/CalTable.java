@@ -31,6 +31,7 @@ import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
+import javax.swing.JFormattedTextField;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
@@ -38,7 +39,6 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
-import javax.swing.JTextField;
 import javax.swing.JToggleButton;
 import javax.swing.JToolBar;
 import javax.swing.SwingConstants;
@@ -52,6 +52,7 @@ import javax.swing.table.JTableHeader;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
+import javax.swing.text.NumberFormatter;
 
 import calib.Type;
 import calib.Variable;
@@ -73,7 +74,7 @@ public final class CalTable extends JPanel {
     private Variable selectedVariable;
     private JTableHeader header;
     private JPopupMenu renamePopup;
-    private JTextField text;
+    private JFormattedTextField text;
     private TableColumn column;
     private int rowBrkPt;
     private int columnBrkPt;
@@ -308,7 +309,7 @@ public final class CalTable extends JPanel {
         table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         table.getTableHeader().setReorderingAllowed(false);
 
-        text = new JTextField();
+        text = new JFormattedTextField(new NumberFormatter());
         text.setBorder(null);
         text.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
@@ -565,6 +566,7 @@ public final class CalTable extends JPanel {
 
         }
         ((DefaultTableModel) table.getModel()).fireTableDataChanged();
+        header.repaint();
     }
 
     private final void adjustCells() {
@@ -775,7 +777,6 @@ public final class CalTable extends JPanel {
                     selectedVariable.backToRefValue();
                     populate(selectedVariable);
                     mapView.fireMapCalChange();
-
                 }
             });
             add(btReset);
@@ -818,6 +819,7 @@ public final class CalTable extends JPanel {
             });
 
             add(btShowCursorValue);
+            btShowCursorValue.setVisible(false);
 
         }
     }

@@ -27,7 +27,7 @@ public final class Log {
 
     public Log(File file) {
 
-        long start = System.currentTimeMillis();
+        // long start = System.currentTimeMillis();
 
         if (file != null) {
 
@@ -51,7 +51,7 @@ public final class Log {
         }
         // System.out.println("Nb points = " + nbPoints);
 
-        System.out.println("log opened in : " + (System.currentTimeMillis() - start) + "ms");
+        // System.out.println("log opened in : " + (System.currentTimeMillis() - start) + "ms");
     }
 
     private final void parseMsl(File file) {

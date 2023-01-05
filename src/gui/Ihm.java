@@ -19,8 +19,6 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
@@ -121,7 +119,6 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
     private final static String VERSION = "v1.57";
     private static String APPLICATION_TITLE = "DataLogViewer " + VERSION;
-    private final String DEMO = "demo";
 
     private final static String LOG_PANEL = "LOG";
     private final static String MAP_PANEL = "MAP";
@@ -253,21 +250,6 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                 if (reponse == JFileChooser.APPROVE_OPTION) {
 
                     final File config = fc.getSelectedFile();
-
-                    if (DEMO.equals(config.getName().toLowerCase())) {
-
-                        try {
-                            final File tmp = File.createTempFile("config", null);
-                            tmp.deleteOnExit();
-                            Files.copy(getClass().getResourceAsStream("/config.cfg"), tmp.toPath(), StandardCopyOption.REPLACE_EXISTING);
-
-                            openConfig(tmp);
-
-                            mainTabbedPane.setSelectedIndex(0);
-                            return;
-                        } catch (IOException e1) {
-                        }
-                    }
                     openConfig(config);
 
                     if (mainTabbedPane != null) {
@@ -497,6 +479,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                                     break;
                                 }
                             } else {
+                                // TODO : Meilleure définition du message à faire, ressort pour une comparaison sans différence
                                 JOptionPane.showMessageDialog(null, "Export abandonn\u00e9 !");
                             }
                         }
@@ -696,24 +679,9 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                 if (reponse == JFileChooser.APPROVE_OPTION) {
                     final File config = fc.getSelectedFile();
 
-                    if (DEMO.equals(config.getName().toLowerCase())) {
-
-                        try {
-                            File tmp = File.createTempFile("config", null);
-                            tmp.deleteOnExit();
-                            Files.copy(getClass().getResourceAsStream("/config.cfg"), tmp.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                            openConfig(tmp);
-                            if (mainTabbedPane != null) {
-                                mainTabbedPane.setSelectedIndex(0);
-                            }
-                            return;
-                        } catch (IOException e) {
-                        }
-                    }
-
-                    long start = System.currentTimeMillis();
+                    // long start = System.currentTimeMillis();
                     openConfig(config);
-                    System.out.println("Config : " + (System.currentTimeMillis() - start) + "ms");
+                    // System.out.println("Config : " + (System.currentTimeMillis() - start) + "ms");
 
                     if (mainTabbedPane != null) {
                         mainTabbedPane.setSelectedIndex(0);
@@ -810,6 +778,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         btNewTable.setEnabled(true);
         btNewTable.setToolTipText("Pas encore impl\u00e9ment\u00e9");
         btNewTable.setEnabled(false);
+        btNewTable.setVisible(false);
         bar.add(btNewTable);
 
         btSynchro = new JToggleButton(new ImageIcon(getClass().getResource(ICON_SHARE_AXIS)));
@@ -1813,6 +1782,11 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
     private final class ChangeDisposition implements ActionListener {
         @Override
         public void actionPerformed(ActionEvent action) {
+
+            if (action.getActionCommand().equals(Preference.getPreference(Preference.KEY_DISPO))) {
+                return;
+            }
+
             Preference.setPreference(Preference.KEY_DISPO, action.getActionCommand());
 
             Container root = Ihm.this.getContentPane();

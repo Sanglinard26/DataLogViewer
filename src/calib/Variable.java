@@ -144,14 +144,16 @@ public final class Variable extends Observable implements Comparable<Variable> {
     public final double getDoubleValue(boolean modifiedVar, int... coord) {
         int idx = coord[1] + dimX * coord[0];
         if (!modifiedVar) {
-            return this.values[idx] != null && this.values[idx] instanceof Number ? ((Number) this.values[idx]).doubleValue() : Float.NaN;
+            return this.values[idx] != null && this.values[idx] instanceof Number ? ((Number) this.values[idx]).doubleValue()
+                    : Double.parseDouble(this.values[idx].toString());
         }
 
         if (newValues == null) {
             newValues = Arrays.copyOf(values, values.length);
         }
 
-        return this.newValues[idx] != null && this.newValues[idx] instanceof Number ? ((Number) this.newValues[idx]).doubleValue() : Float.NaN;
+        return this.newValues[idx] != null && this.newValues[idx] instanceof Number ? ((Number) this.newValues[idx]).doubleValue()
+                : Double.parseDouble(this.newValues[idx].toString());
     }
 
     public final void setValue(boolean newVal, Object value, int... coord) {
