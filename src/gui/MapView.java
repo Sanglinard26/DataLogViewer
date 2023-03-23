@@ -133,14 +133,9 @@ public final class MapView extends JPanel implements Observer, ListSelectionList
                     selectedVariable = (Variable) node.getUserObject();
                     selectedVariable.addObserver(MapView.this);
 
-                    dataTable = new CalTable(MapView.this, selectedVariable);
-                    dataTable.getTable().getSelectionModel().addListSelectionListener(MapView.this);
-                    dataTable.getTable().getColumnModel().getSelectionModel().addListSelectionListener(MapView.this);
+                    dataTable.populate(selectedVariable);
 
-                    lineChartX.setTable(dataTable);
-                    lineChartY.setTable(dataTable);
-
-                    splitPane.setTopComponent(dataTable);
+                    // splitPane.setTopComponent(dataTable);
                     splitPane.revalidate();
                     splitPane.repaint();
 
@@ -155,11 +150,14 @@ public final class MapView extends JPanel implements Observer, ListSelectionList
 
         treeVariable.addMouseListener(new TreeMouseListener());
 
-        dataTable = new CalTable(this, null);
-
+        dataTable = new CalTable(this);
+        dataTable.getTable().getSelectionModel().addListSelectionListener(MapView.this);
+        dataTable.getTable().getColumnModel().getSelectionModel().addListSelectionListener(MapView.this);
         splitPane.setTopComponent(dataTable);
 
         mapChartView = new MapChartView();
+        lineChartX.setTable(dataTable);
+        lineChartY.setTable(dataTable);
         splitPane.setBottomComponent(mapChartView);
     }
 
@@ -288,8 +286,8 @@ public final class MapView extends JPanel implements Observer, ListSelectionList
 
     private final void clearSelection() {
         selectedVariable = null;
-        dataTable = new CalTable(this, selectedVariable);
-        splitPane.setTopComponent(dataTable);
+        dataTable.populate(null);
+        // splitPane.setTopComponent(dataTable);
         lineChartX.setVisible(false);
         lineChartY.setVisible(false);
         surfaceChart.setVisible(false);
@@ -327,17 +325,17 @@ public final class MapView extends JPanel implements Observer, ListSelectionList
     /**
      * Est appelé par le changement de sélection sur l'arbre des variables
      */
-    private final void updateChart(Variable variable) {
+    public final void updateChart(Variable variable) {
 
         JSurface jSurface = surfaceChart.getSurface();
 
         BitSet chartVisible = new BitSet(3); // bit 0 : lineChartX, bit 1 : lineChartY, bit 2 : surfaceChart
-        boolean modifiedVariable = variable.isModified();
+        int idxPage = dataTable.getIdxCalPage();
 
         switch (variable.getType()) {
 
         case COURBE:
-            float[][] zValuesOrigin = variable.getZvalues(modifiedVariable);
+            float[][] zValuesOrigin = variable.getZvalues(idxPage);
 
             int length = zValuesOrigin[0].length;
 
@@ -352,8 +350,7 @@ public final class MapView extends JPanel implements Observer, ListSelectionList
             break;
 
         case MAP:
-            surfaceChart.getArraySurfaceModel().setValues(variable.getXAxis(modifiedVariable), variable.getYAxis(modifiedVariable),
-                    variable.getZvalues(modifiedVariable));
+            surfaceChart.getArraySurfaceModel().setValues(variable.getXAxis(idxPage), variable.getYAxis(idxPage), variable.getZvalues(idxPage));
             jSurface.setXLabel("X");
             jSurface.setYLabel("Y");
 
@@ -377,13 +374,13 @@ public final class MapView extends JPanel implements Observer, ListSelectionList
 
         final XYSeries[] series = new XYSeries[variable.getDimX() - 1];
 
-        boolean modifiedVar = variable.isModified();
+        int idxPage = dataTable.getIdxCalPage();
 
         for (int x = 1; x < variable.getDimX(); x++) {
-            series[x - 1] = new XYSeries(variable.getValue(modifiedVar, 0, x).toString());
+            series[x - 1] = new XYSeries(variable.getValue(idxPage, 0, x).toString());
 
             for (int y = 1; y < variable.getDimY(); y++) {
-                series[x - 1].add(variable.getDoubleValue(modifiedVar, y, 0), variable.getDoubleValue(modifiedVar, y, x), false);
+                series[x - 1].add(variable.getDoubleValue(idxPage, y, 0), variable.getDoubleValue(idxPage, y, x), false);
             }
         }
 
@@ -394,13 +391,13 @@ public final class MapView extends JPanel implements Observer, ListSelectionList
 
         final XYSeries[] series = new XYSeries[variable.getDimY() - 1];
 
-        boolean modifiedVar = variable.isModified();
+        int idxPage = dataTable.getIdxCalPage();
 
         for (int y = 1; y < variable.getDimY(); y++) {
-            series[y - 1] = new XYSeries(variable.getValue(modifiedVar, y, 0).toString());
+            series[y - 1] = new XYSeries(variable.getValue(idxPage, y, 0).toString());
 
             for (int x = 1; x < variable.getDimX(); x++) {
-                series[y - 1].add(variable.getDoubleValue(modifiedVar, 0, x), variable.getDoubleValue(modifiedVar, y, x), false);
+                series[y - 1].add(variable.getDoubleValue(idxPage, 0, x), variable.getDoubleValue(idxPage, y, x), false);
             }
         }
 
@@ -411,10 +408,10 @@ public final class MapView extends JPanel implements Observer, ListSelectionList
 
         final XYSeries[] series = new XYSeries[] { new XYSeries("") };
 
-        boolean modifiedVar = variable.isModified();
+        int idxPage = dataTable.getIdxCalPage();
 
         for (int x = 0; x < variable.getDimX(); x++) {
-            series[0].add(variable.getDoubleValue(modifiedVar, 0, x), variable.getDoubleValue(modifiedVar, 1, x), false);
+            series[0].add(variable.getDoubleValue(idxPage, 0, x), variable.getDoubleValue(idxPage, 1, x), false);
         }
 
         return series;
@@ -765,6 +762,11 @@ public final class MapView extends JPanel implements Observer, ListSelectionList
             }
 
         }
+    }
+
+    public final void refreshVariable(Variable var) {
+        dataTable.populate(var);
+        updateChart(var);
     }
 
     @Override

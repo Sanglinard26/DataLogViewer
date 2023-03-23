@@ -10,7 +10,6 @@ import java.awt.datatransfer.StringSelection;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
-import java.util.StringTokenizer;
 
 import javax.swing.JComponent;
 import javax.swing.JOptionPane;
@@ -92,18 +91,20 @@ public class CopyPasteAdapter implements ActionListener {
             system = Toolkit.getDefaultToolkit().getSystemClipboard();
             system.setContents(stsel, stsel);
         }
+
         if (e.getActionCommand().compareTo("Paste") == 0) {
             int startRow = (jTable1.getSelectedRows())[0];
             int startCol = (jTable1.getSelectedColumns())[0];
             try {
                 String trstring = (String) (system.getContents(this).getTransferData(DataFlavor.stringFlavor));
-                StringTokenizer st1 = new StringTokenizer(trstring, "\n");
-                for (int i = 0; st1.hasMoreTokens(); i++) {
-                    rowstring = st1.nextToken();
-                    StringTokenizer st2 = new StringTokenizer(rowstring, "\t");
-                    for (int j = 0; st2.hasMoreTokens(); j++) {
-                        value = st2.nextToken();
-                        if (startRow + i < jTable1.getRowCount() && startCol + j < jTable1.getColumnCount())
+                String[] line = trstring.split("\n");
+
+                for (int i = 0; i < line.length; i++) {
+                    rowstring = line[i];
+                    String[] column = rowstring.split("\t");
+                    for (int j = 0; j < column.length; j++) {
+                        value = column[j];
+                        if (!value.isEmpty() && startRow + i < jTable1.getRowCount() && startCol + j < jTable1.getColumnCount())
                             jTable1.setValueAt(value, startRow + i, startCol + j);
                     }
                 }

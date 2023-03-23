@@ -184,8 +184,11 @@ public class ButtonTabComponent extends JPanel {
         public void actionPerformed(ActionEvent e) {
             int i = pane.indexOfTabComponent(ButtonTabComponent.this);
             if (i != -1) {
-                ((ChartView) pane.getComponentAt(i)).delObservateur();
-                pane.remove(i);
+                int res = JOptionPane.showConfirmDialog(null, "Etes-vous certain de vouloir supprimer cet onglet?", "", JOptionPane.YES_NO_OPTION);
+                if (res == JOptionPane.OK_OPTION) {
+                    ((ChartView) pane.getComponentAt(i)).delObservateur();
+                    pane.remove(i);
+                }
             }
         }
 

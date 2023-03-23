@@ -148,8 +148,14 @@ public abstract class ExportUtils {
                                 axisNode.appendChild(axisNameNode);
 
                                 Element axisRangeNode = doc.createElement("Range");
-                                Range yRange = axis.getRange();
-                                String txtYRange = yRange.getLowerBound() + ";" + yRange.getUpperBound();
+                                String txtYRange;
+                                if (!axis.isAutoRange()) {
+                                    Range yRange = axis.getRange();
+                                    txtYRange = yRange.getLowerBound() + ";" + yRange.getUpperBound();
+                                } else {
+                                    txtYRange = "auto";
+                                }
+
                                 axisRangeNode.appendChild(doc.createTextNode(txtYRange));
                                 axisNode.appendChild(axisRangeNode);
 

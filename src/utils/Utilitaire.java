@@ -1,6 +1,7 @@
 package utils;
 
 import java.awt.Color;
+import java.awt.Component;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -8,6 +9,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.swing.JFileChooser;
+import javax.swing.JLabel;
+import javax.swing.JTable;
+import javax.swing.SwingConstants;
+import javax.swing.table.TableCellRenderer;
+import javax.swing.table.TableColumn;
+import javax.swing.table.TableColumnModel;
 
 public abstract class Utilitaire {
 
@@ -156,6 +163,96 @@ public abstract class Utilitaire {
         }
 
         return Color.BLACK;
+    }
+
+    public final static void adjustTableCells(JTable table) {
+
+        final TableColumnModel columnModel = table.getColumnModel();
+        final int nbCol = columnModel.getColumnCount();
+        final int nbRow = table.getRowCount();
+        int maxWidth = 10;
+        TableCellRenderer cellRenderer;
+        Object value;
+        Component component;
+        Component componentHeader;
+        TableColumn column;
+
+        for (short col = 0; col < nbCol; col++) {
+            maxWidth = 0;
+            for (short row = 0; row < nbRow; row++) {
+                cellRenderer = table.getCellRenderer(row, col);
+                value = table.getValueAt(row, col);
+
+                if (value == null || value.toString().isEmpty()) {
+                    value = 99999; // Une valeur par défaut pour ne pas avoir une case trop petite
+                }
+
+                component = cellRenderer.getTableCellRendererComponent(table, value, false, false, row, col);
+                ((JLabel) component).setHorizontalAlignment(SwingConstants.CENTER);
+                maxWidth = Math.max(((JLabel) component).getPreferredSize().width, maxWidth);
+
+                if (table.getTableHeader() != null) {
+                    componentHeader = table.getTableHeader().getDefaultRenderer().getTableCellRendererComponent(table,
+                            columnModel.getColumn(col).getHeaderValue(), false, false, 0, col);
+                    maxWidth = Math.max(((JLabel) componentHeader).getPreferredSize().width, maxWidth);
+                }
+            }
+        }
+
+        for (short col = 0; col < nbCol; col++) {
+            column = columnModel.getColumn(col);
+            column.setPreferredWidth(maxWidth + 15);
+        }
+
+    }
+
+    public final static void adjustTableCells(JTable tableRef, JTable tableChild) {
+
+        final TableColumnModel columnModel = tableRef.getColumnModel();
+        final TableColumnModel columnModelChild = tableChild.getColumnModel();
+        final int nbCol = columnModel.getColumnCount();
+        final int nbRow = tableRef.getRowCount();
+        int maxWidth = 10;
+        TableCellRenderer cellRenderer;
+        Object value;
+        Component component;
+        Component componentHeader;
+        TableColumn column;
+        TableColumn columnChild;
+
+        for (short col = 0; col < nbCol; col++) {
+            maxWidth = 0;
+            for (short row = 0; row < nbRow; row++) {
+
+                cellRenderer = tableRef.getCellRenderer(row, col);
+                value = tableRef.getValueAt(row, col);
+                component = cellRenderer.getTableCellRendererComponent(tableRef, value, false, false, row, col);
+                ((JLabel) component).setHorizontalAlignment(SwingConstants.CENTER);
+
+                cellRenderer = tableChild.getCellRenderer(row, col);
+                value = tableChild.getValueAt(row, col);
+                component = cellRenderer.getTableCellRendererComponent(tableChild, value, false, false, row, col);
+                ((JLabel) component).setHorizontalAlignment(SwingConstants.CENTER);
+
+                maxWidth = Math.max(((JLabel) component).getPreferredSize().width, maxWidth);
+
+                if (tableRef.getTableHeader() != null) {
+                    componentHeader = tableRef.getTableHeader().getDefaultRenderer().getTableCellRendererComponent(tableRef,
+                            columnModel.getColumn(col).getHeaderValue(), false, false, 0, col);
+                    maxWidth = Math.max(((JLabel) componentHeader).getPreferredSize().width, maxWidth);
+                }
+            }
+        }
+
+        maxWidth = Math.max(maxWidth, 30);
+
+        for (short col = 0; col < nbCol; col++) {
+            column = columnModel.getColumn(col);
+            columnChild = columnModelChild.getColumn(col);
+            column.setPreferredWidth(maxWidth + 15);
+            columnChild.setPreferredWidth(maxWidth + 15);
+        }
+
     }
 
 }

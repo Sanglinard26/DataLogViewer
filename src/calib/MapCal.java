@@ -60,6 +60,10 @@ public final class MapCal {
     private boolean usedByFormula = false;
     private boolean hasWorkspace = false;
 
+    public static enum ComparResult {
+        RESULT_OK, NO_DIFFERENCE, ERROR
+    }
+
     public MapCal(File mapFile) {
         this.name = mapFile.getName().replace(".map", "");
         this.listVariable = new ArrayList<Variable>();
@@ -326,11 +330,12 @@ public final class MapCal {
         Element vg;
         Element valueNode;
 
-        boolean modifiedVar = var.isModified();
+        // boolean modifiedVar = var.isModified();
+        int idxPage = 0; // Page de travail
 
         switch (var.getType()) {
         case SCALAIRE:
-            value = var.getValue(modifiedVar, 0, 0) != null ? var.getValue(modifiedVar, 0, 0).toString() : "0";
+            value = var.getValue(idxPage, 0, 0) != null ? var.getValue(idxPage, 0, 0).toString() : "0";
             valueNode = doc.createElement("V");
             valueNode.appendChild(doc.createTextNode(value));
             swValuePhys.appendChild(valueNode);
@@ -338,7 +343,7 @@ public final class MapCal {
         case COURBE:
 
             for (short x = 0; x < var.getDimX(); x++) {
-                value = var.getValue(modifiedVar, 1, x) != null ? var.getValue(modifiedVar, 1, x).toString() : "0";
+                value = var.getValue(idxPage, 1, x) != null ? var.getValue(idxPage, 1, x).toString() : "0";
                 if (!var.isTextValue()) {
                     valueNode = doc.createElement("V");
                 } else {
@@ -364,7 +369,7 @@ public final class MapCal {
             swAxisCont.appendChild(swValuePhys);
 
             for (short x = 0; x < var.getDimX(); x++) {
-                value = var.getValue(modifiedVar, 0, x) != null ? var.getValue(modifiedVar, 0, x).toString() : "0";
+                value = var.getValue(idxPage, 0, x) != null ? var.getValue(idxPage, 0, x).toString() : "0";
                 valueNode = doc.createElement("V");
                 valueNode.appendChild(doc.createTextNode(value));
                 swValuePhys.appendChild(valueNode);
@@ -383,7 +388,7 @@ public final class MapCal {
 
                 for (short x = 0; x < var.getDimX(); x++) {
 
-                    value = var.getValue(modifiedVar, y, x) != null ? var.getValue(modifiedVar, y, x).toString() : "0";
+                    value = var.getValue(idxPage, y, x) != null ? var.getValue(idxPage, y, x).toString() : "0";
 
                     // System.out.println(value);
 
@@ -415,7 +420,7 @@ public final class MapCal {
             swAxisCont.appendChild(swValuePhys);
 
             for (short x = 1; x < var.getDimX(); x++) {
-                value = var.getValue(modifiedVar, 0, x) != null ? var.getValue(modifiedVar, 0, x).toString() : "0";
+                value = var.getValue(idxPage, 0, x) != null ? var.getValue(idxPage, 0, x).toString() : "0";
                 valueNode = doc.createElement("V");
                 valueNode.appendChild(doc.createTextNode(value));
                 swValuePhys.appendChild(valueNode);
@@ -433,7 +438,7 @@ public final class MapCal {
             swAxisCont.appendChild(swValuePhys);
 
             for (short y = 1; y < var.getDimY(); y++) {
-                value = var.getValue(modifiedVar, y, 0) != null ? var.getValue(modifiedVar, y, 0).toString() : "0";
+                value = var.getValue(idxPage, y, 0) != null ? var.getValue(idxPage, y, 0).toString() : "0";
                 valueNode = doc.createElement("V");
                 valueNode.appendChild(doc.createTextNode(value));
                 swValuePhys.appendChild(valueNode);
@@ -443,7 +448,7 @@ public final class MapCal {
         case ARRAY:
 
             for (short x = 0; x < var.getDimX(); x++) {
-                value = var.getValue(modifiedVar, 0, x) != null ? var.getValue(modifiedVar, 0, x).toString() : "0";
+                value = var.getValue(idxPage, 0, x) != null ? var.getValue(idxPage, 0, x).toString() : "0";
                 if (!var.isTextValue()) {
                     valueNode = doc.createElement("V");
                 } else {
@@ -462,7 +467,7 @@ public final class MapCal {
 
                 for (short x = 0; x < var.getDimX(); x++) {
 
-                    value = var.getValue(modifiedVar, y, x) != null ? var.getValue(modifiedVar, y, x).toString() : " ";
+                    value = var.getValue(idxPage, y, x) != null ? var.getValue(idxPage, y, x).toString() : " ";
 
                     valueNode = doc.createElement("VT");
                     valueNode.appendChild(doc.createTextNode(value));
@@ -523,14 +528,14 @@ public final class MapCal {
             for (Variable var : listVariable) {
 
                 variableName = var.getName();
-                boolean modifiedVar = var.isModified();
+                int idxPage = 0;
 
                 pw.println("[" + variableName + "]");
 
                 switch (var.getType()) {
                 case SCALAIRE:
 
-                    value = var.getValue(modifiedVar, 0, 0);
+                    value = var.getValue(idxPage, 0, 0);
 
                     if (value == null || "NaN".equals(value.toString())) {
                         value = "";
@@ -545,7 +550,7 @@ public final class MapCal {
 
                     for (short x = 0; x < var.getDimX(); x++) {
 
-                        value = var.getValue(modifiedVar, 0, x);
+                        value = var.getValue(idxPage, 0, x);
 
                         if (value == null || "NaN".equals(value.toString())) {
                             value = "";
@@ -568,7 +573,7 @@ public final class MapCal {
                                 pw.print(LIGNE + EGALE);
                             }
 
-                            value = var.getValue(modifiedVar, y, x);
+                            value = var.getValue(idxPage, y, x);
 
                             if (value == null || "NaN".equals(value.toString())) {
                                 value = "";
@@ -587,7 +592,7 @@ public final class MapCal {
 
                     for (short x = 1; x < var.getDimX(); x++) {
 
-                        value = var.getValue(modifiedVar, 0, x);
+                        value = var.getValue(idxPage, 0, x);
 
                         if (value == null || "NaN".equals(value.toString())) {
                             value = "";
@@ -600,7 +605,7 @@ public final class MapCal {
 
                     for (short y = 1; y < var.getDimY(); y++) {
 
-                        value = var.getValue(modifiedVar, y, 0);
+                        value = var.getValue(idxPage, y, 0);
 
                         if (value == null || "NaN".equals(value.toString())) {
                             value = "";
@@ -612,7 +617,7 @@ public final class MapCal {
                     for (short y = 1; y < var.getDimY(); y++) {
                         for (short x = 0; x < var.getDimX(); x++) {
 
-                            value = var.getValue(modifiedVar, y, x);
+                            value = var.getValue(idxPage, y, x);
 
                             if (value == null || "NaN".equals(value.toString())) {
                                 value = "";
@@ -636,7 +641,7 @@ public final class MapCal {
 
                         for (short x = 0; x < var.getDimX(); x++) {
 
-                            value = var.getValue(modifiedVar, y, x);
+                            value = var.getValue(idxPage, y, x);
 
                             if (value == null) {
                                 value = "";
@@ -702,7 +707,7 @@ public final class MapCal {
             for (Variable var : listVariable) {
 
                 variableName = var.getName();
-                boolean modifiedVar = var.isModified();
+                int idxPage = 0;
 
                 writeCell(sheetValues, 0, row, variableName, arial10format);
 
@@ -712,7 +717,7 @@ public final class MapCal {
                 case SCALAIRE:
 
                     row += 1;
-                    writeCell(sheetValues, 0, row, var.getValue(modifiedVar, 0, 0), borderFormat);
+                    writeCell(sheetValues, 0, row, var.getValue(idxPage, 0, 0), borderFormat);
                     row += 2;
                     break;
 
@@ -721,7 +726,7 @@ public final class MapCal {
                     col = 0;
                     row += 1;
                     for (short x = 0; x < var.getDimX(); x++) {
-                        writeCell(sheetValues, col, row, var.getValue(modifiedVar, 0, x), borderFormat);
+                        writeCell(sheetValues, col, row, var.getValue(idxPage, 0, x), borderFormat);
                         col += 1;
                     }
 
@@ -736,9 +741,9 @@ public final class MapCal {
                         row += 1;
                         for (short x = 0; x < var.getDimX(); x++) {
                             if (y == 0) {
-                                writeCell(sheetValues, col, row, var.getValue(modifiedVar, y, x), axisFormat);
+                                writeCell(sheetValues, col, row, var.getValue(idxPage, y, x), axisFormat);
                             } else {
-                                writeCell(sheetValues, col, row, var.getValue(modifiedVar, y, x), borderFormat);
+                                writeCell(sheetValues, col, row, var.getValue(idxPage, y, x), borderFormat);
                             }
                             col += 1;
                         }
@@ -753,9 +758,9 @@ public final class MapCal {
                         row += 1;
                         for (short x = 0; x < var.getDimX(); x++) {
                             if (y == 0 | x == 0) {
-                                writeCell(sheetValues, col, row, var.getValue(modifiedVar, y, x), axisFormat);
+                                writeCell(sheetValues, col, row, var.getValue(idxPage, y, x), axisFormat);
                             } else {
-                                writeCell(sheetValues, col, row, var.getValue(modifiedVar, y, x), borderFormat);
+                                writeCell(sheetValues, col, row, var.getValue(idxPage, y, x), borderFormat);
                             }
                             col += 1;
                         }
@@ -769,7 +774,7 @@ public final class MapCal {
                         col = 0;
                         row += 1;
                         for (short x = 0; x < var.getDimX(); x++) {
-                            writeCell(sheetValues, col, row, var.getValue(modifiedVar, y, x), borderFormat);
+                            writeCell(sheetValues, col, row, var.getValue(idxPage, y, x), borderFormat);
                             col += 1;
                         }
                     }
@@ -818,7 +823,7 @@ public final class MapCal {
 
     }
 
-    public static final boolean compare(MapCal ref, MapCal work, final File file) {
+    public static final ComparResult compare(MapCal ref, MapCal work, final File file) {
 
         int nbVariable = Math.min(ref.listVariable.size(), work.listVariable.size());
         Variable varRef;
@@ -842,10 +847,10 @@ public final class MapCal {
         if (listDiff.size() > 0) {
             return toHtml(ref.name, work.name, listDiff, file);
         }
-        return false;
+        return ComparResult.NO_DIFFERENCE;
     }
 
-    public static final boolean toHtml(String refMap, String workMap, Map<Variable, Variable> diffs, final File file) {
+    public static final ComparResult toHtml(String refMap, String workMap, Map<Variable, Variable> diffs, final File file) {
 
         PrintWriter printWriter = null;
 
@@ -888,11 +893,11 @@ public final class MapCal {
 
                     for (int x = 0; x < var.getDimX(); x++) {
 
-                        refValue = var.getValue(false, y, x);
+                        refValue = var.getValue(1, y, x);
                         workVar = diffs.get(var);
 
                         if (x < workVar.getDimX() && y < workVar.getDimY()) {
-                            workValue = workVar.getValue(false, y, x);
+                            workValue = workVar.getValue(1, y, x);
                         } else {
                             workValue = Float.NaN;
                         }
@@ -915,12 +920,12 @@ public final class MapCal {
             printWriter.println("</html>");
 
         } catch (FileNotFoundException e) {
-            return false;
+            return ComparResult.ERROR;
         } finally {
             if (printWriter != null)
                 printWriter.close();
         }
-        return true;
+        return ComparResult.RESULT_OK;
 
     }
 

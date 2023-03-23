@@ -194,10 +194,9 @@ public final class DialogProperties extends JPanel implements ActionListener
 
             key = xyPlot.getDataset().getSeriesKey(0);
 
-            XYShapeRenderer shapeRenderer = (XYShapeRenderer) renderer;
+            model.addRow(
+                    new Object[] { key, (Color) renderer.getSeriesPaint(0), ((Ellipse2D) renderer.getDefaultShape()).getHeight(), Boolean.FALSE });
 
-            model.addRow(new Object[] { key, (Color) renderer.getSeriesPaint(0), ((Ellipse2D) shapeRenderer.getDefaultShape()).getHeight(),
-                    Boolean.FALSE });
         }
 
     }
@@ -265,6 +264,7 @@ public final class DialogProperties extends JPanel implements ActionListener
                     combinedplot.getDomainAxis().setLabel(null);
                     chartView.getChart().clearSubtitles();
                 }
+                chartView.getChart().setNotify(true);
                 return;
             }
 

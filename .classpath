@@ -5,12 +5,12 @@
 	<classpathentry excluding="help/" kind="src" path="resources"/>
 	<classpathentry kind="lib" path="SurfacePlotter.jar"/>
 	<classpathentry kind="lib" path="jackcess-2.2.3.jar"/>
-	<classpathentry kind="lib" path="commons-logging-1.2.jar"/>
-	<classpathentry kind="lib" path="commons-lang-2.6.jar"/>
-	<classpathentry kind="lib" path="jxl.jar"/>
 	<classpathentry kind="lib" path="jfreechart-1.5.3.jar"/>
 	<classpathentry kind="lib" path="MathParser.org-mXparser.jar"/>
 	<classpathentry kind="lib" path="jcommon-1.0.23.jar"/>
+	<classpathentry kind="lib" path="jxl.jar"/>
+	<classpathentry kind="lib" path="commons-lang-2.6.jar"/>
+	<classpathentry kind="lib" path="commons-logging-1.2.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

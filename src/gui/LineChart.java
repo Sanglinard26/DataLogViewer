@@ -29,6 +29,7 @@ import org.jfree.chart.ChartMouseListener;
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.annotations.XYDrawableAnnotation;
+import org.jfree.chart.axis.NumberAxis;
 import org.jfree.chart.entity.ChartEntity;
 import org.jfree.chart.entity.EntityCollection;
 import org.jfree.chart.entity.XYItemEntity;
@@ -64,8 +65,6 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
     private final JScrollPane sp;
 
     private boolean onMove = false;
-    private long oldTime = 0;
-    private long time = 0;
 
     private static final Drawable cd = new CircleDrawer(Color.BLACK, new BasicStroke(2.0f), null);
     private static final Shape shape2 = new Ellipse2D.Double(-3, -3, 6, 6);
@@ -85,6 +84,9 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
 
         renderer = new XYLineAndShapeRenderer(true, true);
         chart.getXYPlot().setRenderer(renderer);
+
+        ((NumberAxis) chart.getXYPlot().getRangeAxis()).setAutoRangeIncludesZero(false);
+        ((NumberAxis) chart.getXYPlot().getRangeAxis()).setAxisLineVisible(false); // Permet de retrouver les lignes de l'axe des abscisses, bug?
 
         chartPanel = new ChartPanel(chart);
         chartPanel.addChartMouseListener(this);
@@ -348,33 +350,21 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
     @Override
     public void mouseDragged(MouseEvent e) {
 
-        if (getCursor().getType() != Cursor.DEFAULT_CURSOR) {
+        if (getCursor().getType() != Cursor.DEFAULT_CURSOR && dataTable.getIdxCalPage() == 0) {
 
             onMove = true;
 
-            if (oldTime == 0 && time == 0) {
-                time = System.currentTimeMillis();
-                oldTime = time;
-                return;
-            }
+            setCursor(new Cursor(Cursor.N_RESIZE_CURSOR));
 
-            time = System.currentTimeMillis();
+            int[] cols = dataTable.getTable().getSelectedColumns();
+            int[] rows = dataTable.getTable().getSelectedRows();
 
-            if (time - oldTime > 20) {
-                setCursor(new Cursor(Cursor.N_RESIZE_CURSOR));
+            updatePoints(e, rows, cols);
+            updateAnnotation(rows, cols);
 
-                int[] cols = dataTable.getTable().getSelectedColumns();
-                int[] rows = dataTable.getTable().getSelectedRows();
+            onMove = false;
 
-                updatePoints(e, rows, cols);
-                updateAnnotation(rows, cols);
-
-                onMove = false;
-
-                initialMovePointY = finalMovePointY;
-                oldTime = time;
-            }
-
+            initialMovePointY = finalMovePointY;
         }
 
     }
@@ -382,5 +372,4 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
     @Override
     public void mouseMoved(MouseEvent e) {
     }
-
 }

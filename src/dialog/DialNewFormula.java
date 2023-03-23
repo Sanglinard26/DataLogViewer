@@ -40,6 +40,7 @@ import javax.swing.text.AbstractDocument;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Element;
+import javax.swing.text.JTextComponent;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
 
@@ -189,6 +190,8 @@ public final class DialNewFormula extends JDialog {
         });
         add(formulaTextPane, gbc);
 
+        // AutoSuggestor autoSuggestor = new AutoSuggestor(formulaTextPane, this, words, Color.WHITE.brighter(), Color.BLUE, Color.RED, 0.75f);
+
         if (formula != null) {
             txtName.setText(formula.getName());
             txtUnit.setText(formula.getUnit());
@@ -238,10 +241,13 @@ public final class DialNewFormula extends JDialog {
                 if (ihm.getLog() != null) {
                     Formula newFormula = new Formula(txtName.getText(), txtUnit.getText(), iterateOverContent(formulaTextPane), ihm.getLog(),
                             ihm.getSelectedCal());
+
+                    XYSeriesCollection dataset = (XYSeriesCollection) chartPanel.getChart().getXYPlot().getDataset();
+                    XYSeries serie = dataset.getSeries(0);
+                    serie.clear();
+
                     if (newFormula.isSyntaxOK()) {
-                        XYSeriesCollection dataset = (XYSeriesCollection) chartPanel.getChart().getXYPlot().getDataset();
-                        XYSeries serie = dataset.getSeries(0);
-                        serie.clear();
+
                         Measure time = ihm.getLog().getTime();
                         for (int i = 0; i < time.getDataLength(); i++) {
                             serie.add(time.get(i), newFormula.get(i), false);
@@ -249,6 +255,7 @@ public final class DialNewFormula extends JDialog {
                         serie.fireSeriesChanged();
                         chartPanel.restoreAutoBounds();
                     }
+
                 } else {
                     JOptionPane.showMessageDialog(DialNewFormula.this.getParent(), "Il faut charger un log!", "Erreur", JOptionPane.ERROR_MESSAGE);
                 }
@@ -344,12 +351,12 @@ public final class DialNewFormula extends JDialog {
         setVisible(true);
     }
 
-    private final String iterateOverContent(JTextPane tp) {
+    public final String iterateOverContent(JTextComponent textComp) {
 
         StringBuilder sb = new StringBuilder();
 
-        for (int i = 0; i < tp.getDocument().getLength(); i++) {
-            Element elem = ((StyledDocument) tp.getDocument()).getCharacterElement(i);
+        for (int i = 0; i < textComp.getDocument().getLength(); i++) {
+            Element elem = ((StyledDocument) textComp.getDocument()).getCharacterElement(i);
             AttributeSet as = elem.getAttributes();
             if (as.containsAttribute(AbstractDocument.ElementNameAttribute, StyleConstants.ComponentElementName)) {
                 if (StyleConstants.getComponent(as) instanceof JLabel) {
@@ -364,7 +371,7 @@ public final class DialNewFormula extends JDialog {
                 }
             }
             try {
-                String s = ((StyledDocument) tp.getDocument()).getText(i, 1);
+                String s = ((StyledDocument) textComp.getDocument()).getText(i, 1);
                 if (!s.isEmpty()) {
                     sb.append(s);
                 }
@@ -376,7 +383,7 @@ public final class DialNewFormula extends JDialog {
         return sb.toString().trim();
     }
 
-    private final void parseFormula(String txtformula) {
+    public final void parseFormula(String txtformula) {
 
         Pattern pattern = Pattern.compile("\\#(.*?)\\#");
         Matcher regexMatcher = pattern.matcher(txtformula);
@@ -467,12 +474,23 @@ public final class DialNewFormula extends JDialog {
     private final JPanel createPad() {
         String[] tab_string = new String[] { "SCALAIRE{}", "TABLE1D{,}", "TABLE2D{,,}", "abs()", "^", "sqrt()", "cos()", "sin()", "tan()", "+", "-",
                 "*", "/", ".", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9" };
+        String[] tabDescription = new String[] {
+                "<html><u>Description:</u> Permet d'intégrer une valeur scalaire de calibration dans la formule"
+                        + "<br><u>Exemple:</u> SCALAIRE{Seuil papillon activ. régul ralenti}",
+                "<html><u>Description:</u> Permet d'intégrer une courbe de calibration dans la formule"
+                        + "<br><u>Exemple:</u> TABLE1D{Avance Temp. Air, Air_T(°C)}",
+                "<html><u>Description:</u> Permet d'intégrer une map de calibration dans la formule"
+                        + "<br><u>Exemple:</u> TABLE2D{Rendement volumétrique, RPM(tr/min),Throttle_angle()}",
+                "<html><u>Description:</u> Calcule la valeur absolue", "<html><u>Description:</u> Elève à la puissance renseignée après l'opérateur",
+                "<html><u>Description:</u> Calcule la racine carrée", null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null };
         JButton[] tab_button = new JButton[tab_string.length];
 
         JPanel pad = new JPanel(new GridLayout(6, 5));
 
         for (int i = 0; i < tab_string.length; i++) {
             tab_button[i] = new JButton(tab_string[i]);
+            tab_button[i].setToolTipText(tabDescription[i]);
             tab_button[i].addActionListener(new PadListener());
             pad.add(tab_button[i]);
         }

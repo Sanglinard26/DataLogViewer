@@ -95,7 +95,7 @@ public final class Variable extends Observable implements Comparable<Variable> {
             for (short y = 0; y < dimY; y++) {
                 for (short x = 0; x < dimX; x++) {
                     try {
-                        if (Double.parseDouble(getValue(false, y, x).toString()) != Double.parseDouble(getValue(true, y, x).toString())) {
+                        if (Double.parseDouble(getValue(1, y, x).toString()) != Double.parseDouble(getValue(0, y, x).toString())) {
                             return true;
                         }
                     } catch (NumberFormatException nfe) {
@@ -125,27 +125,55 @@ public final class Variable extends Observable implements Comparable<Variable> {
     }
 
     /**
-     * @param modifiedVar : true to get the modified values if exist
+     * @param modifiedVar : 0 (work), 1 (reference) and 2 (difference)
      * @param coord : first arg for row and second for colum breakpoint
      */
-    public final Object getValue(boolean modifiedVar, int... coord) {
+    public final Object getValue(int idxPage, int... coord) {
         int idx = coord[1] + dimX * coord[0];
-        if (!modifiedVar) {
+
+        switch (idxPage) {
+        case 0:
+            if (newValues == null) {
+                newValues = Arrays.copyOf(values, values.length);
+            }
+            return this.newValues[idx] != null ? this.newValues[idx] : Float.NaN;
+        case 1:
             return this.values[idx] != null ? this.values[idx] : Float.NaN;
+        case 2:
+            if (newValues == null) {
+                newValues = Arrays.copyOf(values, values.length);
+            }
+            if ("Y \\ X".equals(this.newValues[idx].toString()) || coord[0] == 0 || coord[1] == 0) {
+                return this.newValues[idx];
+            }
+            if (this.newValues[idx] instanceof Number && this.values[idx] instanceof Number) {
+                double d1 = Double.parseDouble(this.newValues[idx].toString());
+                double d2 = Double.parseDouble(this.values[idx].toString());
+                return d1 - d2;
+            }
+            return Float.NaN;
         }
-
-        if (newValues == null) {
-            newValues = Arrays.copyOf(values, values.length);
-        }
-
-        return this.newValues[idx] != null ? this.newValues[idx] : Float.NaN;
+        return Float.NaN;
     }
 
-    public final double getDoubleValue(boolean modifiedVar, int... coord) {
+    public final double getDoubleValue(int idxPage, int... coord) {
         int idx = coord[1] + dimX * coord[0];
-        if (!modifiedVar) {
+        if (idxPage == 1) {
             return this.values[idx] != null && this.values[idx] instanceof Number ? ((Number) this.values[idx]).doubleValue()
                     : Double.parseDouble(this.values[idx].toString());
+        }
+
+        if (idxPage == 2 && (coord[0] == 0 || coord[1] == 0)) {
+            return this.values[idx] != null && this.values[idx] instanceof Number ? ((Number) this.values[idx]).doubleValue()
+                    : Double.parseDouble(this.values[idx].toString());
+        }
+
+        if (idxPage == 2 && coord[0] > 0) {
+            if (this.newValues[idx] instanceof Number && this.values[idx] instanceof Number) {
+                double d1 = ((Number) this.newValues[idx]).doubleValue();
+                double d2 = ((Number) this.values[idx]).doubleValue();
+                return d1 - d2;
+            }
         }
 
         if (newValues == null) {
@@ -340,7 +368,7 @@ public final class Variable extends Observable implements Comparable<Variable> {
                     if (splitEgale[0].indexOf("ligne") > -1 && !"ligne".equals(splitEgale[0])) {
                         yBrkPt = Utilitaire.getNumberObject(splitEgale[0].replace("ligne", ""));
 
-                        float[] yAxis = getYAxis(false);
+                        float[] yAxis = getYAxis(1);
 
                         int idx = Arrays.binarySearch(yAxis, yBrkPt.floatValue());
 
@@ -423,7 +451,7 @@ public final class Variable extends Observable implements Comparable<Variable> {
         notifyObservers(); // Mise à jour des graphiques
     }
 
-    public final float[] getXAxis(boolean modifiedVar) {
+    public final float[] getXAxis(int idxPage) {
 
         float[] xAxis;
 
@@ -431,26 +459,26 @@ public final class Variable extends Observable implements Comparable<Variable> {
             xAxis = new float[dimX - 1];
 
             for (int x = 1; x < dimX; x++) {
-                xAxis[x - 1] = Float.parseFloat(getValue(modifiedVar, 0, x).toString());
+                xAxis[x - 1] = Float.parseFloat(getValue(idxPage, 0, x).toString());
             }
         } else {
             xAxis = new float[dimX];
 
             for (int x = 0; x < dimX; x++) {
-                xAxis[x] = Float.parseFloat(getValue(modifiedVar, 0, x).toString());
+                xAxis[x] = Float.parseFloat(getValue(idxPage, 0, x).toString());
             }
         }
 
         return xAxis;
     }
 
-    public final float[] getYAxis(boolean modifiedVar) {
+    public final float[] getYAxis(int idxPage) {
         float[] yAxis = new float[dimY - 1];
 
         Object oValue = null;
 
         for (int y = 1; y < dimY; y++) {
-            oValue = getValue(modifiedVar, y, 0);
+            oValue = getValue(idxPage, y, 0);
             if (oValue != null) {
                 yAxis[y - 1] = Float.parseFloat(oValue.toString());
             } else {
@@ -462,7 +490,7 @@ public final class Variable extends Observable implements Comparable<Variable> {
         return yAxis;
     }
 
-    public final float[][] getZvalues(boolean modifiedVar) {
+    public final float[][] getZvalues(int idxPage) {
 
         float[][] floatValues;
 
@@ -470,14 +498,14 @@ public final class Variable extends Observable implements Comparable<Variable> {
             floatValues = new float[dimY - 1][dimX - 1];
             for (short y = 1; y < dimY; y++) {
                 for (short x = 1; x < dimX; x++) {
-                    floatValues[y - 1][x - 1] = Float.parseFloat(getValue(modifiedVar, y, x).toString());
+                    floatValues[y - 1][x - 1] = Float.parseFloat(getValue(idxPage, y, x).toString());
                 }
             }
         } else {
             floatValues = new float[1][dimX];
             for (short x = 0; x < dimX; x++) {
                 try {
-                    floatValues[0][x] = Float.parseFloat(getValue(modifiedVar, 1, x).toString());
+                    floatValues[0][x] = Float.parseFloat(getValue(idxPage, 1, x).toString());
                 } catch (NumberFormatException e) {
                     floatValues[0][x] = Float.NaN;
                 }
@@ -494,7 +522,8 @@ public final class Variable extends Observable implements Comparable<Variable> {
 
         for (short y = 0; y < getDimY(); y++) {
             for (short x = 0; x < getDimX(); x++) {
-                value = getValue(isModified(), y, x);
+                int idxPage = isModified() ? 0 : 1;
+                value = getValue(idxPage, y, x);
                 if (value != null) {
                     valCheck += value.hashCode();
                 }
@@ -504,15 +533,15 @@ public final class Variable extends Observable implements Comparable<Variable> {
         return valCheck;
     }
 
-    public final double[][] toDouble2D(boolean modifiedVar) {
+    public final double[][] toDouble2D(int idxPage) {
 
         double[][] doubleValues = new double[dimY][dimX];
 
         for (short y = 0; y < dimY; y++) {
             for (short x = 0; x < dimX; x++) {
 
-                if (getValue(modifiedVar, y, x) instanceof Number) {
-                    doubleValues[y][x] = ((Number) getValue(modifiedVar, y, x)).doubleValue();
+                if (getValue(idxPage, y, x) instanceof Number) {
+                    doubleValues[y][x] = ((Number) getValue(idxPage, y, x)).doubleValue();
                 } else {
                     if (x * y != 0) {
                         doubleValues[y][x] = Double.NaN;

@@ -36,11 +36,12 @@ public final class Log {
 
             switch (extension) {
             case "txt":
-                timeName = "Time_ms";
                 parseTxt(file);
                 break;
+            case "csv":
+                parseCsv(file);
+                break;
             case "msl":
-                timeName = "Time";
                 parseMsl(file);
                 break;
             default:
@@ -57,6 +58,16 @@ public final class Log {
     private final void parseMsl(File file) {
 
         final String TAB = "\t";
+
+        int nbLines = 0;
+
+        Stream<String> lines;
+        try {
+            lines = Files.lines(file.toPath(), StandardCharsets.ISO_8859_1);
+            nbLines = (int) (lines.count() - 4);
+            lines.close();
+        } catch (IOException e1) {
+        }
 
         try (BufferedReader bf = new BufferedReader(new FileReader(file))) {
 
@@ -79,8 +90,11 @@ public final class Log {
                 case 2:
                     this.datas = new ArrayList<Measure>(splitTab.length);
 
-                    for (String nameMeasure : splitTab) {
-                        this.datas.add(new Measure(nameMeasure));
+                    for (int idxCol = 0; idxCol < splitTab.length; idxCol++) {
+                        if (idxCol == 0) {
+                            this.timeName = splitTab[idxCol];
+                        }
+                        this.datas.add(new Measure(splitTab[idxCol], nbLines));
                     }
                     break;
                 case 3:
@@ -217,6 +231,78 @@ public final class Log {
                     this.fnr = line.trim();
                     break;
                 case 1:
+                    this.datas = new ArrayList<Measure>(splitTab.length);
+
+                    for (int idxCol = 0; idxCol < splitTab.length; idxCol++) {
+                        if (idxCol == 0) {
+                            this.timeName = splitTab[idxCol];
+                        }
+                        this.datas.add(new Measure(splitTab[idxCol], nbLines));
+                    }
+
+                    break;
+                default:
+                    if (splitTab.length == this.datas.size()) {
+                        for (int idxCol = 0; idxCol < this.datas.size(); idxCol++) {
+                            value = Utilitaire.getDoubleFromString(splitTab[idxCol]);
+                            this.datas.get(idxCol).addPoint(value);
+                        }
+                        this.nbPoints++;
+                    } else {
+                        // System.out.println("erreur ligne " + this.nbPoints);
+                    }
+
+                    break;
+                }
+                cntLine++;
+            }
+
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private final void parseCsv(File file) {
+
+        final String tabDelimiter = "\t";
+        final String commaDelimiter = ",";
+        String delimiter = "";
+
+        int nbLines = 0;
+
+        Stream<String> lines;
+        try {
+            lines = Files.lines(file.toPath(), StandardCharsets.ISO_8859_1);
+            nbLines = (int) (lines.count() - 1);
+            lines.close();
+        } catch (IOException e1) {
+        }
+
+        // System.out.println("Nb lines = " + nbLines);
+
+        try (final BufferedReader bf = new BufferedReader(new FileReader(file))) {
+
+            String line;
+            String[] splitTab;
+            double value = 0;
+            int cntLine = 0;
+
+            while ((line = bf.readLine()) != null) {
+
+                if (cntLine == 0) {
+                    if (line.indexOf(commaDelimiter) > -1) {
+                        delimiter = commaDelimiter;
+                    } else {
+                        delimiter = tabDelimiter;
+                    }
+                }
+
+                splitTab = line.split(delimiter);
+
+                switch (cntLine) {
+                case 0:
                     this.datas = new ArrayList<Measure>(splitTab.length);
 
                     for (int idxCol = 0; idxCol < splitTab.length; idxCol++) {

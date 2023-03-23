@@ -289,14 +289,14 @@ public final class Formula extends Measure {
         switch (nbParams) {
         case 1:
             for (int i = 0; i < dataSize; i++) {
-                double res = variable.getDoubleValue(true, 0, 0);
+                double res = variable.getDoubleValue(0, 0, 0);
                 z.addPoint(res);
             }
             return z;
         case 2:
             x = log.getMeasure(splitParams[1]);
 
-            double[][] courbe = variable.toDouble2D(true);
+            double[][] courbe = variable.toDouble2D(0);
 
             for (int i = 0; i < dataSize; i++) {
                 double res = Interpolation.interpLinear1D(courbe, x.get(i));
@@ -307,7 +307,7 @@ public final class Formula extends Measure {
             x = log.getMeasure(splitParams[1]);
             y = log.getMeasure(splitParams[2]);
 
-            double[][] table = variable.toDouble2D(true);
+            double[][] table = variable.toDouble2D(0);
 
             for (int i = 0; i < dataSize; i++) {
                 double res = Interpolation.interpLinear2D(table, x.get(i), y.get(i));

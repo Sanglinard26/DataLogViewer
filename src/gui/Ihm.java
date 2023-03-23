@@ -63,8 +63,6 @@ import javax.swing.UIManager.LookAndFeelInfo;
 import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
-import javax.swing.event.ListSelectionEvent;
-import javax.swing.event.ListSelectionListener;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.filechooser.FileFilter;
@@ -95,8 +93,10 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
 import calib.MapCal;
+import calib.MapCal.ComparResult;
 import calib.Variable;
 import dialog.DialAddMeasure;
+import dialog.DialDiscretisation;
 import dialog.DialManageFormula;
 import dialog.DialManual;
 import dialog.DialMoveWindow;
@@ -117,7 +117,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
     private static final long serialVersionUID = 1L;
 
-    private final static String VERSION = "v1.57";
+    private final static String VERSION = "v1.6";
     private static String APPLICATION_TITLE = "DataLogViewer " + VERSION;
 
     private final static String LOG_PANEL = "LOG";
@@ -340,7 +340,9 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                new DialMoveWindow(Ihm.this, chartTabbedPane);
+                if (chartTabbedPane.getTabCount() > 1) {
+                    new DialMoveWindow(Ihm.this, chartTabbedPane);
+                }
             }
         });
         menu.add(menuItem);
@@ -427,7 +429,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
                         if (rep == JFileChooser.APPROVE_OPTION) {
 
-                            boolean result = false;
+                            ComparResult result = ComparResult.ERROR;
 
                             if (!fileChooser.getSelectedFile().exists()) {
 
@@ -458,7 +460,8 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
                             mapCals.clear();
 
-                            if (result) {
+                            switch (result) {
+                            case RESULT_OK:
                                 final int reponse2 = JOptionPane.showConfirmDialog(null,
                                         "Comparaison termin\u00e9 !\n" + fileChooser.getSelectedFile() + "\nVoulez-vous ouvrir le fichier?", null,
                                         JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
@@ -478,18 +481,19 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                                 default:
                                     break;
                                 }
-                            } else {
-                                // TODO : Meilleure définition du message à faire, ressort pour une comparaison sans différence
-                                JOptionPane.showMessageDialog(null, "Export abandonn\u00e9 !");
+                                break;
+                            case NO_DIFFERENCE:
+                                JOptionPane.showMessageDialog(null, "Aucune diff\u00e9rence entre les deux fichiers !");
+                                break;
+                            case ERROR:
+                                JOptionPane.showMessageDialog(null, "Export abandonn\u00e9 suite à une erreur...");
+                                break;
                             }
                         }
-
                     } else {
                         JOptionPane.showMessageDialog(null, "Il faut choisir deux fichiers.");
                     }
-
                 }
-
             }
         });
         menu.add(menuItem);
@@ -679,6 +683,17 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                 if (reponse == JFileChooser.APPROVE_OPTION) {
                     final File config = fc.getSelectedFile();
 
+                    int nbWindow = chartTabbedPane.getTabCount();
+
+                    if (nbWindow > 0) {
+                        int res = JOptionPane.showConfirmDialog(null,
+                                "Voulez-vous ajouter la configuration aux fenetres existantes? \nDans le cas d'une réponse négative les fenetres déjà présentes seront supprimées.",
+                                "", JOptionPane.YES_NO_OPTION);
+                        if (res == JOptionPane.NO_OPTION) {
+                            closeWindows();
+                        }
+                    }
+
                     // long start = System.currentTimeMillis();
                     openConfig(config);
                     // System.out.println("Config : " + (System.currentTimeMillis() - start) + "ms");
@@ -770,15 +785,13 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
             @Override
             public void actionPerformed(ActionEvent arg0) {
-
-                addTableWindow();
-
+                new DialDiscretisation(Ihm.this);
             }
         });
         btNewTable.setEnabled(true);
-        btNewTable.setToolTipText("Pas encore impl\u00e9ment\u00e9");
-        btNewTable.setEnabled(false);
-        btNewTable.setVisible(false);
+        btNewTable.setToolTipText("En cours de d\u00e9veloppement");
+        btNewTable.setEnabled(true);
+        btNewTable.setVisible(true);
         bar.add(btNewTable);
 
         btSynchro = new JToggleButton(new ImageIcon(getClass().getResource(ICON_SHARE_AXIS)));
@@ -915,6 +928,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                             chartView.applyCondition(condition.isActive(), bitCondition, log);
                         }
                     }
+
                 } else {
                     tableCursorValues.getModel().clearList();
                 }
@@ -1044,7 +1058,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         gbc.gridwidth = 1;
         gbc.gridheight = 1;
         gbc.weightx = 15;
-        gbc.weighty = 60;
+        gbc.weighty = 50;
         gbc.insets = new Insets(0, 0, 0, 0);
         gbc.anchor = GridBagConstraints.FIRST_LINE_START;
         scrollTableCursorValues = new JScrollPane(tableCursorValues);
@@ -1114,15 +1128,10 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
             }
         });
 
-        panelCondition.getTableListCondition().getSelectionModel().addListSelectionListener(new ListSelectionListener() {
+        panelCondition.getCbZones().addActionListener(new ActionListener() {
 
             @Override
-            public void valueChanged(ListSelectionEvent e) {
-                int idx = panelCondition.getTableListCondition().getSelectedRow();
-
-                if (idx < 0) {
-                    return;
-                }
+            public void actionPerformed(ActionEvent e) {
 
                 int idxWin = chartTabbedPane.getSelectedIndex();
                 if (idxWin > -1) {
@@ -1132,18 +1141,23 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                         if (chartView.getDatasetType() < 2) {
                             CombinedDomainXYPlot combinedDomainXYPlot = chartView.getPlot();
 
-                            double duration = (double) panelCondition.getTableListCondition().getValueAt(idx, 2)
-                                    - (double) panelCondition.getTableListCondition().getValueAt(idx, 1);
+                            double t1 = panelCondition.getStartZone();
+                            double t2 = panelCondition.getEndZone();
 
-                            double t1 = (double) panelCondition.getTableListCondition().getValueAt(idx, 1) - (duration * 0.2);
-                            double t2 = (double) panelCondition.getTableListCondition().getValueAt(idx, 2) + (duration * 0.2);
+                            if (!Double.isNaN(t1) && !Double.isNaN(t2)) {
+                                double duration = panelCondition.getDurationZone();
 
-                            Range newRange = new Range(t1, t2);
-                            combinedDomainXYPlot.getDomainAxis().setRange(newRange);
+                                t1 -= (duration * 0.2);
+                                t2 += (duration * 0.2);
+
+                                Range newRange = new Range(t1, t2);
+                                combinedDomainXYPlot.getDomainAxis().setRange(newRange);
+                            }
                         }
 
                     }
                 }
+
             }
         });
 
@@ -1153,10 +1167,10 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         gbc.gridwidth = 1;
         gbc.gridheight = 1;
         gbc.weightx = 15;
-        gbc.weighty = 40;
+        gbc.weighty = 50;
         gbc.insets = new Insets(0, 0, 0, 0);
         gbc.anchor = GridBagConstraints.FIRST_LINE_START;
-        panel.add(panelCondition, gbc);
+        panel.add(new JScrollPane(panelCondition), gbc);
 
         return panel;
 
@@ -1169,12 +1183,12 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
         final JPopupMenu popUp = new JPopupMenu();
 
-        JMenuItem menuItem = new JMenuItem("Trouver la valeur min", new ImageIcon(getClass().getResource(ICON_MINVALUE)));
+        JMenuItem menuItem = new JMenuItem("Aller à valeur min", new ImageIcon(getClass().getResource(ICON_MINVALUE)));
         menuItem.setActionCommand("MIN_VALUE");
         menuItem.addActionListener(this);
         popUp.add(menuItem);
 
-        menuItem = new JMenuItem("Trouver la valeur max", new ImageIcon(getClass().getResource(ICON_MAXVALUE)));
+        menuItem = new JMenuItem("Aller à la valeur max", new ImageIcon(getClass().getResource(ICON_MAXVALUE)));
         menuItem.setActionCommand("MAX_VALUE");
         menuItem.addActionListener(this);
         popUp.add(menuItem);
@@ -1192,7 +1206,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
                 @Override
                 public String getDescription() {
-                    return "Fichier log (*.txt, *.msl)";
+                    return "Fichier log (*.txt, *.msl, *.csv)";
                 }
 
                 @Override
@@ -1200,7 +1214,8 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                     if (f.isDirectory()) {
                         return true;
                     }
-                    return f.getName().toLowerCase().endsWith("txt") || f.getName().toLowerCase().endsWith("msl");
+                    return f.getName().toLowerCase().endsWith("txt") || f.getName().toLowerCase().endsWith("msl")
+                            || f.getName().toLowerCase().endsWith("csv");
                 }
             });
             final int reponse = fc.showOpenDialog(Ihm.this);
@@ -1259,23 +1274,6 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
             mainTabbedPane.setSelectedComponent(mapView);
         }
 
-    }
-
-    private final CalTable addTableWindow() {
-        String defaultName = "Fenetre_" + chartTabbedPane.getTabCount();
-        String windowName = JOptionPane.showInputDialog(Ihm.this, "Nom de la fenetre :", defaultName);
-        if (windowName == null) {
-            return null;
-        }
-        if ("".equals(windowName)) {
-            windowName = defaultName;
-        }
-        CalTable table = new CalTable(null, null);
-        chartTabbedPane.addTab(windowName, table);
-        chartTabbedPane.setTabComponentAt(chartTabbedPane.getTabCount() - 1, new ButtonTabComponent(chartTabbedPane));
-        chartTabbedPane.setSelectedIndex(chartTabbedPane.getTabCount() - 1);
-
-        return table;
     }
 
     private final ChartView addChartWindow(String nameWindow) {
@@ -1658,6 +1656,10 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                         } else {
                             Comparable<?> serieKey = ((DefaultXYDataset) xyPlot.getDataset()).getSeriesKey(nSerie);
 
+                            if (xyPlot.getDatasetCount() > 1) {
+                                xyPlot.clearAnnotations();
+                            }
+
                             String xLabel = xyPlot.getDomainAxis().getLabel();
                             String yLabel = xyPlot.getRangeAxis().getLabel();
 
@@ -1669,6 +1671,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                         }
                     }
                 }
+
             }
 
             // TODO : Génère un NPE quand la synchro des axes X est active
@@ -1676,6 +1679,14 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                 chartView.getPlot().getDomainAxis().setAutoRange(true);
                 chartView.getPlot().configureDomainAxes();
                 chartView.configureScrollbar();
+            }
+
+            for (Object plot : chartView.getPlot().getSubplots()) { // Obligé de configuer l'axe Y une fois que l'axe X est sur la pleine échelle
+                xyPlot = (XYPlot) plot;
+
+                if (xyPlot.getRangeAxis().isAutoRange()) {
+                    xyPlot.configureRangeAxes();
+                }
             }
 
             chartView.getPlot().setNotify(true);
@@ -1915,13 +1926,14 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                                     String nameSerie = serieNode.getElementsByTagName("Name").item(0).getTextContent();
                                     String colorSerie = serieNode.getElementsByTagName("Color").item(0).getTextContent();
                                     String widthSerie = serieNode.getElementsByTagName("Width").item(0).getTextContent();
-                                    chartView.addMeasure((XYPlot) chartView.getPlot().getSubplots().get(j), new Measure("Time_ms"),
+                                    chartView.addMeasure((XYPlot) chartView.getPlot().getSubplots().get(j), new Measure(timeBase),
                                             new Measure(nameSerie), colorSerie, widthSerie, nameAxis);
                                 }
 
+                                ValueAxis axis = ((XYPlot) chartView.getPlot().getSubplots().get(j)).getRangeAxis(k);
+
                                 if (splitRange.length == 2) {
                                     try {
-                                        ValueAxis axis = ((XYPlot) chartView.getPlot().getSubplots().get(j)).getRangeAxis(k);
                                         double lowerBound = Double.parseDouble(splitRange[0]);
                                         double upperBound = Double.parseDouble(splitRange[1]);
                                         Range newRange = new Range(lowerBound, upperBound);
@@ -1929,6 +1941,8 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
                                     } catch (NumberFormatException e) {
                                     }
+                                } else {
+                                    axis.setAutoRange(true);
                                 }
                             }
 

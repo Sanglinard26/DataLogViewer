@@ -31,6 +31,7 @@ import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JFormattedTextField;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
@@ -72,12 +73,13 @@ public final class CalTable extends JPanel {
     private BarControl control;
     private JScrollPane scrollPane;
     private Variable selectedVariable;
-    private JTableHeader header;
+    private final JTableHeader header;
     private JPopupMenu renamePopup;
     private JFormattedTextField text;
     private TableColumn column;
     private int rowBrkPt;
     private int columnBrkPt;
+    private int idxCalPage = 0;
 
     private JToggleButton btTrace;
     private boolean[][] flagInLog;
@@ -90,7 +92,7 @@ public final class CalTable extends JPanel {
     final String ICON_MARKER = "/icon_marker_12.png";
     private final ImageIcon iconMarker = new ImageIcon(getClass().getResource(ICON_MARKER));
 
-    public CalTable(MapView mapView, Variable variable) {
+    public CalTable(MapView mapView) {
         super(new BorderLayout(0, 0));
 
         this.mapView = mapView;
@@ -98,32 +100,15 @@ public final class CalTable extends JPanel {
         control = new BarControl();
         add(control, BorderLayout.NORTH);
 
-        if (variable == null) {
-            return;
-        }
+        DefaultTableModel model = new DefaultTableModel(0, 0) {
+            private static final long serialVersionUID = 1L;
 
-        this.selectedVariable = variable;
+            public boolean isCellEditable(int row, int column) {
+                return idxCalPage == 0 ? true : false;
+            };
+        };
 
-        int nbRow = variable.getDimY();
-        int nbCol = variable.getDimX();
-
-        switch (variable.getType()) {
-
-        case COURBE:
-            nbRow--;
-            break;
-
-        case MAP:
-            nbRow--;
-            nbCol--;
-            break;
-
-        default:
-
-            break;
-        }
-
-        table = new JTable(nbRow, nbCol);
+        table = new JTable(model);
         new CopyPasteAdapter(table);
         table.addMouseListener(new MouseAdapter() {
 
@@ -141,6 +126,23 @@ public final class CalTable extends JPanel {
 
                         @Override
                         public void actionPerformed(ActionEvent e) {
+
+                            int offsetRow = 0;
+                            int offsetCol = 0;
+
+                            switch (CalTable.this.selectedVariable.getType()) {
+
+                            case COURBE:
+                                offsetRow = 1;
+                                break;
+                            case MAP:
+                                offsetRow = 1;
+                                offsetCol = 1;
+                                break;
+                            default:
+                                break;
+                            }
+
                             int[] cols = table.getSelectedColumns();
                             int[] rows = table.getSelectedRows();
 
@@ -148,7 +150,7 @@ public final class CalTable extends JPanel {
 
                             for (int col : cols) {
                                 for (int row : rows) {
-                                    refValue = selectedVariable.getValue(false, row + 1, col + 1);
+                                    refValue = selectedVariable.getValue(1, row + offsetRow, col + offsetCol);
                                     table.setValueAt(refValue, row, col);
                                 }
                             }
@@ -170,6 +172,10 @@ public final class CalTable extends JPanel {
 
             @Override
             public void keyTyped(KeyEvent e) {
+
+                if (table.getCellEditor() == null) {
+                    return;
+                }
 
                 String res = null;
                 double val;
@@ -253,8 +259,6 @@ public final class CalTable extends JPanel {
 
         });
 
-        table.setDefaultEditor(Object.class, new SaturateValueEditor(variable.getMin(), variable.getMax()));
-
         table.getModel().addTableModelListener(new TableModelListener() {
 
             @Override
@@ -327,16 +331,16 @@ public final class CalTable extends JPanel {
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
         scrollPane.setRowHeaderView(rowTable);
 
-        populate(variable);
-
-        adjustCells();
-
         add(scrollPane, BorderLayout.CENTER);
 
     }
 
     public final JTable getTable() {
         return table;
+    }
+
+    public final int getIdxCalPage() {
+        return idxCalPage;
     }
 
     private void editColumnAt(Point p) {
@@ -400,7 +404,7 @@ public final class CalTable extends JPanel {
     public final void calcZvalue() {
 
         final double[][] datasTable = getTableDoubleValue();
-        final double[][] datasRef = selectedVariable.toDouble2D(false);
+        final double[][] datasRef = selectedVariable.toDouble2D(1);
         double result = Double.NaN;
 
         for (int row = 0; row < table.getRowCount(); row++) {
@@ -490,16 +494,55 @@ public final class CalTable extends JPanel {
         String value;
         Object oValue;
 
-        boolean modifiedVar = variable.isModified();
+        this.selectedVariable = variable;
+
+        if (this.selectedVariable != null) {
+            int nbRow = variable.getDimY();
+            int nbCol = variable.getDimX();
+
+            table.setDefaultEditor(Object.class, new SaturateValueEditor(variable.getMin(), variable.getMax()));
+
+            switch (variable.getType()) {
+
+            case COURBE:
+                nbRow--;
+                break;
+            case MAP:
+                nbRow--;
+                nbCol--;
+                break;
+            default:
+                break;
+            }
+
+            int nbRowTable = ((DefaultTableModel) table.getModel()).getRowCount();
+            int nbColTable = ((DefaultTableModel) table.getModel()).getColumnCount();
+
+            if (nbRowTable != nbRow) {
+                ((DefaultTableModel) table.getModel()).setRowCount(nbRow);
+                ((DefaultTableModel) rowTable.getModel()).setRowCount(nbRow);
+            }
+
+            if (nbColTable != nbCol) {
+                ((DefaultTableModel) table.getModel()).setColumnCount(nbCol);
+            }
+        } else {
+            ((DefaultTableModel) table.getModel()).setRowCount(0);
+            ((DefaultTableModel) rowTable.getModel()).setRowCount(0);
+            ((DefaultTableModel) table.getModel()).setColumnCount(0);
+            return;
+        }
 
         @SuppressWarnings({ "rawtypes" })
         Vector<Vector> dataVector = ((DefaultTableModel) table.getModel()).getDataVector();
 
         if (variable.getDimX() * variable.getDimY() == 1) {
+
             table.setTableHeader(null);
             scrollPane.setRowHeaderView(null);
+            scrollPane.getColumnHeader().setVisible(false);
 
-            oValue = variable.getValue(modifiedVar, 0, 0);
+            oValue = variable.getValue(idxCalPage, 0, 0);
 
             value = oValue != null ? oValue.toString() : "";
 
@@ -507,13 +550,20 @@ public final class CalTable extends JPanel {
 
         } else if (variable.getDimY() == 2) {
 
+            table.setTableHeader(header);
             scrollPane.setRowHeaderView(null);
+            scrollPane.getColumnHeader().setVisible(true);
 
             String xValue;
 
             for (int col = 0; col < variable.getDimX(); col++) {
-                xValue = variable.getValue(modifiedVar, 0, col).toString();
-                value = variable.getValue(modifiedVar, 1, col).toString();
+
+                if (idxCalPage == 2) {
+                    xValue = variable.getValue(0, 0, col).toString();
+                } else {
+                    xValue = variable.getValue(idxCalPage, 0, col).toString();
+                }
+                value = variable.getValue(idxCalPage, 1, col).toString();
 
                 table.getColumnModel().getColumn(col).setHeaderValue(xValue);
                 dataVector.get(0).set(col, value);
@@ -522,9 +572,10 @@ public final class CalTable extends JPanel {
 
             table.setTableHeader(null);
             scrollPane.setRowHeaderView(null);
+            scrollPane.getColumnHeader().setVisible(false);
 
             for (int col = 0; col < variable.getDimX(); col++) {
-                oValue = variable.getValue(modifiedVar, 0, col);
+                oValue = variable.getValue(idxCalPage, 0, col);
 
                 value = oValue != null ? oValue.toString() : "";
 
@@ -532,15 +583,25 @@ public final class CalTable extends JPanel {
             }
         } else {
 
-            if ("Y \\ X".equals(variable.getValue(modifiedVar, 0, 0).toString())) {
+            if ("Y \\ X".equals(variable.getValue(idxCalPage, 0, 0).toString())) {
                 String xValue;
                 String yValue;
 
+                table.setTableHeader(header);
+                scrollPane.setRowHeaderView(rowTable);
+                scrollPane.getColumnHeader().setVisible(true);
+
                 for (int row = 1; row < variable.getDimY(); row++) {
                     for (int col = 1; col < variable.getDimX(); col++) {
-                        xValue = variable.getValue(modifiedVar, 0, col).toString();
-                        yValue = variable.getValue(modifiedVar, row, 0).toString();
-                        value = variable.getValue(modifiedVar, row, col).toString();
+                        if (idxCalPage == 2) {
+                            xValue = variable.getValue(0, 0, col).toString();
+                            yValue = variable.getValue(0, row, 0).toString();
+                        } else {
+                            xValue = variable.getValue(idxCalPage, 0, col).toString();
+                            yValue = variable.getValue(idxCalPage, row, 0).toString();
+                        }
+
+                        value = variable.getValue(idxCalPage, row, col).toString();
 
                         table.getColumnModel().getColumn(col - 1).setHeaderValue(xValue);
                         rowTable.setValueAt(yValue, row - 1, 0);
@@ -551,11 +612,12 @@ public final class CalTable extends JPanel {
 
                 table.setTableHeader(null);
                 scrollPane.setRowHeaderView(null);
+                scrollPane.getColumnHeader().setVisible(false);
 
                 for (int row = 0; row < variable.getDimY() - 1; row++) {
                     for (int col = 0; col < variable.getDimX() - 1; col++) {
 
-                        oValue = variable.getValue(modifiedVar, row, col);
+                        oValue = variable.getValue(idxCalPage, row, col);
 
                         value = oValue != null ? oValue.toString() : "";
 
@@ -567,42 +629,14 @@ public final class CalTable extends JPanel {
         }
         ((DefaultTableModel) table.getModel()).fireTableDataChanged();
         header.repaint();
-    }
 
-    private final void adjustCells() {
-
-        final TableColumnModel columnModel = table.getColumnModel();
-        final int nbCol = columnModel.getColumnCount();
-        final int nbRow = table.getRowCount();
-        int maxWidth = 10;
-        TableCellRenderer cellRenderer;
-        Object value;
-        Component component;
-        Component componentHeader;
-        TableColumn column;
-
-        for (short col = 0; col < nbCol; col++) {
-            maxWidth = 0;
-            for (short row = 0; row < nbRow; row++) {
-                cellRenderer = table.getCellRenderer(row, col);
-                value = table.getValueAt(row, col);
-                component = cellRenderer.getTableCellRendererComponent(table, value, false, false, row, col);
-                ((JLabel) component).setHorizontalAlignment(SwingConstants.CENTER);
-                maxWidth = Math.max(((JLabel) component).getPreferredSize().width, maxWidth);
-
-                if (table.getTableHeader() != null) {
-                    componentHeader = table.getTableHeader().getDefaultRenderer().getTableCellRendererComponent(table,
-                            columnModel.getColumn(col).getHeaderValue(), false, false, 0, col);
-                    maxWidth = Math.max(((JLabel) componentHeader).getPreferredSize().width, maxWidth);
-                }
-            }
+        if (btTrace.isSelected()) {
+            setTrackFlag();
         }
 
-        for (short col = 0; col < nbCol; col++) {
-            column = columnModel.getColumn(col);
-            column.setPreferredWidth(maxWidth + 15);
-        }
+        cursorValues = null;
 
+        Utilitaire.adjustTableCells(table);
     }
 
     private class MyMouseListener extends MouseAdapter {
@@ -821,6 +855,22 @@ public final class CalTable extends JPanel {
             add(btShowCursorValue);
             btShowCursorValue.setVisible(false);
 
+            String[] choixCal = new String[] { "Travail", "Référence", "Différences" };
+            JComboBox<String> cbPage = new JComboBox<String>(choixCal);
+            cbPage.addActionListener(new ActionListener() {
+
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    int idx = cbPage.getSelectedIndex();
+                    if (idx > -1 && idx != idxCalPage) {
+                        idxCalPage = idx;
+                        populate(selectedVariable);
+                        mapView.updateChart(selectedVariable);
+                    }
+                }
+            });
+            cbPage.setMaximumSize(new Dimension(80, 24));
+            add(cbPage);
         }
     }
 
@@ -883,7 +933,7 @@ public final class CalTable extends JPanel {
         switch (selectedVariable.getType()) {
         case COURBE:
 
-            xBrkPt = selectedVariable.getXAxis(true);
+            xBrkPt = selectedVariable.getXAxis(0);
 
             cursorValues = new boolean[1][xBrkPt.length];
 
@@ -915,8 +965,8 @@ public final class CalTable extends JPanel {
             break;
         case MAP:
 
-            xBrkPt = selectedVariable.getXAxis(true);
-            yBrkPt = selectedVariable.getYAxis(true);
+            xBrkPt = selectedVariable.getXAxis(0);
+            yBrkPt = selectedVariable.getYAxis(0);
 
             cursorValues = new boolean[yBrkPt.length][xBrkPt.length];
 
@@ -970,6 +1020,14 @@ public final class CalTable extends JPanel {
             return;
         }
 
+        if (Float.isNaN(xFraction) || Float.isInfinite(xFraction)) {
+            xFraction = 0;
+        }
+
+        if (Float.isNaN(yFraction) || Float.isInfinite(yFraction)) {
+            yFraction = 0f;
+        }
+
         table.repaint();
     }
 
@@ -1001,7 +1059,7 @@ public final class CalTable extends JPanel {
                 return;
             }
 
-            xBrkPt = this.selectedVariable.getXAxis(true);
+            xBrkPt = this.selectedVariable.getXAxis(0);
 
             flagInLog = new boolean[1][xBrkPt.length];
 
@@ -1032,8 +1090,8 @@ public final class CalTable extends JPanel {
                 return;
             }
 
-            xBrkPt = this.selectedVariable.getXAxis(true);
-            yBrkPt = this.selectedVariable.getYAxis(true);
+            xBrkPt = this.selectedVariable.getXAxis(0);
+            yBrkPt = this.selectedVariable.getYAxis(0);
 
             flagInLog = new boolean[yBrkPt.length][xBrkPt.length];
 
@@ -1107,7 +1165,9 @@ public final class CalTable extends JPanel {
                     g2d.fillOval(x, getHeight() / 2 - 3, 6, 6);
                     break;
                 case 2:
+
                     int y = (int) (getHeight() * yFraction) - 3;
+
                     if (xFraction <= 0.5) {
                         x += (getWidth() / 2);
                     } else {
@@ -1189,8 +1249,8 @@ public final class CalTable extends JPanel {
                 break;
             }
 
-            Object oValue1 = selectedVariable.getValue(false, row + offsetRow, column + offsetCol);
-            Object oValue2 = selectedVariable.getValue(true, row + offsetRow, column + offsetCol);
+            Object oValue1 = selectedVariable.getValue(1, row + offsetRow, column + offsetCol);
+            Object oValue2 = selectedVariable.getValue(0, row + offsetRow, column + offsetCol);
 
             double oldValue = 0;
             double newValue = 0;
@@ -1210,9 +1270,9 @@ public final class CalTable extends JPanel {
                 super.setBackground(background);
             }
 
-            if (diff > 0) {
+            if (diff > 0 && idxCalPage != 1) {
                 setForeground(Color.RED);
-            } else if (diff < 0) {
+            } else if (diff < 0 && idxCalPage != 1) {
                 setForeground(Color.BLUE);
             } else {
                 setForeground(Color.BLACK);
