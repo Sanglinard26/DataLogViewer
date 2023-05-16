@@ -117,7 +117,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
     private static final long serialVersionUID = 1L;
 
-    private final static String VERSION = "v1.6";
+    private final static String VERSION = "v1.61";
     private static String APPLICATION_TITLE = "DataLogViewer " + VERSION;
 
     private final static String LOG_PANEL = "LOG";
@@ -1722,6 +1722,10 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                     if (xyPlot.getDataset() instanceof XYSeriesCollection) {
 
                         int idxSerie = xyPlot.getDataset(nDataset).indexOf(formulaName);
+
+                        if (idxSerie == -1) {
+                            continue;
+                        }
 
                         serie = ((XYSeriesCollection) xyPlot.getDataset(nDataset)).getSeries(idxSerie);
                         serie.clear();

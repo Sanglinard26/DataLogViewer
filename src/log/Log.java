@@ -24,6 +24,7 @@ public final class Log {
     private List<Measure> datas;
     private int nbPoints = 0;
     private String timeName = "";
+    private float te;
 
     public Log(File file) {
 
@@ -256,6 +257,23 @@ public final class Log {
                 }
                 cntLine++;
             }
+
+            /*
+             * final Measure time = this.getTime();
+             * te = 0;
+             * 
+             * for (int t = 0; t < nbPoints; t++) {
+             * if (t > 0) {
+             * double dT = time.get(t) - time.get(t - 1);
+             * te += dT;
+             * }
+             * }
+             * 
+             * te /= nbPoints;
+             * System.out.println("te = " + te + "s");
+             * 
+             * System.out.println(time.get(nbPoints - 1) / nbPoints);
+             */
 
         } catch (FileNotFoundException e) {
             e.printStackTrace();

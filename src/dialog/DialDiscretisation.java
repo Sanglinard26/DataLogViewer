@@ -369,6 +369,9 @@ public final class DialDiscretisation extends JDialog {
                         zValues = new ArrayList<>();
 
                         while ((line = br.readLine()) != null) {
+
+                            line = line.replace(",", ".");
+
                             splitLine = line.split(";");
 
                             switch (cnt) {

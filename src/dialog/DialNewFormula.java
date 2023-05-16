@@ -460,7 +460,7 @@ public final class DialNewFormula extends JDialog {
             if (text.charAt(idx1--) == accoladeOuvrante) {
                 break;
             }
-        } while (idx1 == 0);
+        } while (idx1 > 0);
 
         do {
             if (text.charAt(idx2++) == accoladeFermante) {
@@ -472,8 +472,8 @@ public final class DialNewFormula extends JDialog {
     }
 
     private final JPanel createPad() {
-        String[] tab_string = new String[] { "SCALAIRE{}", "TABLE1D{,}", "TABLE2D{,,}", "abs()", "^", "sqrt()", "cos()", "sin()", "tan()", "+", "-",
-                "*", "/", ".", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9" };
+        String[] tab_string = new String[] { "SCALAIRE{}", "TABLE1D{,}", "TABLE2D{,,}", "abs()", "^", "sqrt()", "delta(,)", "passeBasTypeK(,)",
+                "bitactif(,)", "saturation(,,)", "+", "-", "*", "/", ".", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9" };
         String[] tabDescription = new String[] {
                 "<html><u>Description:</u> Permet d'intégrer une valeur scalaire de calibration dans la formule"
                         + "<br><u>Exemple:</u> SCALAIRE{Seuil papillon activ. régul ralenti}",
@@ -482,8 +482,14 @@ public final class DialNewFormula extends JDialog {
                 "<html><u>Description:</u> Permet d'intégrer une map de calibration dans la formule"
                         + "<br><u>Exemple:</u> TABLE2D{Rendement volumétrique, RPM(tr/min),Throttle_angle()}",
                 "<html><u>Description:</u> Calcule la valeur absolue", "<html><u>Description:</u> Elève à la puissance renseignée après l'opérateur",
-                "<html><u>Description:</u> Calcule la racine carrée", null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null };
+                "<html><u>Description:</u> Calcule la racine carrée",
+                "<html><u>Description:</u> Calcule la différence de deux valeurs à n points d'interval" + "<br><u>Exemple:</u> delta(Richness(), 5)"
+                        + "<br>Le calcul réalisé sera : Richness[n]-Richness[n-5]",
+                "<html><u>Description:</u> Filtre passe bas du 1er ordre" + "<br><u>Exemple:</u> passeBasTypeK(Richness(), 0.1)"
+                        + "<br>Le coefficient de filtrage doit être entre 0 et 1, à 1 pas de filtrage",
+                "<html><u>Description:</u> Renvoie 1 si le bit sélectionné est actif" + "<br><u>Exemple:</u> bitactif(Status_transient_enrichm(), 0)",
+                "<html><u>Description:</u> Sature un signal entre deux bornes" + "<br><u>Exemple:</u> saturation(RPM(tr/min), 2000,3000", null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null };
         JButton[] tab_button = new JButton[tab_string.length];
 
         JPanel pad = new JPanel(new GridLayout(6, 5));

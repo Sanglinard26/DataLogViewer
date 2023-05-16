@@ -12,6 +12,7 @@ import javax.swing.JOptionPane;
 
 import org.mariuszgromada.math.mxparser.Argument;
 import org.mariuszgromada.math.mxparser.Expression;
+import org.mariuszgromada.math.mxparser.Function;
 
 import calib.MapCal;
 import calib.Variable;
@@ -36,6 +37,8 @@ public final class Formula extends Measure {
         mapRegexCal.put("SCALAIRE", "SCALAIRE\\{.*?\\}");
     }
 
+    private static String[] functions = new String[] { "delta", "passeBasTypeK", "bitactif", "saturation" };
+
     public Formula(String name, String unit, String baseExpression, Log log, MapCal calib) {
         super(name, log.getNbPoints());
 
@@ -49,9 +52,11 @@ public final class Formula extends Measure {
         build();
 
         if (syntaxOK) {
+
             calculate(log, calib);
         } else {
-            JOptionPane.showMessageDialog(null, "V\u00e9rifiez la synthaxe svp", "Erreur", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(null, "V\u00e9rifiez la synthaxe svp \n" + expression.getErrorMessage(), "Erreur",
+                    JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -70,7 +75,8 @@ public final class Formula extends Measure {
         if (syntaxOK) {
             upToDate = false;
         } else {
-            JOptionPane.showMessageDialog(null, "V\u00e9rifiez la synthaxe svp", "Erreur", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(null, "V\u00e9rifiez la synthaxe svp \n" + expression.getErrorMessage(), "Erreur",
+                    JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -87,8 +93,31 @@ public final class Formula extends Measure {
         }
 
         this.expression = new Expression(this.internExpression, args);
-        syntaxOK = expression.checkSyntax();
 
+        Function f = null;
+        for (String s : functions) {
+            switch (s) {
+            case "delta":
+                f = new Function(s, new DeltaFunction());
+                this.expression.addFunctions(f);
+                break;
+            case "passeBasTypeK":
+                f = new Function(s, new LowPassFilterK());
+                this.expression.addFunctions(f);
+                break;
+            case "bitactif":
+                f = new Function(s, new GetBit());
+                this.expression.addFunctions(f);
+                break;
+            case "saturation":
+                f = new Function(s, new Limit());
+                this.expression.addFunctions(f);
+                break;
+            }
+
+        }
+
+        syntaxOK = expression.checkSyntax();
     }
 
     private final void renameVariables() {

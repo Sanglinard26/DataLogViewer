@@ -23,7 +23,8 @@ import javax.swing.KeyStroke;
  * interoperability between enabled JTables and Excel.
  */
 public class CopyPasteAdapter implements ActionListener {
-    private String rowstring, value;
+    private String rowstring;
+    private Object value;
     private Clipboard system;
     private StringSelection stsel;
     private JTable jTable1;
@@ -81,7 +82,12 @@ public class CopyPasteAdapter implements ActionListener {
             }
             for (int i = 0; i < numrows; i++) {
                 for (int j = 0; j < numcols; j++) {
-                    sbf.append(jTable1.getValueAt(rowsselected[i], colsselected[j]));
+                    if (jTable1.getValueAt(rowsselected[i], colsselected[j]) != null) {
+                        sbf.append(jTable1.getValueAt(rowsselected[i], colsselected[j]));
+                    } else {
+                        sbf.append("");
+                    }
+
                     if (j < numcols - 1)
                         sbf.append("\t");
                 }
@@ -93,6 +99,7 @@ public class CopyPasteAdapter implements ActionListener {
         }
 
         if (e.getActionCommand().compareTo("Paste") == 0) {
+
             int startRow = (jTable1.getSelectedRows())[0];
             int startCol = (jTable1.getSelectedColumns())[0];
             try {
@@ -103,8 +110,18 @@ public class CopyPasteAdapter implements ActionListener {
                     rowstring = line[i];
                     String[] column = rowstring.split("\t");
                     for (int j = 0; j < column.length; j++) {
+
                         value = column[j];
-                        if (!value.isEmpty() && startRow + i < jTable1.getRowCount() && startCol + j < jTable1.getColumnCount())
+
+                        if (value.toString().isEmpty()) {
+                            continue;
+                        }
+
+                        if (jTable1.getColumnClass(startCol + j).equals(Float.class)) {
+                            value = Float.parseFloat(value.toString());
+                        }
+
+                        if (startRow + i < jTable1.getRowCount() && startCol + j < jTable1.getColumnCount())
                             jTable1.setValueAt(value, startRow + i, startCol + j);
                     }
                 }

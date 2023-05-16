@@ -1136,7 +1136,10 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
             break;
         case "Y_AUTO":
-            plot.getRangeAxis().setAutoRange(true);
+            int nbAxis = plot.getRangeAxisCount();
+            for (int i = 0; i < nbAxis; i++) {
+                plot.getRangeAxis(i).setAutoRange(true);
+            }
             break;
         case "X_AUTO":
             plot.getDomainAxis().setAutoRange(true);
