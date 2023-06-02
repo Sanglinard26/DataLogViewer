@@ -117,7 +117,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
     private static final long serialVersionUID = 1L;
 
-    private final static String VERSION = "v1.61";
+    private final static String VERSION = "v1.62";
     private static String APPLICATION_TITLE = "DataLogViewer " + VERSION;
 
     private final static String LOG_PANEL = "LOG";

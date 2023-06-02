@@ -20,13 +20,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 import javax.swing.DefaultBoundedRangeModel;
 import javax.swing.ImageIcon;
+import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -92,6 +95,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
     private List<Observateur> listObservateur = new ArrayList<Observateur>();
     private List<CursorObservateur> listCursorObservateur = new ArrayList<CursorObservateur>();
+    private HashMap<String, Boolean> yAxisAutoAdapt = new HashMap<String, Boolean>();
 
     // TODO Adapter l'incrément de la scrollbar en fonction du zoom
     private JScrollBar scrollBar;
@@ -101,6 +105,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         super(new BorderLayout(), true);
 
         this.chartPanel = new MyChartPanel(null, 680, 420, 300, 200, 1920, 1080, true, false, false, false, false, false);
+
         add(this.chartPanel, BorderLayout.CENTER);
 
         parentPlot = new CombinedDomainXYPlot();
@@ -125,7 +130,6 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
             @Override
             public void chartChanged(ChartChangeEvent var1) {
-                // System.out.println("chartChanged : " + var1.getSource());
 
             }
         });
@@ -142,6 +146,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
     private final class MyChartMouseListener extends MouseAdapter {
 
         private HashMap<String, Range> actualRanges2 = new HashMap<String, Range>();
+        private Set<String> yAutoAxis = new HashSet<String>();
         private XYPlot plot;
 
         @Override
@@ -167,6 +172,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             } else {
                 setCursor(Cursor.getDefaultCursor());
             }
+
         }
 
         @Override
@@ -179,9 +185,11 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             }
 
             for (int i = 0; i < plot.getRangeAxisCount(); i++) {
-                if (!plot.getRangeAxis(i).isAutoRange()) {
-                    actualRanges2.put(plot.getRangeAxis(i).getLabel(), plot.getRangeAxis(i).getRange());
-                }
+
+                actualRanges2.put(plot.getRangeAxis(i).getLabel(), plot.getRangeAxis(i).getRange());
+                if (plot.getRangeAxis(i).isAutoRange()) {
+                    yAutoAxis.add(plot.getRangeAxis(i).getLabel()); // Permet de remettre l'échelle auto après
+                } // un zoom sur l'axe X
             }
 
             if (SwingUtilities.isLeftMouseButton(e)) {
@@ -217,6 +225,8 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         @Override
         public void mouseReleased(MouseEvent e) {
 
+            plot = parentPlot.findSubplot(chartPanel.getChartRenderingInfo().getPlotInfo(), chartPanel.translateScreenToJava2D(e.getPoint()));
+
             chartPanel.setDomainZoomable(true);
 
             if (plot != null && !actualRanges2.isEmpty() && SwingUtilities.isRightMouseButton(e)) {
@@ -224,9 +234,18 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
                     Range range = actualRanges2.get(plot.getRangeAxis(i).getLabel());
 
+                    Boolean adaptON = yAxisAutoAdapt.getOrDefault(plot.getRangeAxis(i).getLabel(), false);
+
                     if (range != null) {
                         if (!plot.getRangeAxis(i).getRange().equals(range)) {
-                            plot.getRangeAxis(i).setRange(range);
+                            if (yAutoAxis.contains(plot.getRangeAxis(i).getLabel())) {
+                                plot.getRangeAxis(i).setAutoRange(true);
+                                if (scrollBar.getModel().getExtent() != scrollBar.getMaximum() && !adaptON) {
+                                    plot.getRangeAxis(i).setRange(range, false, true);
+                                }
+                            } else {
+                                plot.getRangeAxis(i).setRange(range);
+                            }
                         }
                     }
 
@@ -234,6 +253,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             }
 
             actualRanges2.clear();
+            yAutoAxis.clear();
 
             popUpLocation = chartPanel.translateScreenToJava2D(e.getPoint());
 
@@ -247,6 +267,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
                 boolean visibleZScale = false;
                 boolean visibleTrendLine = false;
+                boolean visibleYAutoAdapt = false;
 
                 if (getDatasetType() == 3) {
                     visibleZScale = true;
@@ -256,13 +277,26 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
                     visibleTrendLine = true;
                 }
 
+                if (getDatasetType() == 1) {
+                    visibleYAutoAdapt = true;
+                }
+
                 for (Component c : chartPanel.getPopupMenu().getComponents()) {
-                    if ("Echelle_Z".equals(c.getName())) {
-                        c.setVisible(visibleZScale);
+
+                    JMenuItem item = (JMenuItem) c;
+
+                    if ("ECHELLE_Z".equals(item.getActionCommand())) {
+                        item.setVisible(visibleZScale);
                     }
 
-                    if ("TrendLine".equals(c.getName())) {
-                        c.setVisible(visibleTrendLine);
+                    if ("Y_AUTO_ADAPT".equals(item.getActionCommand())) {
+                        item.setVisible(visibleYAutoAdapt);
+                        Boolean adaptON = yAxisAutoAdapt.getOrDefault(plot.getRangeAxis().getLabel(), false);
+                        ((JCheckBoxMenuItem) item).setSelected(adaptON);
+                    }
+
+                    if ("TRENDLINE".equals(item.getActionCommand())) {
+                        item.setVisible(visibleTrendLine);
                     }
                 }
             }
@@ -278,6 +312,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
             updateTableValue(e);
         }
+
     }
 
     private final void updateTableValue(MouseEvent e) {
@@ -528,6 +563,8 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         final XYSeriesCollection collections = new XYSeriesCollection(series);
         final NumberAxis yAxis = new NumberAxis(measure.getName());
         yAxis.setAutoRangeIncludesZero(false);
+
+        // yAxisAutoAdapt.put(yAxis.getLabel(), false);
 
         final XYItemRenderer renderer = new XYLineAndShapeRenderer(true, false);
         renderer.setSeriesStroke(0, new BasicStroke(1.5f));
@@ -932,6 +969,12 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         menuItem.addActionListener(this);
         popUp.add(menuItem);
 
+        JCheckBoxMenuItem checkItem = new JCheckBoxMenuItem("Axe Y auto-adaptatif");
+        checkItem.setToolTipText("l'\u00e9chelle s'adapte en fonction du zoom sur l'axe X");
+        checkItem.setActionCommand("Y_AUTO_ADAPT");
+        checkItem.addActionListener(this);
+        popUp.add(checkItem);
+
         menuItem = new JMenuItem("Echelle X auto", new ImageIcon(getClass().getResource(ICON_ZOOMAUTO)));
         menuItem.setActionCommand("X_AUTO");
         menuItem.addActionListener(this);
@@ -1141,6 +1184,16 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
                 plot.getRangeAxis(i).setAutoRange(true);
             }
             break;
+        case "Y_AUTO_ADAPT":
+            int nbAxis2 = plot.getRangeAxisCount();
+            for (int i = 0; i < nbAxis2; i++) {
+                JCheckBoxMenuItem checkBoxMenuItem = (JCheckBoxMenuItem) event.getSource();
+                yAxisAutoAdapt.put(plot.getRangeAxis(i).getLabel(), checkBoxMenuItem.isSelected());
+                if (checkBoxMenuItem.isSelected()) {
+                    plot.getRangeAxis(i).setAutoRange(true);
+                }
+            }
+            break;
         case "X_AUTO":
             plot.getDomainAxis().setAutoRange(true);
             break;
@@ -1251,29 +1304,36 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
     @Override
     public void axisChanged(AxisChangeEvent arg0) {
-        NumberAxis axis = (NumberAxis) arg0.getAxis();
-        Range axisRange = axis.getRange();
+        NumberAxis timeAxis = (NumberAxis) arg0.getAxis();
+        Range timeAxisRange = timeAxis.getRange();
 
-        // for (Object plot : parentPlot.getSubplots()) {
-        // ((XYPlot) plot).configureRangeAxes();
-        // }
+        for (Object plot : parentPlot.getSubplots()) {
+            XYPlot xyplot = ((XYPlot) plot);
+            for (int i = 0; i < xyplot.getRangeAxisCount(); i++) {
+                if (yAxisAutoAdapt.getOrDefault(xyplot.getRangeAxis(i).getLabel(), false)) {
+                    if (xyplot.getRangeAxis(i).isAutoRange()) {
+                        xyplot.getRangeAxis(i).configure();
+                    }
+                }
+            }
+        }
 
-        if (!axis.getDefaultAutoRange().equals(axisRange)) {
-            if (axisRange.getLowerBound() < axis.getDefaultAutoRange().getLowerBound()) {
-                axis.setLowerBound(axis.getDefaultAutoRange().getLowerBound());
+        if (!timeAxis.getDefaultAutoRange().equals(timeAxisRange)) {
+            if (timeAxisRange.getLowerBound() < timeAxis.getDefaultAutoRange().getLowerBound()) {
+                timeAxis.setLowerBound(timeAxis.getDefaultAutoRange().getLowerBound());
             }
 
-            if (axisRange.getUpperBound() > axis.getDefaultAutoRange().getUpperBound() && axisRange.getLowerBound() > 0) {
-                axis.setUpperBound(axis.getDefaultAutoRange().getUpperBound());
+            if (timeAxisRange.getUpperBound() > timeAxis.getDefaultAutoRange().getUpperBound() && timeAxisRange.getLowerBound() > 0) {
+                timeAxis.setUpperBound(timeAxis.getDefaultAutoRange().getUpperBound());
             }
         }
 
         scrollBar.removeAdjustmentListener(this);
 
-        int value = Math.max((int) (axis.getRange().getLowerBound() * 1000), 0);
+        int value = Math.max((int) (timeAxis.getRange().getLowerBound() * 1000), 0);
         int min = Math.max((scrollBar.getMinimum()), 0);
 
-        scrollBar.getModel().setRangeProperties(value, (int) (axisRange.getLength() * 1000), min, scrollBar.getMaximum(), false);
+        scrollBar.getModel().setRangeProperties(value, (int) (timeAxisRange.getLength() * 1000), min, scrollBar.getMaximum(), false);
 
         scrollBar.addAdjustmentListener(this);
 

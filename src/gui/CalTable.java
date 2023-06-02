@@ -31,6 +31,7 @@ import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JFormattedTextField;
 import javax.swing.JLabel;
@@ -59,6 +60,7 @@ import calib.Type;
 import calib.Variable;
 import log.Log;
 import log.Measure;
+import net.ericaro.surfaceplotter.surface.ColorModel;
 import utils.CopyPasteAdapter;
 import utils.Interpolation;
 import utils.Utilitaire;
@@ -88,6 +90,8 @@ public final class CalTable extends JPanel {
     float xFraction = Float.NaN;
     float yFraction = Float.NaN;
     int[] coordFraction;
+
+    boolean colorTable = false;
 
     final String ICON_MARKER = "/icon_marker_12.png";
     private final ImageIcon iconMarker = new ImageIcon(getClass().getResource(ICON_MARKER));
@@ -749,6 +753,8 @@ public final class CalTable extends JPanel {
         final String ICON_RESET = "/icon_backRef_24.png";
         final String ICON_TRACE = "/icon_traceMap_24.png";
         final String ICON_CURSOR_TRACK = "/icon_cursorTrack_24.png";
+        final String ICON_COLOR = "/icon_color_24.png";
+        final String ICON_COLOR_SELECTED = "/icon_color_selected_24.png";
 
         public BarControl() {
             super();
@@ -805,7 +811,7 @@ public final class CalTable extends JPanel {
 
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    if (table == null) {
+                    if (table == null || selectedVariable == null) {
                         return;
                     }
                     selectedVariable.backToRefValue();
@@ -834,6 +840,7 @@ public final class CalTable extends JPanel {
                     if ("OK".equals(logOK) && "OK".equals(workspaceOK)) {
                         setTrackFlag();
                     } else {
+                        btTrace.setSelected(false);
                         JOptionPane.showMessageDialog(null, "Cette fonction a besoin :\n -d'un workspace associ\u00e9 au fichier *.map => "
                                 + workspaceOK + "\n -d'un log => " + logOK, "INFO", JOptionPane.WARNING_MESSAGE);
                     }
@@ -871,6 +878,18 @@ public final class CalTable extends JPanel {
             });
             cbPage.setMaximumSize(new Dimension(80, 24));
             add(cbPage);
+
+            JCheckBox chkColor = new JCheckBox(new ImageIcon(getClass().getResource(ICON_COLOR)));
+            chkColor.setSelectedIcon(new ImageIcon(getClass().getResource(ICON_COLOR_SELECTED)));
+            chkColor.addActionListener(new ActionListener() {
+
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    colorTable = chkColor.isSelected();
+                    table.repaint();
+                }
+            });
+            add(chkColor);
         }
     }
 
@@ -1139,9 +1158,11 @@ public final class CalTable extends JPanel {
 
         private Color unselectedBackground;
         private boolean flagPaint = false;
+        private ColorModel spectrum;
 
         public MyTableRenderer() {
             setOpaque(true);
+            this.spectrum = new ColorModel((byte) 1, 0.0F, 1.0F, 1.0F, 0.0F, 0.6666F);
         }
 
         @Override
@@ -1263,16 +1284,25 @@ public final class CalTable extends JPanel {
             }
 
             if (isSelected) {
-                // super.setBackground(table.getSelectionBackground());
                 super.setBackground(Color.LIGHT_GRAY);
             } else {
-                Color background = unselectedBackground != null ? unselectedBackground : table.getBackground();
-                super.setBackground(background);
+                if (colorTable) {
+                    float[] minMax = selectedVariable.getMinMaxZ(idxCalPage);
+                    float z = (Utilitaire.getNumberObject(value.toString()).floatValue() - minMax[0]) / (minMax[1] - minMax[0]);
+                    if (Float.isNaN(z)) {
+                        z = 0.5f;
+                    }
+                    setBackground(this.spectrum.getPolygonColor(z));
+                } else {
+                    Color background = unselectedBackground != null ? unselectedBackground : table.getBackground();
+                    super.setBackground(background);
+                }
+
             }
 
-            if (diff > 0 && idxCalPage != 1) {
+            if (diff > 0 && idxCalPage != 1 && !colorTable) {
                 setForeground(Color.RED);
-            } else if (diff < 0 && idxCalPage != 1) {
+            } else if (diff < 0 && idxCalPage != 1 && !colorTable) {
                 setForeground(Color.BLUE);
             } else {
                 setForeground(Color.BLACK);

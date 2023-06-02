@@ -87,6 +87,8 @@ public final class LineChart extends JPanel implements ChartMouseListener, Mouse
 
         ((NumberAxis) chart.getXYPlot().getRangeAxis()).setAutoRangeIncludesZero(false);
         ((NumberAxis) chart.getXYPlot().getRangeAxis()).setAxisLineVisible(false); // Permet de retrouver les lignes de l'axe des abscisses, bug?
+        ((NumberAxis) chart.getXYPlot().getRangeAxis()).setAutoRangeMinimumSize(1); // Permet de modifier graphiquement un point quand c'est une
+                                                                                    // valeur constante en fonction de x ou y
 
         chartPanel = new ChartPanel(chart);
         chartPanel.addChartMouseListener(this);

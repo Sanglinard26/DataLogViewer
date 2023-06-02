@@ -143,9 +143,22 @@ public final class Variable extends Observable implements Comparable<Variable> {
             if (newValues == null) {
                 newValues = Arrays.copyOf(values, values.length);
             }
-            if ("Y \\ X".equals(this.newValues[idx].toString()) || coord[0] == 0 || coord[1] == 0) {
-                return this.newValues[idx];
+
+            switch (type) {
+            case COURBE:
+                if (coord[0] == 0) {
+                    return this.newValues[idx];
+                }
+                break;
+            case MAP:
+                if ("Y \\ X".equals(this.newValues[idx].toString()) || coord[0] == 0 || coord[1] == 0) {
+                    return this.newValues[idx];
+                }
+                break;
+            default:
+                break;
             }
+
             if (this.newValues[idx] instanceof Number && this.values[idx] instanceof Number) {
                 double d1 = Double.parseDouble(this.newValues[idx].toString());
                 double d2 = Double.parseDouble(this.values[idx].toString());
@@ -163,9 +176,21 @@ public final class Variable extends Observable implements Comparable<Variable> {
                     : Double.parseDouble(this.values[idx].toString());
         }
 
-        if (idxPage == 2 && (coord[0] == 0 || coord[1] == 0)) {
-            return this.values[idx] != null && this.values[idx] instanceof Number ? ((Number) this.values[idx]).doubleValue()
-                    : Double.parseDouble(this.values[idx].toString());
+        switch (type) {
+        case COURBE:
+            if (idxPage == 2 && coord[0] == 0) {
+                return this.values[idx] != null && this.values[idx] instanceof Number ? ((Number) this.values[idx]).doubleValue()
+                        : Double.parseDouble(this.values[idx].toString());
+            }
+            break;
+        case MAP:
+            if (idxPage == 2 && (coord[0] == 0 || coord[1] == 0)) {
+                return this.values[idx] != null && this.values[idx] instanceof Number ? ((Number) this.values[idx]).doubleValue()
+                        : Double.parseDouble(this.values[idx].toString());
+            }
+            break;
+        default:
+            break;
         }
 
         if (idxPage == 2 && coord[0] > 0) {
@@ -181,7 +206,7 @@ public final class Variable extends Observable implements Comparable<Variable> {
         }
 
         return this.newValues[idx] != null && this.newValues[idx] instanceof Number ? ((Number) this.newValues[idx]).doubleValue()
-                : Double.parseDouble(this.newValues[idx].toString());
+                : Utilitaire.getNumberObject(this.newValues[idx].toString()).doubleValue();
     }
 
     public final void setValue(boolean newVal, Object value, int... coord) {
@@ -514,6 +539,61 @@ public final class Variable extends Observable implements Comparable<Variable> {
         }
 
         return floatValues;
+    }
+
+    public final float[] getMinMaxZ(int idxPage) {
+
+        float[] minMax = new float[] { Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY };
+
+        float val;
+
+        if (dimY > 2) {
+            for (short y = 1; y < dimY; y++) {
+                for (short x = 1; x < dimX; x++) {
+                    val = Float.parseFloat(getValue(idxPage, y, x).toString());
+                    if (val < minMax[0]) {
+                        minMax[0] = val;
+                    }
+                    if (val > minMax[1]) {
+                        minMax[1] = val;
+                    }
+                }
+            }
+        } else if (dimX * dimY == 1) {
+            Arrays.fill(minMax, Float.NaN);
+        } else if (dimX * dimY == dimX) {
+            for (short x = 0; x < dimX; x++) {
+                try {
+                    val = Float.parseFloat(getValue(idxPage, 0, x).toString());
+                    if (val < minMax[0]) {
+                        minMax[0] = val;
+                    }
+                    if (val > minMax[1]) {
+                        minMax[1] = val;
+                    }
+                } catch (NumberFormatException e) {
+                    val = Float.NaN;
+                }
+
+            }
+        } else {
+            for (short x = 0; x < dimX; x++) {
+                try {
+                    val = Float.parseFloat(getValue(idxPage, 1, x).toString());
+                    if (val < minMax[0]) {
+                        minMax[0] = val;
+                    }
+                    if (val > minMax[1]) {
+                        minMax[1] = val;
+                    }
+                } catch (NumberFormatException e) {
+                    val = Float.NaN;
+                }
+
+            }
+        }
+
+        return minMax;
     }
 
     public final long getChecksum() {
