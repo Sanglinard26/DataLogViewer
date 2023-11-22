@@ -75,6 +75,7 @@ public class ButtonTabComponent extends JPanel {
             throw new NullPointerException("TabbedPane is null");
         }
         this.pane = pane;
+
         setOpaque(false);
 
         // make JLabel read titles from JTabbedPane
@@ -103,6 +104,7 @@ public class ButtonTabComponent extends JPanel {
                 if (e.getClickCount() > 1) {
                     textfield.setText(label.getText());
                     cl.show(panel, "textfield component");
+                    textfield.requestFocusInWindow();
                     onEditing = true;
                 } else {
                     int idx = pane.indexOfTabComponent(ButtonTabComponent.this);

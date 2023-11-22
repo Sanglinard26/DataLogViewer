@@ -55,8 +55,8 @@ import org.jfree.chart.plot.Crosshair;
 import org.jfree.chart.plot.IntervalMarker;
 import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.chart.plot.XYPlot;
+import org.jfree.chart.renderer.xy.SamplingXYLineRenderer;
 import org.jfree.chart.renderer.xy.XYItemRenderer;
-import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
 import org.jfree.chart.renderer.xy.XYShapeRenderer;
 import org.jfree.chart.title.PaintScaleLegend;
 import org.jfree.chart.ui.Layer;
@@ -88,6 +88,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
     private final CombinedDomainXYPlot parentPlot;
     private static Point2D popUpLocation;
 
+    private CrosshairOverlay crosshairOverlay;
     private Crosshair crosshair;
     private static double oldXValue = Double.NaN;
     private static double xValue = Double.NaN;
@@ -97,7 +98,6 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
     private List<CursorObservateur> listCursorObservateur = new ArrayList<CursorObservateur>();
     private HashMap<String, Boolean> yAxisAutoAdapt = new HashMap<String, Boolean>();
 
-    // TODO Adapter l'incrément de la scrollbar en fonction du zoom
     private JScrollBar scrollBar;
 
     public ChartView() {
@@ -121,9 +121,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         chartPanel.setRangeZoomable(false);
         chartPanel.setDomainZoomable(true);
 
-        crosshair = new Crosshair(Double.NaN, Color.BLUE, new BasicStroke(2));
-        CrosshairOverlay crosshairOverlay = new CrosshairOverlay();
-        crosshairOverlay.addDomainCrosshair(crosshair);
+        crosshairOverlay = new CrosshairOverlay();
         chartPanel.addOverlay(crosshairOverlay);
 
         chart.addChangeListener(new ChartChangeListener() {
@@ -185,11 +183,13 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             }
 
             for (int i = 0; i < plot.getRangeAxisCount(); i++) {
+                if (plot.getRangeAxis(i) != null) {
+                    actualRanges2.put(plot.getRangeAxis(i).getLabel(), plot.getRangeAxis(i).getRange());
+                    if (plot.getRangeAxis(i).isAutoRange()) {
+                        yAutoAxis.add(plot.getRangeAxis(i).getLabel()); // Permet de remettre l'échelle auto après
+                    } // un zoom sur l'axe X
+                }
 
-                actualRanges2.put(plot.getRangeAxis(i).getLabel(), plot.getRangeAxis(i).getRange());
-                if (plot.getRangeAxis(i).isAutoRange()) {
-                    yAutoAxis.add(plot.getRangeAxis(i).getLabel()); // Permet de remettre l'échelle auto après
-                } // un zoom sur l'axe X
             }
 
             if (SwingUtilities.isLeftMouseButton(e)) {
@@ -214,10 +214,12 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
                     if (axisEntity.getAxis().equals(parentPlot.getDomainAxis())) {
                         return;
                     }
+
                     String res = JOptionPane.showInputDialog(null, "Nom de l'axe :", axisEntity.getAxis().getLabel());
                     if (res != null && !res.equals(axisEntity.getAxis().getLabel())) {
                         axisEntity.getAxis().setLabel(res);
                     }
+
                 }
             }
         }
@@ -531,12 +533,13 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         }
     }
 
-    public final XYPlot addPlot(Measure time, String backGroundColor) {
+    public final XYPlot addPlot(Measure time, String backGroundColor, String cursorColor, BasicStroke cursorStroke) {
 
         final XYSeriesCollection collections = new XYSeriesCollection();
         final NumberAxis yAxis = new NumberAxis();
         yAxis.setAutoRangeIncludesZero(false);
-        final XYItemRenderer renderer = new XYLineAndShapeRenderer(true, false);
+        // final XYItemRenderer renderer = new XYLineAndShapeRenderer(true, false);
+        final XYItemRenderer renderer = new SamplingXYLineRenderer();
         renderer.setSeriesStroke(0, new BasicStroke(1.5f));
         final XYPlot plot = new XYPlot(collections, null, yAxis, renderer);
 
@@ -546,6 +549,11 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
                 parentPlot.setDomainAxis(new NumberAxis(time.getName()));
                 parentPlot.getDomainAxis().addChangeListener(this);
             }
+
+            Color cursorPaint = Utilitaire.parseRGBColor(cursorColor, 255);
+
+            crosshair = new Crosshair(Double.NaN, cursorPaint, cursorStroke);
+            crosshairOverlay.addDomainCrosshair(crosshair);
 
             xValue = Double.NaN;
         }
@@ -564,9 +572,10 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         final NumberAxis yAxis = new NumberAxis(measure.getName());
         yAxis.setAutoRangeIncludesZero(false);
 
-        // yAxisAutoAdapt.put(yAxis.getLabel(), false);
+        // final XYItemRenderer renderer = new XYLineAndShapeRenderer(true, false);
 
-        final XYItemRenderer renderer = new XYLineAndShapeRenderer(true, false);
+        final XYItemRenderer renderer = new SamplingXYLineRenderer();
+
         renderer.setSeriesStroke(0, new BasicStroke(1.5f));
         final XYPlot plot = new XYPlot(collections, null, yAxis, renderer);
 
@@ -582,6 +591,10 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
                 parentPlot.setDomainAxis(new NumberAxis(time.getName()));
                 parentPlot.getDomainAxis().addChangeListener(this);
             }
+
+            crosshair = new Crosshair(Double.NaN, Color.BLUE, new BasicStroke(2));
+            crosshairOverlay.addDomainCrosshair(crosshair);
+
             if (nbPoint > 1) {
                 xValue = temps[nbPoint / 2];
             } else {
@@ -848,7 +861,8 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             plot.getRenderer().setSeriesPaint(selectedCollection.getSeriesCount() - 1, Utilitaire.parseRGBColor(color, 255));
         } else {
             XYSeriesCollection newCollection = new XYSeriesCollection(newSerie);
-            final XYItemRenderer renderer = new XYLineAndShapeRenderer(true, false);
+            // final XYItemRenderer renderer = new XYLineAndShapeRenderer(true, false);
+            final XYItemRenderer renderer = new SamplingXYLineRenderer();
             renderer.setSeriesStroke(0, new BasicStroke(Float.parseFloat(width)));
             renderer.setSeriesPaint(0, Utilitaire.parseRGBColor(color, 255));
             plot.setRenderer(nbDataset, renderer);
@@ -914,7 +928,8 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             plot.getRenderer().setSeriesStroke(selectedCollection.getSeriesCount() - 1, new BasicStroke(1.5f));
         } else {
             XYSeriesCollection newCollection = new XYSeriesCollection(newSerie);
-            final XYItemRenderer renderer = new XYLineAndShapeRenderer(true, false);
+            // final XYItemRenderer renderer = new XYLineAndShapeRenderer(true, false);
+            final XYItemRenderer renderer = new SamplingXYLineRenderer();
             renderer.setSeriesStroke(0, new BasicStroke(1.5f));
             plot.setRenderer(nbDataset, renderer);
             plot.setDataset(nbDataset, newCollection);
@@ -1002,6 +1017,10 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
     public final CombinedDomainXYPlot getPlot() {
         return this.parentPlot;
+    }
+
+    public final Crosshair getCrossair() {
+        return this.crosshair;
     }
 
     public final int getDatasetType() {
@@ -1170,7 +1189,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         switch (command) {
         case "PROPERTIES":
             if (getDatasetType() > 0) {
-                DialogProperties propertiesPanel = new DialogProperties(plot);
+                DialogProperties propertiesPanel = new DialogProperties(ChartView.this, plot);
                 int res = JOptionPane.showConfirmDialog(this, propertiesPanel, "Propri\u00e9t\u00e9s", 2, -1);
                 if (res == JOptionPane.OK_OPTION) {
                     propertiesPanel.updatePlot(this, plot);
@@ -1206,6 +1225,11 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             }
 
             parentPlot.remove(plot);
+
+            if (parentPlot.getSubplots().isEmpty()) {
+                crosshairOverlay.clearDomainCrosshairs();
+            }
+
             if (plot.getRenderer() instanceof XYShapeRenderer) {
                 parentPlot.getDomainAxis().setLabel(null);
                 chartPanel.getChart().clearSubtitles();
@@ -1260,6 +1284,16 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
     public DefaultBoundedRangeModel getScrollBarModel() {
         return (DefaultBoundedRangeModel) scrollBar.getModel();
+    }
+
+    public JScrollBar getScrollbar() {
+        return this.scrollBar;
+    }
+
+    public final void setScrollBarProperties(JScrollBar refScrollBar) {
+        scrollBar.setModel(refScrollBar.getModel());
+        scrollBar.setUnitIncrement(refScrollBar.getUnitIncrement());
+        scrollBar.setBlockIncrement(refScrollBar.getBlockIncrement());
     }
 
     public final void setScrollBarProperties(DefaultBoundedRangeModel model) {
@@ -1334,6 +1368,13 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         int min = Math.max((scrollBar.getMinimum()), 0);
 
         scrollBar.getModel().setRangeProperties(value, (int) (timeAxisRange.getLength() * 1000), min, scrollBar.getMaximum(), false);
+
+        int minAxisValue = (int) (timeAxisRange.getLowerBound() * 1000);
+        int maxAxisValue = (int) (timeAxisRange.getUpperBound() * 1000);
+        int delta = maxAxisValue - minAxisValue;
+
+        scrollBar.setUnitIncrement(delta / 10);
+        scrollBar.setBlockIncrement(delta / 5);
 
         scrollBar.addAdjustmentListener(this);
 

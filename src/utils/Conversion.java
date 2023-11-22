@@ -14,13 +14,22 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import calib.MdbData;
+import calib.MdbData.ConfigEcu.ParamEcu;
+import calib.MdbData.VariableInfo;
 
 public class Conversion {
 
@@ -28,6 +37,7 @@ public class Conversion {
     static {
         dataType = new HashMap<String, String>();
         dataType.put("uint16", "UWORD");
+        dataType.put("int16", "SWORD");
         dataType.put("sint16", "SWORD");
     }
 
@@ -107,14 +117,22 @@ public class Conversion {
 
         final String EQU = "EQU";
         final String DEFR = "DEFR";
-        final Pattern HEX_PATTERN = Pattern.compile("\\b(\\p{XDigit}+h)\\b");
+        // final Pattern HEX_PATTERN = Pattern.compile("\\b(\\p{XDigit}+h)\\b"); // Pattern.compile("\\b(\\p{XDigit}+h)\\b");
+        // final Pattern HEX_PATTERN_0x = Pattern.compile("(0x+\\p{XDigit}+)");
+        final Pattern HEX_PATTERN_Final = Pattern.compile("\\b(\\p{XDigit}+h|(0x+\\p{XDigit}+))\\b");
+        final Pattern WORD_PATTERN = Pattern.compile("\\b\\w+\\b");
         final String SECTION_DATA = "SECTION DATA";
         // final String AT = "AT";
         final String ENDS = "ENDS";
+        final String RAM_EXT = ";ramsav SECTION HDAT AT 100002h";
+
+        final int minAdress = 0;
+        final int maxAdress = 65534;
 
         List<Variable> listVar = new ArrayList<Variable>();
+        Map<Variable, String> mappingAdress = new HashMap<>();
 
-        for (int nFile = 0; nFile < appIncFile.length; nFile++) {
+        for (int nFile = 0; nFile < appIncFile.length - 1; nFile++) {
             try (BufferedReader br = new BufferedReader(
                     new InputStreamReader(new FileInputStream(appIncFile[nFile]), Charset.forName("ISO-8859-1")))) { // ISO-8859-1
 
@@ -127,7 +145,7 @@ public class Conversion {
                 String infos;
                 HashMap<String, String> varInfos;
 
-                while ((line = br.readLine()) != null) {
+                while ((line = br.readLine()) != null && !line.contains(RAM_EXT)) {
 
                     int idxEQU = line.toUpperCase().lastIndexOf(EQU);
                     int idxSectionData = line.toUpperCase().lastIndexOf(SECTION_DATA);
@@ -155,20 +173,45 @@ public class Conversion {
 
                         // System.out.println(variableName);
 
-                        variable = new Variable(variableName);
+                        if (!mappingAdress.containsKey(new Variable(variableName))) {
+                            variable = new Variable(variableName);
+                        } else {
+                            System.out.println(variableName + " déjà présente!");
+                            variable = new Variable(variableName + "_2");
+                        }
+
                         varInfos = variable.getVarInfos();
                         listVar.add(variable);
 
-                        final Matcher matcher = HEX_PATTERN.matcher(line);
+                        Matcher matcher = HEX_PATTERN_Final.matcher(line);
 
                         int endAdress = -1;
 
                         if (matcher.find()) {
                             adress = matcher.group();
-                            adress = "0x" + adress.substring(1, adress.length() - 1);
+                            if (!adress.startsWith("0x")) {
+                                adress = "0x" + adress.replace("h", "").toUpperCase();
+                            }
+                            variable.setAdress(adress);
+                            endAdress = matcher.end();
+                        } else {
+                            matcher = WORD_PATTERN.matcher(line);
+
+                            String prevWord = null;
+
+                            while (matcher.find()) {
+                                adress = matcher.group();
+                                if (EQU.equals(prevWord)) {
+                                    break;
+                                }
+                                prevWord = adress;
+                            }
+
                             variable.setAdress(adress);
                             endAdress = matcher.end();
                         }
+
+                        mappingAdress.put(variable, adress);
 
                         int idxStartInfo;
                         if (nFile == 0) {
@@ -197,7 +240,7 @@ public class Conversion {
                         }
                     } else if (idxSectionData > -1) {
 
-                        final Matcher matcher = HEX_PATTERN.matcher(line);
+                        final Matcher matcher = HEX_PATTERN_Final.matcher(line);
 
                         int decimalAdress = 0;
 
@@ -215,7 +258,13 @@ public class Conversion {
                             String[] splitSpace = line.split("\t");
                             variableName = splitSpace[0].trim();
 
-                            variable = new Variable(variableName);
+                            if (!mappingAdress.containsKey(new Variable(variableName))) {
+                                variable = new Variable(variableName);
+                            } else {
+                                System.out.println(variableName + " déjà présente!");
+                                variable = new Variable(variableName + "_2");
+                            }
+
                             varInfos = variable.getVarInfos();
                             listVar.add(variable);
 
@@ -237,6 +286,8 @@ public class Conversion {
                             adress = "0x" + Integer.toHexString(decimalAdress).toUpperCase();
 
                             variable.setAdress(adress);
+
+                            mappingAdress.put(variable, adress);
 
                             int idxSemiCol = line.indexOf(';');
 
@@ -263,11 +314,42 @@ public class Conversion {
                 }
 
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
             } catch (IOException e) {
-                e.printStackTrace();
             }
         }
+
+        // Traitement des adresses (min/max) et suppression des variables en doublons pour une même adresse
+        for (Entry<Variable, String> entry : mappingAdress.entrySet()) {
+            if (!entry.getValue().startsWith("0x")) {
+                String newAdress = mappingAdress.get(new Variable(entry.getValue()));
+                entry.getKey().setAdress(newAdress);
+                listVar.remove(new Variable(entry.getValue()));
+            } else {
+                int intAdress = Integer.parseInt(entry.getValue().replace("0x", ""), 16);
+                if (intAdress < minAdress || intAdress > maxAdress) {
+                    listVar.remove(entry.getKey());
+                }
+            }
+
+        }
+
+        boolean mdb = true;
+        MdbData mdbData;
+        Map<String, VariableInfo> varInfo;
+        List<ParamEcu> paramsEcu;
+        String fileNameMdb = "";
+        // Mdb
+        if (mdb) {
+            mdbData = new MdbData(appIncFile[2]);
+            fileNameMdb = mdbData.getName() + "_";
+            varInfo = mdbData.getInfos();
+            paramsEcu = mdbData.getConfigEcu().getParamsEcu();
+        } else {
+            varInfo = Collections.emptyMap();
+            paramsEcu = Collections.emptyList();
+        }
+
+        //
 
         // Ecriture A2l
         // try (BufferedWriter bw = new BufferedWriter(new FileWriter(appIncFile[0].getAbsolutePath().replace(".inc", ".a2l")))) {
@@ -280,10 +362,15 @@ public class Conversion {
         // ************
 
         // Ecriture A2l
-        try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(
-                new FileOutputStream(appIncFile[0].getAbsolutePath().replace(".inc", ".a2l")), StandardCharsets.ISO_8859_1));) {
+
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("ddMMyyyy");
+        String dateStr = simpleDateFormat.format(new Date());
+        String a2lFileName = appIncFile[0].getParent() + File.separator + dateStr + "_" + fileNameMdb
+                + appIncFile[0].getName().replace(".inc", ".a2l");
+
+        try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(a2lFileName), StandardCharsets.ISO_8859_1));) {
             bw.write("ASAP2_VERSION 1 60\n");
-            bw.write(writeProject("BGM_Project", "\"Project description\"", listVar));
+            bw.write(writeProject("BGM_Project", "\"Project description\"", listVar, varInfo, paramsEcu));
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -292,7 +379,8 @@ public class Conversion {
 
     }
 
-    private static final String writeProject(String name, String description, List<Variable> listVar) {
+    private static final String writeProject(String name, String description, List<Variable> listVar, Map<String, VariableInfo> varInfo,
+            List<ParamEcu> paramsEcu) {
 
         StringBuilder sb = new StringBuilder("/begin PROJECT ");
 
@@ -301,7 +389,7 @@ public class Conversion {
 
         sb.append(writeHeader("\"Header description\""));
 
-        sb.append(writeModule("ECU_Variables", "\"Module description\"", listVar));
+        sb.append(writeModule("ECU_Variables", "\"Module description\"", listVar, varInfo, paramsEcu));
 
         sb.append("/end PROJECT");
 
@@ -321,7 +409,8 @@ public class Conversion {
 
     }
 
-    private static final String writeModule(String name, String description, List<Variable> listVar) {
+    private static final String writeModule(String name, String description, List<Variable> listVar, Map<String, VariableInfo> varInfo,
+            List<ParamEcu> paramsEcu) {
 
         final Set<String> listClasses = new HashSet<String>();
 
@@ -345,6 +434,20 @@ public class Conversion {
 
         for (String classe : listClasses) {
             sb.append(writeGroup(classe, "\"Group description\"", listVar));
+        }
+
+        for (Entry<String, VariableInfo> entry : varInfo.entrySet()) {
+            sb.append(writeCharacteristic(entry));
+
+            sb.append(writeCompuMethod(entry));
+            sb.append("\n\n");
+        }
+
+        for (ParamEcu param : paramsEcu) {
+            sb.append(writeCharacteristic(param));
+
+            sb.append(writeCompuMethod("CM_" + param.getNom(), "%.0", "-", "1.0 0"));
+            sb.append("\n\n");
         }
 
         sb.append("/end MODULE\n\n");
@@ -439,6 +542,154 @@ public class Conversion {
 
     }
 
+    private static final String writeCharacteristic(Entry<String, VariableInfo> varInfo) {
+        /// begin CHARACTERISTIC ident Name (NomCarto)
+        // string LongIdentifier
+        // enum Type (ASCII, CURVE, MAP, VAL_BLK, VALUE)
+        // ulong Address ()
+        // ident Deposit ()
+        // float MaxDiff (0)
+        // ident Conversion ()
+        // float LowerLimit (Valeur_mini)
+        // float UpperLimit (Valeur_max)
+        // [-> ANNOTATION]*
+        // [-> AXIS_DESCR]*
+        // [-> FORMAT]
+        /// end CHARACTERISTIC
+
+        StringBuilder sb = new StringBuilder("/begin CHARACTERISTIC ");
+
+        sb.append(varInfo.getKey() + "\n");
+        sb.append("\"" + varInfo.getValue().getDetail() + "\"" + "\n");
+        sb.append(varInfo.getValue().getType() + "\n");
+        sb.append(MdbData.AdressDecToHex(varInfo.getValue().getVal_adr()) + "\n");
+        sb.append("RL_" + varInfo.getKey() + "\n");
+        sb.append("0" + "\n");
+        sb.append("CM_" + varInfo.getKey() + "\n");
+        sb.append(varInfo.getValue().getMin() + "\n");
+        sb.append(varInfo.getValue().getMax() + "\n");
+        sb.append("ECU_ADDRESS_EXTENSION " + MdbData.AdressDecToHex(varInfo.getValue().getAllocadr()) + "\n");
+
+        switch (varInfo.getValue().getType()) {
+        case "VALUE":
+            break;
+        case "CURVE":
+            sb.append("\n");
+            sb.append(writeAxisDescr(varInfo, (byte) 1));
+            sb.append("\n\n");
+            break;
+        case "MAP":
+            sb.append("\n");
+            sb.append(writeAxisDescr(varInfo, (byte) 1));
+            sb.append("\n\n");
+            sb.append(writeAxisDescr(varInfo, (byte) 2));
+            sb.append("\n\n");
+            break;
+        }
+
+        sb.append("/end CHARACTERISTIC\n\n");
+
+        switch (varInfo.getValue().getType()) {
+        case "VALUE":
+            break;
+        case "CURVE":
+            sb.append(writeCompuMethod("CM_AXIS_1_" + varInfo.getKey(), "%.8", "-", String.valueOf(1.0F / varInfo.getValue().getColBkptFactor())));
+            sb.append("\n\n");
+            break;
+        case "MAP":
+            sb.append(writeCompuMethod("CM_AXIS_1_" + varInfo.getKey(), "%.8", "-", String.valueOf(1.0F / varInfo.getValue().getColBkptFactor())));
+            sb.append("\n\n");
+            sb.append(writeCompuMethod("CM_AXIS_2_" + varInfo.getKey(), "%.8", "-", String.valueOf(1.0F / varInfo.getValue().getRowBkptFactor())));
+            sb.append("\n\n");
+            break;
+        }
+
+        return sb.toString();
+    }
+
+    private static final String writeCharacteristic(ParamEcu param) {
+        /// begin CHARACTERISTIC ident Name (NomCarto)
+        // string LongIdentifier
+        // enum Type (ASCII, CURVE, MAP, VAL_BLK, VALUE)
+        // ulong Address ()
+        // ident Deposit ()
+        // float MaxDiff (0)
+        // ident Conversion ()
+        // float LowerLimit (Valeur_mini)
+        // float UpperLimit (Valeur_max)
+        // [-> ANNOTATION]*
+        // [-> AXIS_DESCR]*
+        // [-> FORMAT]
+        /// end CHARACTERISTIC
+
+        StringBuilder sb = new StringBuilder("/begin CHARACTERISTIC ");
+
+        sb.append(param.getNom() + "\n");
+        sb.append("\"" + param.getCommentaire() + "\"" + "\n");
+        sb.append("VALUE" + "\n");
+        sb.append(MdbData.AdressDecToHex(param.getAdresse()) + "\n");
+        sb.append("RL_" + param.getNom() + "\n");
+        sb.append("0" + "\n");
+        sb.append("CM_" + param.getNom() + "\n");
+        sb.append("0" + "\n");
+        sb.append("65535" + "\n");
+        sb.append("/end CHARACTERISTIC\n\n");
+
+        return sb.toString();
+    }
+
+    private static final String writeAxisDescr(Entry<String, VariableInfo> varInfo, byte axisNum) {
+        /// begin AXIS_DESCR enum Attribute ()
+        // ident InputQuantity ()
+        // ident Conversion ()
+        // uint MaxAxisPoints ()
+        // float LowerLimit ()
+        // float UpperLimit ()
+        // [-> ANNOTATION]*
+        // [-> FORMAT]
+        /// end AXIS_DESCR
+
+        StringBuilder sb = new StringBuilder("/begin AXIS_DESCR ");
+        sb.append("STD_AXIS\n");
+        switch (axisNum) {
+        case 1:
+            sb.append(MdbData.AdressDecToHex(varInfo.getValue().getColbkptadr()) + "\n");
+            sb.append("CM_AXIS_1_" + varInfo.getKey() + "\n");
+            sb.append(varInfo.getValue().getNbBkPtCol() + "\n");
+            sb.append("min\n");
+            sb.append("max\n");
+            break;
+        case 2:
+            sb.append(MdbData.AdressDecToHex(varInfo.getValue().getLgnbkptadr()) + "\n");
+            sb.append("CM_AXIS_2_" + varInfo.getKey() + "\n");
+            sb.append(varInfo.getValue().getNbBkPtRow() + "\n");
+            sb.append("min\n");
+            sb.append("max\n");
+            break;
+        }
+
+        sb.append("/end AXIS_DESCR");
+
+        return sb.toString();
+    }
+
+    private static String writeCompuMethod(Entry<String, VariableInfo> varInfo) {
+
+        StringBuilder sb = new StringBuilder("/begin COMPU_METHOD ");
+
+        sb.append("CM_" + varInfo.getKey() + "\n");
+        sb.append("\"\"" + "\n");
+        sb.append("LINEAR" + "\n");
+        sb.append("\"" + varInfo.getValue().getFormat() + "\"" + "\n");
+        sb.append("\"" + "-" + "\"" + "\n");
+        sb.append("COEFFS_LINEAR " + (1.0F / varInfo.getValue().getFactor()) + " 0" + "\n");
+
+        sb.append("/end COMPU_METHOD");
+
+        return sb.toString();
+
+    }
+
     protected static class Variable {
 
         private String name;
@@ -485,7 +736,7 @@ public class Conversion {
         }
 
         public String getAdress() {
-            return adress != null ? adress : "0xFFFF";
+            return adress != null ? adress : "0xFFFE";
         }
 
         public HashMap<String, String> getVarInfos() {
@@ -493,7 +744,7 @@ public class Conversion {
         }
 
         public String getComment() {
-            return varInfos.get(COMMENT) != null ? varInfos.get(COMMENT) : "...";
+            return varInfos.get(COMMENT) != null ? varInfos.get(COMMENT) : "NON_DEFINI";
         }
 
         public String getDataType() {
@@ -501,7 +752,7 @@ public class Conversion {
         }
 
         public String getUnit() {
-            return varInfos.get(UNIT) != null ? varInfos.get(UNIT) : "...";
+            return varInfos.get(UNIT) != null ? varInfos.get(UNIT) : "su";
         }
 
         public String getConversion() {
@@ -509,15 +760,22 @@ public class Conversion {
         }
 
         public String getGroup() {
-            return varInfos.get(CLASS) != null ? varInfos.get(CLASS) : "...";
+            return varInfos.get(CLASS) != null ? varInfos.get(CLASS) : "NON_DEFINI";
         }
 
         public String getRangeMin() {
-            return varInfos.get(RANGE_MIN) != null ? varInfos.get(RANGE_MIN).replace(',', '.') : String.valueOf(Short.MIN_VALUE);
+            if ("sint16".equals(getDataType()) || "int16".equals(getDataType())) {
+                return varInfos.get(RANGE_MIN) != null ? varInfos.get(RANGE_MIN).replace(',', '.') : String.valueOf(Short.MIN_VALUE);
+            }
+            return varInfos.get(RANGE_MIN) != null ? varInfos.get(RANGE_MIN).replace(',', '.') : "0";
+
         }
 
         public String getRangeMax() {
-            return varInfos.get(RANGE_MAX) != null ? varInfos.get(RANGE_MAX).replace(',', '.') : String.valueOf(Short.MAX_VALUE);
+            if ("sint16".equals(getDataType()) || "int16".equals(getDataType())) {
+                return varInfos.get(RANGE_MAX) != null ? varInfos.get(RANGE_MAX).replace(',', '.') : String.valueOf(Short.MAX_VALUE);
+            }
+            return varInfos.get(RANGE_MAX) != null ? varInfos.get(RANGE_MAX).replace(',', '.') : "65535";
         }
 
         public String getDisplayFormat() {
@@ -552,6 +810,28 @@ public class Conversion {
 
             return "DEC";
         }
+
+        @Override
+        public String toString() {
+            return this.name;
+        }
+
+        @Override
+        public int hashCode() {
+            return this.name.hashCode();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj == null) {
+                return false;
+            }
+            return this.name.equals(obj.toString());
+        }
+
+    }
+
+    protected static class Characteristic {
 
     }
 

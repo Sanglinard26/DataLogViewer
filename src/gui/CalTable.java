@@ -305,6 +305,12 @@ public final class CalTable extends JPanel {
                     if ((cols.length > 0 && rows.length > 0) && row == rows[rows.length - 1] && col == cols[cols.length - 1]) {
                         mapView.fireMapCalChange();
                     }
+
+                    // Test
+                    if (colorTable) {
+                        table.repaint();
+                    }
+                    //
                 }
 
             }

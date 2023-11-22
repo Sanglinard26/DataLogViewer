@@ -108,27 +108,7 @@ public final class DialManageFormula extends JDialog {
 
             @Override
             public void actionPerformed(ActionEvent arg0) {
-                new DialNewFormula(ihm, ((Formula) listFormula.getSelectedValue()));
-            }
-        }), gbc);
-
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.gridx = 1;
-        gbc.gridy = 3;
-        gbc.gridwidth = 1;
-        gbc.gridheight = 1;
-        gbc.weightx = 0;
-        gbc.weighty = 0;
-        gbc.insets = new Insets(0, 5, 0, 5);
-        gbc.anchor = GridBagConstraints.NORTH;
-        add(new JButton(new AbstractAction("Valider") {
-
-            private static final long serialVersionUID = 1L;
-
-            @Override
-            public void actionPerformed(ActionEvent arg0) {
-                ihm.refresh(null);
-                dispose();
+                new DialNewFormula(ihm, ((Formula) listFormula.getSelectedValue()), true);
             }
         }), gbc);
 

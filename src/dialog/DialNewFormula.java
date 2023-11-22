@@ -67,10 +67,10 @@ public final class DialNewFormula extends JDialog {
     private ChartPanel chartPanel;
 
     public DialNewFormula(final Ihm ihm) {
-        this(ihm, null);
+        this(ihm, null, false);
     }
 
-    public DialNewFormula(final Ihm ihm, final Formula formula) {
+    public DialNewFormula(final Ihm ihm, final Formula formula, boolean isEdited) {
 
         super(ihm, "Edition de formule", false);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
@@ -294,6 +294,9 @@ public final class DialNewFormula extends JDialog {
                     formula.setName(txtName.getText());
                     formula.setUnit(txtUnit.getText());
                     formula.setExpression(iterateOverContent(formulaTextPane));
+                    if (isEdited) {
+                        ihm.refresh(null);
+                    }
                     dispose();
                 }
 

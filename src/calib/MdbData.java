@@ -26,11 +26,17 @@ public final class MdbData {
     private static final String TYPENAME = "Typename";
     private static final String SOUSTYPE = "Soustype";
     private static final String INTERP_TABLE = "InterpTable";
+    private static final String ALLOCADR = "Allocadr";
+    private static final String COLBKPTADR = "colbkptadr";
+    private static final String LGNBKPTADR = "lgnbkptadr";
+    private static final String VAL_ADR = "Val_adr";
     private static final String VARCOL = "ColVarAdr";
     private static final String VARLIGNE = "LgnVarAdr";
     private static final String NBBKPTCOL = "NbBkptCol"; // float
     private static final String NBBKPTLGN = "NbBkptLgn"; // float
     private static final String TYPEVAR = "TypeVariable";
+    private static final String COLBKPTFACTOR = "ColBkptFactor";
+    private static final String ROWBKPTFACTOR = "RowBkptFactor";
     private static final String FACTOR = "Factor"; // int
     private static final String VAL_MAX = "Valeur_max"; //
     private static final String VAL_MIN = "Valeur_mini"; //
@@ -38,11 +44,15 @@ public final class MdbData {
 
     private static final String DATALOGCFG = "datalogcfg";
 
+    private static final String CONFIG_ECU = "config_ecu";
+
     private final String name;
     private Map<String, VariableInfo> infos;
     private Hashtable<String, Vector<String>> category;
 
     private ConfigDatalogger configDatalogger;
+
+    private ConfigEcu configEcu;
 
     public MdbData(File mdbFile) {
         this.name = mdbFile.getName().replace(".mdb", "");
@@ -71,6 +81,9 @@ public final class MdbData {
 
             Table tableDatalogCfg = db.getTable(DATALOGCFG);
             this.configDatalogger = new ConfigDatalogger(tableDatalogCfg);
+
+            Table tableConfigEcu = db.getTable(CONFIG_ECU);
+            this.configEcu = new ConfigEcu(tableConfigEcu);
 
             db.close();
         } catch (IOException e) {
@@ -105,9 +118,10 @@ public final class MdbData {
             }
 
             listInfos.put(row.getString(NOMCARTO),
-                    new VariableInfo(row.getString(TYPENAME), row.getString(SOUSTYPE), row.getBoolean(INTERP_TABLE), row.getInt(VARCOL),
-                            row.getInt(VARLIGNE), row.getShort(NBBKPTCOL), row.getShort(NBBKPTLGN), row.getDouble(FACTOR), row.getByte(TYPEVAR),
-                            row.getDouble(VAL_MAX), row.getDouble(VAL_MIN), row.getString(DETAIL)));
+                    new VariableInfo(row.getString(TYPENAME), row.getString(SOUSTYPE), row.getBoolean(INTERP_TABLE), row.getInt(ALLOCADR),
+                            row.getInt(COLBKPTADR), row.getInt(LGNBKPTADR), row.getInt(VAL_ADR), row.getInt(VARCOL), row.getInt(VARLIGNE),
+                            row.getShort(NBBKPTCOL), row.getShort(NBBKPTLGN), row.getInt(COLBKPTFACTOR), row.getDouble(ROWBKPTFACTOR),
+                            row.getDouble(FACTOR), row.getByte(TYPEVAR), row.getDouble(VAL_MAX), row.getDouble(VAL_MIN), row.getString(DETAIL)));
         }
 
         return listInfos;
@@ -124,30 +138,52 @@ public final class MdbData {
         return this.category;
     }
 
+    public static final String AdressDecToHex(int decimalValue) {
+        return "0x" + Integer.toHexString(decimalValue).toUpperCase();
+    }
+
+    public ConfigEcu getConfigEcu() {
+        return configEcu;
+    }
+
     public class VariableInfo {
 
         private String typeName;
         private String sousType;
         private boolean interpTable;
+        private int allocadr;
+        private int colbkptadr;
+        private int lgnbkptadr;
+        private int val_adr;
         private int varCol;
         private int varLigne;
         private short nbBkPtCol;
         private short nbBkPtRow;
+        private int colBkptFactor;
+        private double rowBkptFactor;
         private double factor;
         private byte typeVar;
         private double max;
         private double min;
         private String detail;
+        private String type;
 
-        public VariableInfo(String typeName, String sousType, boolean interpTable, int varCol, int varLigne, short nbBkPtCol, short nbBkPtRow,
-                double factor, byte typeVar, double max, double min, String detail) {
+        public VariableInfo(String typeName, String sousType, boolean interpTable, int allocadr, int colbkptadr, int lgnbkptadr, int val_adr,
+                int varCol, int varLigne, short nbBkPtCol, short nbBkPtRow, int colBkptFactor, double rowBkptFactor, double factor, byte typeVar,
+                double max, double min, String detail) {
             this.typeName = typeName;
             this.sousType = sousType;
             this.interpTable = interpTable;
+            this.allocadr = allocadr;
+            this.colbkptadr = colbkptadr;
+            this.lgnbkptadr = lgnbkptadr;
+            this.val_adr = val_adr;
             this.varCol = varCol;
             this.varLigne = varLigne;
             this.nbBkPtCol = nbBkPtCol;
             this.nbBkPtRow = nbBkPtRow;
+            this.colBkptFactor = colBkptFactor;
+            this.rowBkptFactor = rowBkptFactor;
             this.factor = factor;
             this.typeVar = typeVar;
             this.max = max;
@@ -187,6 +223,20 @@ public final class MdbData {
             return factor;
         }
 
+        public String getFormat() {
+            double facConv = 1 / getFactor();
+            String sFacConv = String.valueOf(facConv);
+            int idxDot = sFacConv.indexOf('.');
+
+            if (idxDot == -1) {
+                return "%.0";
+            }
+
+            int nbDigit = sFacConv.length() - (idxDot + 1);
+
+            return "%." + nbDigit;
+        }
+
         public byte getTypeVar() {
             return typeVar;
         }
@@ -208,6 +258,49 @@ public final class MdbData {
             return "Var=f(" + varCol + "," + varLigne + ")" + "\n\t|_" + typeName + "\n\t\t|_" + sousType;
         }
 
+        public int getAllocadr() {
+            return allocadr;
+        }
+
+        public int getColbkptadr() {
+            return colbkptadr;
+        }
+
+        public int getLgnbkptadr() {
+            return lgnbkptadr;
+        }
+
+        public int getVal_adr() {
+            return val_adr;
+        }
+
+        public int getColBkptFactor() {
+            return colBkptFactor;
+        }
+
+        public double getRowBkptFactor() {
+            return rowBkptFactor;
+        }
+
+        public String getType() {
+
+            int nbCol = getNbBkPtCol();
+            int nbLigne = getNbBkPtRow();
+
+            if (nbCol == 1) {
+                return "VALUE";
+            }
+
+            if (nbCol > 1 && nbLigne == 0) {
+                return "CURVE";
+            }
+
+            if (nbCol > 1 && nbLigne > 1 && typeVar == 0) {
+                return "MAP";
+            }
+
+            return "UNKNOW";
+        }
     }
 
     public class ConfigDatalogger {
@@ -332,6 +425,63 @@ public final class MdbData {
             return sb.toString();
         }
 
+    }
+
+    public class ConfigEcu {
+
+        private static final String NOM = "Nom";
+        private static final String ADRESSE = "Adresse";
+        private static final String VALEUR = "Valeur";
+        private static final String COMMENTAIRE = "Commentaire";
+
+        private List<ParamEcu> paramsEcu;
+
+        public List<ParamEcu> getParamsEcu() {
+            return paramsEcu;
+        }
+
+        public ConfigEcu(Table tableConfigEcu) {
+
+            this.paramsEcu = new ArrayList<>();
+
+            for (Row row : tableConfigEcu) {
+                if (!row.getString(NOM).equals("-")) {
+                    this.paramsEcu.add(new ParamEcu(row));
+                }
+            }
+        }
+
+        public class ParamEcu {
+
+            private String nom;
+            private int adresse;
+            private int valeur;
+            private String commentaire;
+
+            public ParamEcu(Row row) {
+                this.nom = row.getString(NOM);
+                this.adresse = row.getDouble(ADRESSE).intValue();
+                this.valeur = row.getDouble(VALEUR).intValue();
+                this.commentaire = row.getString(COMMENTAIRE);
+            }
+
+            public String getNom() {
+                return nom;
+            }
+
+            public int getAdresse() {
+                return adresse;
+            }
+
+            public int getValeur() {
+                return valeur;
+            }
+
+            public String getCommentaire() {
+                return commentaire;
+            }
+
+        }
     }
 
 }

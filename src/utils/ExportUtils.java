@@ -22,7 +22,6 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
-import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.ValueAxis;
 import org.jfree.chart.plot.CombinedDomainXYPlot;
 import org.jfree.chart.plot.XYPlot;
@@ -39,6 +38,7 @@ import org.jfree.data.xy.XYZDataset;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
+import gui.ChartView;
 import gui.ColorPaintScale;
 import gui.Condition;
 import log.Formula;
@@ -46,7 +46,7 @@ import log.Measure;
 
 public abstract class ExportUtils {
 
-    public static final boolean ConfigToXml(File file, Map<String, JFreeChart> listChart, Set<Formula> listFormula, List<Condition> listConditions) {
+    public static final boolean ConfigToXml(File file, Map<String, ChartView> listChart, Set<Formula> listFormula, List<Condition> listConditions) {
 
         DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
         DocumentBuilder docBuilder;
@@ -64,7 +64,7 @@ public abstract class ExportUtils {
                 Element windows = doc.createElement("Windows");
                 racine.appendChild(windows);
 
-                for (Entry<String, JFreeChart> entry : listChart.entrySet()) {
+                for (Entry<String, ChartView> entry : listChart.entrySet()) {
                     // Nom fenêtre
                     // Type graph
                     // Couleur de fond
@@ -72,18 +72,18 @@ public abstract class ExportUtils {
                     // Couleur série
                     // Epaisseur série
 
+                    ChartView chart = entry.getValue();
+
                     noeudObject = doc.createElement("Window");
                     windows.appendChild(noeudObject);
-
                     attribut = doc.createElement("Name");
                     attribut.appendChild(doc.createTextNode(entry.getKey()));
                     noeudObject.appendChild(attribut);
 
-                    JFreeChart chart = entry.getValue();
-
-                    CombinedDomainXYPlot parentPlot = (CombinedDomainXYPlot) chart.getXYPlot();
+                    CombinedDomainXYPlot parentPlot = chart.getPlot();
 
                     int datasetType = 0;
+                    int idx = -1;
                     XYDataset dataset;
 
                     @SuppressWarnings("unchecked")
@@ -106,6 +106,33 @@ public abstract class ExportUtils {
                     type.appendChild(doc.createTextNode(String.valueOf(datasetType)));
                     noeudObject.appendChild(type);
 
+                    if (datasetType == 1) {
+                        Element cursor = doc.createElement("Cursor");
+                        attribut = doc.createElement("Color");
+                        String cursorColor = ((Color) chart.getCrossair().getPaint()).toString();
+                        idx = cursorColor.indexOf('[');
+                        if (idx > -1) {
+                            cursorColor = cursorColor.substring(idx);
+                        }
+                        attribut.appendChild(doc.createTextNode(cursorColor));
+                        cursor.appendChild(attribut);
+
+                        BasicStroke cursorStroke = (BasicStroke) chart.getCrossair().getStroke();
+
+                        String style = cursorStroke.getDashArray() != null ? cursorStroke.getDashArray()[0] + ";" + cursorStroke.getDashArray()[1]
+                                : "continue";
+
+                        attribut = doc.createElement("Style");
+                        attribut.appendChild(doc.createTextNode(style));
+                        cursor.appendChild(attribut);
+
+                        attribut = doc.createElement("Width");
+                        attribut.appendChild(doc.createTextNode(Float.toString(cursorStroke.getLineWidth())));
+                        cursor.appendChild(attribut);
+
+                        noeudObject.appendChild(cursor);
+                    }
+
                     Element plots = doc.createElement("Plots");
                     noeudObject.appendChild(plots);
 
@@ -116,9 +143,9 @@ public abstract class ExportUtils {
 
                         Element plotBackgroundNode = doc.createElement("Background");
                         String stringColor = ((Color) plot.getBackgroundPaint()).toString();
-                        int idx = stringColor.indexOf('[');
-                        if (idx > -1) {
-                            stringColor = stringColor.substring(idx);
+                        int idx2 = stringColor.indexOf('[');
+                        if (idx2 > -1) {
+                            stringColor = stringColor.substring(idx2);
                         }
                         plotBackgroundNode.appendChild(doc.createTextNode(stringColor));
                         plotNode.appendChild(plotBackgroundNode);
@@ -254,7 +281,7 @@ public abstract class ExportUtils {
                             axisYRangeNode_.appendChild(doc.createTextNode(txtYRange_));
                             plotNode.appendChild(axisYRangeNode_);
 
-                            for (Object o : chart.getSubtitles()) {
+                            for (Object o : chart.getChart().getSubtitles()) {
                                 if (o instanceof PaintScaleLegend) {
 
                                     PaintScaleLegend paintScale = (PaintScaleLegend) o;
@@ -282,7 +309,7 @@ public abstract class ExportUtils {
                             serieNode_.appendChild(yNode_);
 
                             Element zNode_ = doc.createElement("Z");
-                            String zLabel = ((PaintScaleLegend) chart.getSubtitle(0)).getAxis().getLabel();
+                            String zLabel = ((PaintScaleLegend) chart.getChart().getSubtitle(0)).getAxis().getLabel();
                             zNode_.appendChild(doc.createTextNode(zLabel));
                             serieNode_.appendChild(zNode_);
 

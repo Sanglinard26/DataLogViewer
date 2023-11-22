@@ -7,6 +7,7 @@ import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.GridLayout;
 import java.awt.Shape;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -34,9 +35,11 @@ import javax.swing.table.DefaultTableModel;
 import org.jfree.chart.axis.ValueAxis;
 import org.jfree.chart.plot.CombinedDomainXYPlot;
 import org.jfree.chart.plot.XYPlot;
+import org.jfree.chart.renderer.xy.SamplingXYLineRenderer;
 import org.jfree.chart.renderer.xy.XYItemRenderer;
-import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
 import org.jfree.chart.renderer.xy.XYShapeRenderer;
+import org.jfree.chart.ui.StrokeChooserPanel;
+import org.jfree.chart.ui.StrokeSample;
 import org.jfree.data.Range;
 import org.jfree.data.xy.XYSeriesCollection;
 
@@ -53,12 +56,15 @@ public final class DialogProperties extends JPanel implements ActionListener
     private JTextField rangeX;
     private JTextField rangeY;
     private JButton btBackgroundColor;
+    private JButton btCursorColor;
+    private StrokeChooserPanel strokeChooserPanel;
+    private JTextField txtWidth;
     private JColorChooser colorChooser;
     private JDialog dialog;
     private final JComboBox<String> axisList;
     private Map<String, String> axisRange;
 
-    public DialogProperties(final XYPlot xyPlot) {
+    public DialogProperties(ChartView chartView, final XYPlot xyPlot) {
 
         super(new BorderLayout());
         JPanel panel = new JPanel();
@@ -92,17 +98,57 @@ public final class DialogProperties extends JPanel implements ActionListener
         JPanel panelBackground = new JPanel(new BorderLayout());
         panelBackground.setBorder(BorderFactory.createTitledBorder("Couleur de fond"));
         btBackgroundColor = new JButton(" ");
-        btBackgroundColor.setActionCommand("edit");
-        colorChooser = new JColorChooser();
-        dialog = JColorChooser.createDialog(btBackgroundColor, "Choix de couleur", true, colorChooser, this, null);
+        btBackgroundColor.setActionCommand("editBackground");
         btBackgroundColor.addActionListener(this);
-
         btBackgroundColor.setBackground((Color) xyPlot.getBackgroundPaint());
         btBackgroundColor.setContentAreaFilled(false);
         btBackgroundColor.setOpaque(true);
         btBackgroundColor.setBorder(BorderFactory.createEtchedBorder());
         panelBackground.add(btBackgroundColor, BorderLayout.CENTER);
         panel.add(panelBackground);
+
+        if (chartView.getDatasetType() == 1) {
+            JPanel panelCursor = new JPanel(new GridLayout(1, 3, 5, 5));
+            panelCursor.setBorder(BorderFactory.createTitledBorder("Curseur"));
+            btCursorColor = new JButton(" ");
+            btCursorColor.setActionCommand("editCursor");
+            btCursorColor.addActionListener(this);
+            btCursorColor.setBackground((Color) chartView.getCrossair().getPaint());
+            btCursorColor.setContentAreaFilled(false);
+            btCursorColor.setOpaque(true);
+            btCursorColor.setBorder(BorderFactory.createEtchedBorder());
+
+            BasicStroke cusorStroke = (BasicStroke) chartView.getCrossair().getStroke();
+            float cursorWidth = cusorStroke.getLineWidth();
+
+            StrokeSample continueLine = new StrokeSample(new BasicStroke(cursorWidth));
+            StrokeSample dash = new StrokeSample(
+                    new BasicStroke(cursorWidth, BasicStroke.CAP_SQUARE, BasicStroke.JOIN_MITER, 4.0f, new float[] { 2, 6 }, 0.0f));
+            StrokeSample dash1 = new StrokeSample(
+                    new BasicStroke(cursorWidth, BasicStroke.CAP_SQUARE, BasicStroke.JOIN_MITER, 4.0f, new float[] { 2, 12 }, 0.0f));
+            StrokeSample dash2 = new StrokeSample(
+                    new BasicStroke(cursorWidth, BasicStroke.CAP_SQUARE, BasicStroke.JOIN_MITER, 4.0f, new float[] { 6, 24 }, 0.0f));
+            StrokeSample dash3 = new StrokeSample(
+                    new BasicStroke(cursorWidth, BasicStroke.CAP_SQUARE, BasicStroke.JOIN_MITER, 4.0f, new float[] { 12, 24 }, 0.0f));
+            StrokeSample[] arrayStroke = new StrokeSample[] { continueLine, dash, dash1, dash2, dash3 };
+
+            int selIdx = 0;
+            for (int i = 0; i < arrayStroke.length; i++) {
+                if (cusorStroke.equals(arrayStroke[i].getStroke())) {
+                    selIdx = i;
+                    break;
+                }
+            }
+            strokeChooserPanel = new StrokeChooserPanel(arrayStroke[selIdx], arrayStroke);
+
+            txtWidth = new JTextField(3);
+            txtWidth.setText(Float.toString(cusorStroke.getLineWidth()));
+
+            panelCursor.add(btCursorColor);
+            panelCursor.add(strokeChooserPanel);
+            panelCursor.add(txtWidth);
+            panel.add(panelCursor);
+        }
 
         JPanel panelRangeX = new JPanel(new BorderLayout());
         panelRangeX.setBorder(BorderFactory.createTitledBorder("Plage X"));
@@ -173,7 +219,7 @@ public final class DialogProperties extends JPanel implements ActionListener
 
         renderer = xyPlot.getRenderer();
 
-        if (renderer instanceof XYLineAndShapeRenderer) {
+        if (renderer instanceof SamplingXYLineRenderer) {
 
             for (int nDataset = 0; nDataset < xyPlot.getDatasetCount(); nDataset++) {
 
@@ -189,7 +235,6 @@ public final class DialogProperties extends JPanel implements ActionListener
 
                 }
             }
-
         } else {
 
             key = xyPlot.getDataset().getSeriesKey(0);
@@ -244,6 +289,22 @@ public final class DialogProperties extends JPanel implements ActionListener
         }
 
         xyPlot.setBackgroundPaint(btBackgroundColor.getBackground());
+
+        if (chartView.getDatasetType() == 1) {
+            chartView.getCrossair().setPaint(btCursorColor.getBackground());
+            BasicStroke newStroke = (BasicStroke) strokeChooserPanel.getSelectedStroke();
+
+            float lineWidth;
+            try {
+                lineWidth = Float.parseFloat(txtWidth.getText());
+            } catch (NumberFormatException nfe) {
+                lineWidth = newStroke.getLineWidth();
+            }
+
+            BasicStroke newStrokeWidth = new BasicStroke(lineWidth, BasicStroke.CAP_SQUARE, BasicStroke.JOIN_MITER, 4.0f, newStroke.getDashArray(),
+                    newStroke.getDashPhase());
+            chartView.getCrossair().setStroke(newStrokeWidth);
+        }
 
         for (int i = 0; i < model.getRowCount(); i++) {
             serieName = model.getValueAt(i, 0).toString();
@@ -308,13 +369,27 @@ public final class DialogProperties extends JPanel implements ActionListener
 
     @Override
     public void actionPerformed(ActionEvent e) {
-        if ("edit".equals(e.getActionCommand())) {
-
+        if ("editBackground".equals(e.getActionCommand())) {
+            colorChooser = new JColorChooser();
+            dialog = JColorChooser.createDialog(btBackgroundColor, "Choix de couleur de fond", true, colorChooser, this, null);
             colorChooser.setColor(btBackgroundColor.getBackground());
             dialog.setVisible(true);
+            return;
+        }
 
-        } else { // User pressed dialog's "OK" button.
+        if ("editCursor".equals(e.getActionCommand())) {
+            colorChooser = new JColorChooser();
+            dialog = JColorChooser.createDialog(btCursorColor, "Choix de couleur", true, colorChooser, this, null);
+            colorChooser.setColor(btCursorColor.getBackground());
+            dialog.setVisible(true);
+            return;
+        }
+
+        // User pressed dialog's "OK" button.
+        if ("Choix de couleur de fond".equals(dialog.getTitle())) {
             btBackgroundColor.setBackground(colorChooser.getColor());
+        } else {
+            btCursorColor.setBackground(colorChooser.getColor());
         }
 
     }
