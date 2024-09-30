@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.Vector;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -76,6 +77,8 @@ public class Conversion {
 
     }
 
+    private static MdbData mdbData;
+
     public static final void AppIncToA2l(File[] appIncFile) {
 
         /*
@@ -117,6 +120,7 @@ public class Conversion {
 
         final String EQU = "EQU";
         final String DEFR = "DEFR";
+        final String DEFA = "DEFA";
         // final Pattern HEX_PATTERN = Pattern.compile("\\b(\\p{XDigit}+h)\\b"); // Pattern.compile("\\b(\\p{XDigit}+h)\\b");
         // final Pattern HEX_PATTERN_0x = Pattern.compile("(0x+\\p{XDigit}+)");
         final Pattern HEX_PATTERN_Final = Pattern.compile("\\b(\\p{XDigit}+h|(0x+\\p{XDigit}+))\\b");
@@ -128,6 +132,8 @@ public class Conversion {
 
         final int minAdress = 0;
         final int maxAdress = 65534;
+
+        HashMap<String, Integer> keysMap = new HashMap<String, Integer>();
 
         List<Variable> listVar = new ArrayList<Variable>();
         Map<Variable, String> mappingAdress = new HashMap<>();
@@ -147,16 +153,39 @@ public class Conversion {
 
                 while ((line = br.readLine()) != null && !line.contains(RAM_EXT)) {
 
+                    if (line.startsWith(";") || line.isEmpty()) {
+                        continue;
+                    }
+
+                    keysMap.clear();
+
                     int idxEQU = line.toUpperCase().lastIndexOf(EQU);
+                    if (idxEQU > -1) {
+                        keysMap.put(EQU, idxEQU);
+                    }
                     int idxSectionData = line.toUpperCase().lastIndexOf(SECTION_DATA);
+                    if (idxSectionData > -1) {
+                        keysMap.put(SECTION_DATA, idxSectionData);
+                    }
+
+                    int idx0x = line.indexOf("0x");
+
                     int idxDEFR = line.toUpperCase().lastIndexOf(DEFR);
+                    if (idxDEFR > -1 && idxDEFR < idx0x) {
+                        keysMap.put(DEFR, idxDEFR);
+                    }
+                    int idxDEFA = line.toUpperCase().lastIndexOf(DEFA);
+                    if (idxDEFA > -1 && idxDEFA < idx0x) {
+                        keysMap.put(DEFA, idxDEFA);
+                    }
 
                     boolean condition;
 
                     if (nFile == 0) {
                         condition = !line.trim().startsWith("PUBLIC") && idxEQU > -1;
                     } else {
-                        condition = idxDEFR > -1 || idxEQU > -1;
+                        // condition = idxDEFR > -1 || idxDEFA > -1 || idxEQU > -1;
+                        condition = !keysMap.isEmpty() && keysMap.get(EQU) == null;
                     }
 
                     if (condition) {
@@ -168,7 +197,7 @@ public class Conversion {
                         if (nFile == 0) {
                             variableName = line.substring(0, idxEQU - 1).trim();
                         } else {
-                            variableName = line.substring(0, Math.max(idxEQU, idxDEFR) - 1).trim();
+                            variableName = line.substring(0, Math.max(idxDEFR, idxDEFA) - 1).trim();
                         }
 
                         // System.out.println(variableName);
@@ -216,28 +245,32 @@ public class Conversion {
                         int idxStartInfo;
                         if (nFile == 0) {
                             idxStartInfo = endAdress > -1 ? endAdress : idxEQU + 3;
-                        } else {
-                            idxStartInfo = endAdress > -1 ? endAdress : Math.max(idxEQU, idxDEFR) + 3;
-                        }
+                            int idxSemiCol = line.indexOf(';', idxStartInfo);
 
-                        int idxSemiCol = line.indexOf(';', idxStartInfo);
+                            if (idxSemiCol > -1) {
+                                infos = line.substring(idxSemiCol);
 
-                        if (idxSemiCol > -1) {
-                            infos = line.substring(idxSemiCol);
-
-                            for (String s : varInfos.keySet()) {
-                                int idx = infos.indexOf(s);
-                                if (idx > -1) {
-                                    int idx2 = infos.indexOf(';', idx);
-                                    int lastIdx = infos.lastIndexOf(';');
-                                    if (idx2 > -1) {
-                                        varInfos.put(s, infos.substring(idx + s.length(), idx2));
-                                    } else if (idx == lastIdx + 1) {
-                                        varInfos.put(s, infos.substring(idx + s.length(), infos.length()));
+                                for (String s : varInfos.keySet()) {
+                                    int idx = infos.indexOf(s);
+                                    if (idx > -1) {
+                                        int idx2 = infos.indexOf(';', idx);
+                                        int lastIdx = infos.lastIndexOf(';');
+                                        if (idx2 > -1) {
+                                            varInfos.put(s, infos.substring(idx + s.length(), idx2));
+                                        } else if (idx == lastIdx + 1) {
+                                            varInfos.put(s, infos.substring(idx + s.length(), infos.length()));
+                                        }
                                     }
                                 }
                             }
+                        } else {
+                            // idxStartInfo = endAdress > -1 ? endAdress : Math.max(idxDEFR, idxDEFA) + 3;
+                            idxStartInfo = line.lastIndexOf("\"", line.length() - 2);
+                            if (idxStartInfo > -1) {
+                                variable.setComment(line.substring(idxStartInfo + 1, line.length() - 1));
+                            }
                         }
+
                     } else if (idxSectionData > -1) {
 
                         final Matcher matcher = HEX_PATTERN_Final.matcher(line);
@@ -334,7 +367,6 @@ public class Conversion {
         }
 
         boolean mdb = true;
-        MdbData mdbData;
         Map<String, VariableInfo> varInfo;
         List<ParamEcu> paramsEcu;
         String fileNameMdb = "";
@@ -385,7 +417,7 @@ public class Conversion {
         StringBuilder sb = new StringBuilder("/begin PROJECT ");
 
         sb.append(name);
-        sb.append("\n" + description + "\n\n");
+        sb.append(System.lineSeparator() + description + System.lineSeparator() + System.lineSeparator());
 
         sb.append(writeHeader("\"Header description\""));
 
@@ -401,9 +433,9 @@ public class Conversion {
 
         StringBuilder sb = new StringBuilder("/begin HEADER ");
 
-        sb.append(description + "\n");
+        sb.append(description + System.lineSeparator());
 
-        sb.append("/end HEADER\n\n");
+        sb.append("/end HEADER" + System.lineSeparator() + System.lineSeparator());
 
         return sb.toString();
 
@@ -417,17 +449,17 @@ public class Conversion {
         StringBuilder sb = new StringBuilder("/begin MODULE ");
 
         sb.append(name);
-        sb.append("\n" + description + "\n\n");
+        sb.append(System.lineSeparator() + description + System.lineSeparator() + System.lineSeparator());
 
         sb.append(writeModPar("\"MOD_PAR description\""));
 
         for (Variable var : listVar) {
             sb.append(writeMeasurement(var.getName(), var.getComment(), var.getDataType(), "CM_" + var.getName(), var.getRangeMin(),
                     var.getRangeMax(), var.getDisplayName(), var.getAdress(), var.getDisplayBase()));
-            sb.append("\n\n");
+            sb.append(System.lineSeparator() + System.lineSeparator());
 
             sb.append(writeCompuMethod("CM_" + var.getName(), var.getDisplayFormat(), var.getUnit(), var.getConversion() + " 0"));
-            sb.append("\n\n");
+            sb.append(System.lineSeparator() + System.lineSeparator());
 
             listClasses.add(var.getGroup());
         }
@@ -436,21 +468,27 @@ public class Conversion {
             sb.append(writeGroup(classe, "\"Group description\"", listVar));
         }
 
+        for (Entry<String, Vector<String>> entry : mdbData.getCategory().entrySet()) {
+            sb.append(writeFunction(entry.getKey(), "Function description", entry.getValue(), varInfo));
+        }
+
         for (Entry<String, VariableInfo> entry : varInfo.entrySet()) {
-            sb.append(writeCharacteristic(entry));
+            sb.append(writeCharacteristic(entry, listVar));
 
             sb.append(writeCompuMethod(entry));
-            sb.append("\n\n");
+            sb.append(System.lineSeparator() + System.lineSeparator());
         }
+
+        sb.append(writeFunctionEcuConfig(paramsEcu));
 
         for (ParamEcu param : paramsEcu) {
             sb.append(writeCharacteristic(param));
 
             sb.append(writeCompuMethod("CM_" + param.getNom(), "%.0", "-", "1.0 0"));
-            sb.append("\n\n");
+            sb.append(System.lineSeparator() + System.lineSeparator());
         }
 
-        sb.append("/end MODULE\n\n");
+        sb.append("/end MODULE" + System.lineSeparator() + System.lineSeparator());
 
         return sb.toString();
 
@@ -459,13 +497,13 @@ public class Conversion {
     private static final String writeModPar(String description) {
         StringBuilder sb = new StringBuilder("/begin MOD_PAR ");
 
-        sb.append(description + "\n");
+        sb.append(description + System.lineSeparator());
 
-        sb.append("EPK" + " " + "\"Cdfx_Name\"" + "\n");
+        sb.append("EPK" + " " + "\"Cdfx_Name\"" + System.lineSeparator());
 
-        sb.append("USER" + " " + "\"Workspace_Name\"" + "\n");
+        sb.append("USER" + " " + "\"Workspace_Name\"" + System.lineSeparator());
 
-        sb.append("/end MOD_PAR\n\n");
+        sb.append("/end MOD_PAR" + System.lineSeparator() + System.lineSeparator());
 
         return sb.toString();
     }
@@ -475,17 +513,17 @@ public class Conversion {
 
         StringBuilder sb = new StringBuilder("/begin MEASUREMENT ");
 
-        sb.append(name + "\n");
-        sb.append("\"" + comment + "\"" + "\n");
-        sb.append(Conversion.dataType.get(dataType) + "\n");
-        sb.append(conversion + "\n");
-        sb.append("1" + "\n");
-        sb.append("0" + "\n");
-        sb.append(min + "\n");
-        sb.append(max + "\n");
-        sb.append("DISPLAY_IDENTIFIER " + displayIdentifier + "\n");
-        sb.append("ECU_ADDRESS " + adress + "\n");
-        sb.append(writeAnnotation(base) + "\n");
+        sb.append(name + System.lineSeparator());
+        sb.append("\"" + comment + "\"" + System.lineSeparator());
+        sb.append(Conversion.dataType.get(dataType) + System.lineSeparator());
+        sb.append(conversion + System.lineSeparator());
+        sb.append("1" + System.lineSeparator());
+        sb.append("0" + System.lineSeparator());
+        sb.append(min + System.lineSeparator());
+        sb.append(max + System.lineSeparator());
+        sb.append("DISPLAY_IDENTIFIER " + displayIdentifier + System.lineSeparator());
+        sb.append("ECU_ADDRESS " + adress + System.lineSeparator());
+        sb.append(writeAnnotation(base) + System.lineSeparator());
 
         sb.append("/end MEASUREMENT");
 
@@ -495,9 +533,9 @@ public class Conversion {
 
     private static final String writeAnnotation(String base) {
 
-        StringBuilder sb = new StringBuilder("/begin ANNOTATION\n");
+        StringBuilder sb = new StringBuilder("/begin ANNOTATION" + System.lineSeparator());
 
-        sb.append("ANNOTATION_LABEL " + "\"" + base + "\"" + "\n");
+        sb.append("ANNOTATION_LABEL " + "\"" + base + "\"" + System.lineSeparator());
 
         sb.append("/end ANNOTATION");
 
@@ -508,12 +546,12 @@ public class Conversion {
 
         StringBuilder sb = new StringBuilder("/begin COMPU_METHOD ");
 
-        sb.append(name + "\n");
-        sb.append("\"\"" + "\n");
-        sb.append("LINEAR" + "\n");
-        sb.append("\"" + format + "\"" + "\n");
-        sb.append("\"" + unit + "\"" + "\n");
-        sb.append("COEFFS_LINEAR " + coeff + "\n");
+        sb.append(name + System.lineSeparator());
+        sb.append("\"\"" + System.lineSeparator());
+        sb.append("LINEAR" + System.lineSeparator());
+        sb.append("\"" + format + "\"" + System.lineSeparator());
+        sb.append("\"" + unit + "\"" + System.lineSeparator());
+        sb.append("COEFFS_LINEAR " + coeff + System.lineSeparator());
 
         sb.append("/end COMPU_METHOD");
 
@@ -526,13 +564,13 @@ public class Conversion {
         StringBuilder sb = new StringBuilder("/begin GROUP ");
 
         sb.append(name);
-        sb.append("\n" + description + "\n");
+        sb.append(System.lineSeparator() + description + System.lineSeparator());
         sb.append("ROOT\n");
 
         sb.append("/begin REF_MEASUREMENT\n");
         for (Variable var : listVar) {
             if (var.getGroup().equals(name)) {
-                sb.append(var.getName() + "\n");
+                sb.append(var.getName() + System.lineSeparator());
             }
         }
         sb.append("/end REF_MEASUREMENT\n");
@@ -542,7 +580,54 @@ public class Conversion {
 
     }
 
-    private static final String writeCharacteristic(Entry<String, VariableInfo> varInfo) {
+    private static final String writeFunction(String name, String description, Vector<String> subFunctions, Map<String, VariableInfo> varInfo) {
+        StringBuilder sb = new StringBuilder("/begin FUNCTION ");
+
+        sb.append(name);
+        sb.append(System.lineSeparator() + "\"" + description + "\"" + System.lineSeparator());
+
+        sb.append("/begin REF_CHARACTERISTIC" + System.lineSeparator());
+        for (Entry<String, VariableInfo> entry : varInfo.entrySet()) {
+            if (name.equals(entry.getValue().getTypeName()) && entry.getValue().getSousType().isEmpty()) {
+                sb.append(entry.getKey() + System.lineSeparator());
+            }
+        }
+        sb.append("/end REF_CHARACTERISTIC" + System.lineSeparator());
+
+        for (String subFunc : subFunctions) {
+            sb.append("/begin SUB_FUNCTION " + subFunc + System.lineSeparator());
+            sb.append("/begin REF_CHARACTERISTIC" + System.lineSeparator());
+            for (Entry<String, VariableInfo> entry : varInfo.entrySet()) {
+                if (name.equals(entry.getValue().getTypeName()) && subFunc.equals(entry.getValue().getSousType())) {
+                    sb.append(entry.getKey() + System.lineSeparator());
+                }
+            }
+            sb.append("/end REF_CHARACTERISTIC" + System.lineSeparator());
+            sb.append("/end SUB_FUNCTION" + System.lineSeparator());
+        }
+
+        sb.append("/end FUNCTION" + System.lineSeparator() + System.lineSeparator());
+
+        return sb.toString();
+    }
+
+    private static final String writeFunctionEcuConfig(List<ParamEcu> paramEcus) {
+        StringBuilder sb = new StringBuilder("/begin FUNCTION ");
+
+        sb.append("ECU_CONFIG");
+        sb.append(System.lineSeparator() + "\"Parametrage de base de l'ECU\"" + System.lineSeparator());
+
+        sb.append("/begin REF_CHARACTERISTIC\n");
+        for (ParamEcu param : paramEcus) {
+            sb.append(param.getNom() + System.lineSeparator());
+        }
+        sb.append("/end REF_CHARACTERISTIC" + System.lineSeparator());
+        sb.append("/end FUNCTION" + System.lineSeparator() + System.lineSeparator());
+
+        return sb.toString();
+    }
+
+    private static final String writeCharacteristic(Entry<String, VariableInfo> varInfo, List<Variable> listVar) {
         /// begin CHARACTERISTIC ident Name (NomCarto)
         // string LongIdentifier
         // enum Type (ASCII, CURVE, MAP, VAL_BLK, VALUE)
@@ -559,48 +644,56 @@ public class Conversion {
 
         StringBuilder sb = new StringBuilder("/begin CHARACTERISTIC ");
 
-        sb.append(varInfo.getKey() + "\n");
-        sb.append("\"" + varInfo.getValue().getDetail() + "\"" + "\n");
-        sb.append(varInfo.getValue().getType() + "\n");
-        sb.append(MdbData.AdressDecToHex(varInfo.getValue().getVal_adr()) + "\n");
-        sb.append("RL_" + varInfo.getKey() + "\n");
-        sb.append("0" + "\n");
-        sb.append("CM_" + varInfo.getKey() + "\n");
-        sb.append(varInfo.getValue().getMin() + "\n");
-        sb.append(varInfo.getValue().getMax() + "\n");
-        sb.append("ECU_ADDRESS_EXTENSION " + MdbData.AdressDecToHex(varInfo.getValue().getAllocadr()) + "\n");
+        String characteristicName = varInfo.getKey();
+
+        sb.append(characteristicName + System.lineSeparator());
+        sb.append("\"" + varInfo.getValue().getDetail() + "\"" + System.lineSeparator());
+        sb.append(varInfo.getValue().getType() + System.lineSeparator());
+        sb.append(MdbData.AdressDecToHex(varInfo.getValue().getVal_adr()) + System.lineSeparator());
+        sb.append("RL_" + characteristicName + System.lineSeparator());
+        sb.append("0" + System.lineSeparator());
+        sb.append("CM_" + characteristicName + System.lineSeparator());
+        sb.append(varInfo.getValue().getMin() + System.lineSeparator());
+        sb.append(varInfo.getValue().getMax() + System.lineSeparator());
+        sb.append("ECU_ADDRESS_EXTENSION " + MdbData.AdressDecToHex(varInfo.getValue().getAllocadr()) + System.lineSeparator());
+        if ("VAL_BLK".equals(varInfo.getValue().getType())) {
+            short x = varInfo.getValue().getNbBkPtCol();
+            short yRaw = varInfo.getValue().getNbBkPtRow();
+            short y = yRaw > 0 ? yRaw : 1;
+            sb.append("MATRIX_DIM " + x + " " + y + " " + 1 + System.lineSeparator());
+        }
 
         switch (varInfo.getValue().getType()) {
         case "VALUE":
             break;
         case "CURVE":
-            sb.append("\n");
-            sb.append(writeAxisDescr(varInfo, (byte) 1));
-            sb.append("\n\n");
+            sb.append(System.lineSeparator());
+            sb.append(writeAxisDescr(varInfo, (byte) 1, listVar));
+            sb.append(System.lineSeparator() + System.lineSeparator());
             break;
         case "MAP":
-            sb.append("\n");
-            sb.append(writeAxisDescr(varInfo, (byte) 1));
-            sb.append("\n\n");
-            sb.append(writeAxisDescr(varInfo, (byte) 2));
-            sb.append("\n\n");
+            sb.append(System.lineSeparator());
+            sb.append(writeAxisDescr(varInfo, (byte) 1, listVar));
+            sb.append(System.lineSeparator() + System.lineSeparator());
+            sb.append(writeAxisDescr(varInfo, (byte) 2, listVar));
+            sb.append(System.lineSeparator() + System.lineSeparator());
             break;
         }
 
-        sb.append("/end CHARACTERISTIC\n\n");
+        sb.append("/end CHARACTERISTIC" + System.lineSeparator() + System.lineSeparator());
 
         switch (varInfo.getValue().getType()) {
         case "VALUE":
             break;
         case "CURVE":
-            sb.append(writeCompuMethod("CM_AXIS_1_" + varInfo.getKey(), "%.8", "-", String.valueOf(1.0F / varInfo.getValue().getColBkptFactor())));
-            sb.append("\n\n");
+            sb.append(writeCompuMethod("CM_AXIS_1_" + characteristicName, "%.8", "-", String.valueOf(1.0F / varInfo.getValue().getColBkptFactor())));
+            sb.append(System.lineSeparator() + System.lineSeparator());
             break;
         case "MAP":
-            sb.append(writeCompuMethod("CM_AXIS_1_" + varInfo.getKey(), "%.8", "-", String.valueOf(1.0F / varInfo.getValue().getColBkptFactor())));
-            sb.append("\n\n");
-            sb.append(writeCompuMethod("CM_AXIS_2_" + varInfo.getKey(), "%.8", "-", String.valueOf(1.0F / varInfo.getValue().getRowBkptFactor())));
-            sb.append("\n\n");
+            sb.append(writeCompuMethod("CM_AXIS_1_" + characteristicName, "%.8", "-", String.valueOf(1.0F / varInfo.getValue().getColBkptFactor())));
+            sb.append(System.lineSeparator() + System.lineSeparator());
+            sb.append(writeCompuMethod("CM_AXIS_2_" + characteristicName, "%.8", "-", String.valueOf(1.0F / varInfo.getValue().getRowBkptFactor())));
+            sb.append(System.lineSeparator() + System.lineSeparator());
             break;
         }
 
@@ -624,21 +717,21 @@ public class Conversion {
 
         StringBuilder sb = new StringBuilder("/begin CHARACTERISTIC ");
 
-        sb.append(param.getNom() + "\n");
-        sb.append("\"" + param.getCommentaire() + "\"" + "\n");
-        sb.append("VALUE" + "\n");
-        sb.append(MdbData.AdressDecToHex(param.getAdresse()) + "\n");
-        sb.append("RL_" + param.getNom() + "\n");
-        sb.append("0" + "\n");
-        sb.append("CM_" + param.getNom() + "\n");
-        sb.append("0" + "\n");
-        sb.append("65535" + "\n");
-        sb.append("/end CHARACTERISTIC\n\n");
+        sb.append(param.getNom() + System.lineSeparator());
+        sb.append("\"" + param.getCommentaire() + "\"" + System.lineSeparator());
+        sb.append("VALUE" + System.lineSeparator());
+        sb.append(MdbData.AdressDecToHex(param.getAdresse()) + System.lineSeparator());
+        sb.append("RL_" + param.getNom() + System.lineSeparator());
+        sb.append("0" + System.lineSeparator());
+        sb.append("CM_" + param.getNom() + System.lineSeparator());
+        sb.append("0" + System.lineSeparator());
+        sb.append("65535" + System.lineSeparator());
+        sb.append("/end CHARACTERISTIC" + System.lineSeparator() + System.lineSeparator());
 
         return sb.toString();
     }
 
-    private static final String writeAxisDescr(Entry<String, VariableInfo> varInfo, byte axisNum) {
+    private static final String writeAxisDescr(Entry<String, VariableInfo> varInfo, byte axisNum, List<Variable> listVar) {
         /// begin AXIS_DESCR enum Attribute ()
         // ident InputQuantity ()
         // ident Conversion ()
@@ -649,22 +742,54 @@ public class Conversion {
         // [-> FORMAT]
         /// end AXIS_DESCR
 
+        String characteristicName = varInfo.getKey();
+
         StringBuilder sb = new StringBuilder("/begin AXIS_DESCR ");
         sb.append("STD_AXIS\n");
         switch (axisNum) {
         case 1:
-            sb.append(MdbData.AdressDecToHex(varInfo.getValue().getColbkptadr()) + "\n");
-            sb.append("CM_AXIS_1_" + varInfo.getKey() + "\n");
-            sb.append(varInfo.getValue().getNbBkPtCol() + "\n");
-            sb.append("min\n");
-            sb.append("max\n");
+            sb.append(MdbData.AdressDecToHex(varInfo.getValue().getVarCol()) + System.lineSeparator());
+            sb.append("CM_AXIS_1_" + characteristicName + System.lineSeparator());
+            sb.append(varInfo.getValue().getNbBkPtCol() + System.lineSeparator());
+
+            Variable varX = null;
+            for (Variable var : listVar) {
+                if (Integer.parseInt(var.getAdress().replace("0x", ""), 16) == varInfo.getValue().getVarCol()) {
+                    varX = var;
+                    break;
+                }
+            }
+            if (varX != null) {
+                sb.append(varX.getRangeMin() + System.lineSeparator());
+                sb.append(varX.getRangeMax() + System.lineSeparator());
+            } else {
+                sb.append("min" + System.lineSeparator());
+                sb.append("max" + System.lineSeparator());
+            }
+
+            sb.append(writeAnnotation(MdbData.AdressDecToHex(varInfo.getValue().getColbkptadr())) + System.lineSeparator());
             break;
         case 2:
-            sb.append(MdbData.AdressDecToHex(varInfo.getValue().getLgnbkptadr()) + "\n");
-            sb.append("CM_AXIS_2_" + varInfo.getKey() + "\n");
-            sb.append(varInfo.getValue().getNbBkPtRow() + "\n");
-            sb.append("min\n");
-            sb.append("max\n");
+            sb.append(MdbData.AdressDecToHex(varInfo.getValue().getVarLigne()) + System.lineSeparator());
+            sb.append("CM_AXIS_2_" + characteristicName + System.lineSeparator());
+            sb.append(varInfo.getValue().getNbBkPtRow() + System.lineSeparator());
+
+            Variable varY = null;
+            for (Variable var : listVar) {
+                if (Integer.parseInt(var.getAdress().replace("0x", ""), 16) == varInfo.getValue().getVarLigne()) {
+                    varY = var;
+                    break;
+                }
+            }
+            if (varY != null) {
+                sb.append(varY.getRangeMin() + System.lineSeparator());
+                sb.append(varY.getRangeMax() + System.lineSeparator());
+            } else {
+                sb.append("min" + System.lineSeparator());
+                sb.append("max" + System.lineSeparator());
+            }
+
+            sb.append(writeAnnotation(MdbData.AdressDecToHex(varInfo.getValue().getLgnbkptadr())) + System.lineSeparator());
             break;
         }
 
@@ -675,14 +800,16 @@ public class Conversion {
 
     private static String writeCompuMethod(Entry<String, VariableInfo> varInfo) {
 
+        String characteristicName = varInfo.getKey();
+
         StringBuilder sb = new StringBuilder("/begin COMPU_METHOD ");
 
-        sb.append("CM_" + varInfo.getKey() + "\n");
-        sb.append("\"\"" + "\n");
-        sb.append("LINEAR" + "\n");
-        sb.append("\"" + varInfo.getValue().getFormat() + "\"" + "\n");
-        sb.append("\"" + "-" + "\"" + "\n");
-        sb.append("COEFFS_LINEAR " + (1.0F / varInfo.getValue().getFactor()) + " 0" + "\n");
+        sb.append("CM_" + characteristicName + System.lineSeparator());
+        sb.append("\"\"" + System.lineSeparator());
+        sb.append("LINEAR" + System.lineSeparator());
+        sb.append("\"" + varInfo.getValue().getFormat() + "\"" + System.lineSeparator());
+        sb.append("\"" + "-" + "\"" + System.lineSeparator());
+        sb.append("COEFFS_LINEAR " + (1.0F / varInfo.getValue().getFactor()) + " 0" + System.lineSeparator());
 
         sb.append("/end COMPU_METHOD");
 
@@ -745,6 +872,12 @@ public class Conversion {
 
         public String getComment() {
             return varInfos.get(COMMENT) != null ? varInfos.get(COMMENT) : "NON_DEFINI";
+        }
+
+        public void setComment(String comment) {
+            if ("NON_DEFINI".equals(getComment())) {
+                varInfos.put(COMMENT, comment);
+            }
         }
 
         public String getDataType() {

@@ -618,13 +618,9 @@ public final class MapView extends JPanel implements Observer, ListSelectionList
                         final int rep = fileChooser.showSaveDialog(null);
 
                         if (rep == JFileChooser.APPROVE_OPTION) {
-                            List<Variable> listToExport = new ArrayList<Variable>();
 
-                            for (int i = 0; i < mapCal.getListVariable().size(); i++) {
-                                listToExport.add(mapCal.getListVariable().get(i));
-                            }
-
-                            boolean result = MapCal.toCdfx(listToExport, fileChooser.getSelectedFile());
+                            boolean result = MapCal.toCdfx(mapCal.getListVariable(), mapCal.getMdbData().getConfigEcu().getParamsEcu(),
+                                    fileChooser.getSelectedFile());
 
                             if (result) {
                                 JOptionPane.showMessageDialog(null, "Conversion termin\u00e9e !");

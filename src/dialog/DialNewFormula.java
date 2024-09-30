@@ -2,6 +2,7 @@ package dialog;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
@@ -17,6 +18,8 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -36,6 +39,8 @@ import javax.swing.JTextPane;
 import javax.swing.SwingConstants;
 import javax.swing.TransferHandler;
 import javax.swing.border.LineBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.text.AbstractDocument;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
@@ -51,6 +56,7 @@ import org.jfree.data.xy.XYSeries;
 import org.jfree.data.xy.XYSeriesCollection;
 
 import calib.MapCal;
+import gui.AutoSuggestor;
 import gui.Ihm;
 import gui.MapView;
 import log.Formula;
@@ -65,6 +71,8 @@ public final class DialNewFormula extends JDialog {
     private final JTextField txtUnit;
     private final JTextPane formulaTextPane;
     private ChartPanel chartPanel;
+    private final List<String> measureNames;
+    private final HashMap<Integer, JLabel> mapLabels;
 
     public DialNewFormula(final Ihm ihm) {
         this(ihm, null, false);
@@ -74,6 +82,10 @@ public final class DialNewFormula extends JDialog {
 
         super(ihm, "Edition de formule", false);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+
+        mapLabels = new HashMap<>();
+
+        measureNames = ihm.getListStringMeasure();
 
         final GridBagConstraints gbc = new GridBagConstraints();
 
@@ -174,10 +186,17 @@ public final class DialNewFormula extends JDialog {
 
                 int caretPosition = formulaTextPane.getCaretPosition();
 
+                JLabel label;
+
                 if (checkAccolades(caretPosition)) {
-                    formulaTextPane.insertComponent(createLabel(data, Color.BLUE));
+                    label = createLabel(data, Color.BLUE);
+                    formulaTextPane.insertComponent(label);
+                    mapLabels.put(caretPosition, label);
                 } else {
-                    formulaTextPane.insertComponent(createLabel(data, Color.RED));
+                    label = createLabel(data, Color.RED);
+                    formulaTextPane.insertComponent(label);
+                    mapLabels.put(caretPosition, label);
+
                 }
 
                 DialNewFormula.this.toFront();
@@ -188,9 +207,27 @@ public final class DialNewFormula extends JDialog {
                 return true;
             }
         });
+
+        formulaTextPane.getDocument().addDocumentListener(new DocumentListener() {
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                updateComponents(formulaTextPane);
+            }
+
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                updateComponents(formulaTextPane);
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+            }
+        });
+
         add(formulaTextPane, gbc);
 
-        // AutoSuggestor autoSuggestor = new AutoSuggestor(formulaTextPane, this, words, Color.WHITE.brighter(), Color.BLUE, Color.RED, 0.75f);
+        new AutoSuggestor(formulaTextPane, this, measureNames, Color.WHITE.brighter(), Color.BLUE, Color.RED, 0.75f);
 
         if (formula != null) {
             txtName.setText(formula.getName());
@@ -386,6 +423,48 @@ public final class DialNewFormula extends JDialog {
         return sb.toString().trim();
     }
 
+    public final int caretPosWithComponent(int rawCaretPos, JTextComponent textComp) {
+
+        Component comp = null;
+        JLabel label = null;
+        StringBuilder sb = new StringBuilder();
+
+        for (int i = 0; i <= rawCaretPos; i++) {
+            Element elem = ((StyledDocument) textComp.getDocument()).getCharacterElement(i);
+            AttributeSet as = elem.getAttributes();
+            if (as.containsAttribute(AbstractDocument.ElementNameAttribute, StyleConstants.ComponentElementName)) {
+                comp = StyleConstants.getComponent(as);
+                if (comp instanceof JLabel) {
+                    label = (JLabel) comp;
+                    sb.append("#" + label.getText() + "#");
+                }
+            } else {
+                try {
+                    sb.append(textComp.getText(i, 1));
+                } catch (BadLocationException e) {
+                }
+            }
+        }
+        return sb.length();
+    }
+
+    public final void updateComponents(JTextComponent textComp) {
+        Component comp = null;
+        JLabel label = null;
+        mapLabels.clear();
+        for (int i = 0; i < textComp.getDocument().getLength(); i++) {
+            Element elem = ((StyledDocument) textComp.getDocument()).getCharacterElement(i);
+            AttributeSet as = elem.getAttributes();
+            if (as.containsAttribute(AbstractDocument.ElementNameAttribute, StyleConstants.ComponentElementName)) {
+                comp = StyleConstants.getComponent(as);
+                if (comp instanceof JLabel) {
+                    label = (JLabel) comp;
+                    mapLabels.put(i, label);
+                }
+            }
+        }
+    }
+
     public final void parseFormula(String txtformula) {
 
         Pattern pattern = Pattern.compile("\\#(.*?)\\#");
@@ -393,6 +472,7 @@ public final class DialNewFormula extends JDialog {
 
         String matchedMeasure;
         int idxLabel = -1;
+        JLabel label;
 
         try {
             formulaTextPane.setText(txtformula);
@@ -405,7 +485,9 @@ public final class DialNewFormula extends JDialog {
 
                 formulaTextPane.getDocument().remove(idxLabel, measureText.length());
                 formulaTextPane.setCaretPosition(idxLabel);
-                formulaTextPane.insertComponent(createLabel(matchedMeasure, Color.RED));
+                label = createLabel(matchedMeasure, Color.RED);
+                formulaTextPane.insertComponent(label);
+                mapLabels.put(idxLabel, label);
             }
             // *****
 
@@ -432,11 +514,14 @@ public final class DialNewFormula extends JDialog {
 
                         formulaTextPane.getDocument().remove(idxLabel, sParam.length());
                         formulaTextPane.setCaretPosition(idxLabel);
-                        formulaTextPane.insertComponent(createLabel(sParam, Color.BLUE));
+                        label = createLabel(sParam, Color.BLUE);
+                        formulaTextPane.insertComponent(label);
+                        mapLabels.put(idxLabel, label);
                     }
 
                 }
             }
+
             // *****
         } catch (BadLocationException e) {
             e.printStackTrace();

@@ -11,12 +11,12 @@ import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
+import java.util.List;
 
 import javax.swing.AbstractAction;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JTextField;
 import javax.swing.JWindow;
 import javax.swing.KeyStroke;
 import javax.swing.border.LineBorder;
@@ -38,11 +38,15 @@ public class AutoSuggestor {
     private JWindow autoSuggestionPopUpWindow;
     private String typedWord;
     private final ArrayList<String> dictionary = new ArrayList<>();
-    private int currentIndexOfSpace, tW, tH;
+    private int tW, tH;
+    private int newCaretPos;
     private DocumentListener documentListener = new DocumentListener() {
         @Override
         public void insertUpdate(DocumentEvent de) {
-            checkForAndShowSuggestions();
+            if (de.getLength() == 1) // Permet de ne pas prendre compte l'appui sur un bouton pour une fonction
+            {
+                checkForAndShowSuggestions();
+            }
         }
 
         @Override
@@ -58,7 +62,7 @@ public class AutoSuggestor {
     private final Color suggestionsTextColor;
     private final Color suggestionFocusedColor;
 
-    public AutoSuggestor(JTextComponent textComp, Window mainWindow, ArrayList<String> words, Color popUpBackground, Color textColor,
+    public AutoSuggestor(JTextComponent textComp, Window mainWindow, List<String> measureNames, Color popUpBackground, Color textColor,
             Color suggestionFocusedColor, float opacity) {
         this.textComp = textComp;
         this.suggestionsTextColor = textColor;
@@ -66,10 +70,9 @@ public class AutoSuggestor {
         this.suggestionFocusedColor = suggestionFocusedColor;
         this.textComp.getDocument().addDocumentListener(documentListener);
 
-        setDictionary(words);
+        setDictionary(measureNames);
 
         typedWord = "";
-        currentIndexOfSpace = 0;
         tW = 0;
         tH = 0;
 
@@ -86,6 +89,8 @@ public class AutoSuggestor {
     private void addKeyBindingToRequestFocusInPopUpWindow() {
         textComp.getInputMap(JComponent.WHEN_FOCUSED).put(KeyStroke.getKeyStroke(KeyEvent.VK_DOWN, 0, true), "Down released");
         textComp.getActionMap().put("Down released", new AbstractAction() {
+            private static final long serialVersionUID = 1L;
+
             @Override
             public void actionPerformed(ActionEvent ae) {// focuses the first label on popwindow
                 for (int i = 0; i < suggestionsPanel.getComponentCount(); i++) {
@@ -103,6 +108,7 @@ public class AutoSuggestor {
         suggestionsPanel.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_DOWN, 0, true),
                 "Down released");
         suggestionsPanel.getActionMap().put("Down released", new AbstractAction() {
+            private static final long serialVersionUID = 1L;
             int lastFocusableIndex = 0;
 
             @Override
@@ -194,15 +200,21 @@ public class AutoSuggestor {
     }
 
     public String getCurrentlyTypedWord() {// get newest word after last white spaceif any or the first word if no white spaces
-        String text = textComp.getText();
+
+        String text = ((DialNewFormula) AutoSuggestor.this.container).iterateOverContent(textComp);
+
+        int caretPosition = textComp.getCaretPosition();
+
+        newCaretPos = ((DialNewFormula) AutoSuggestor.this.container).caretPosWithComponent(caretPosition, textComp);
+
+        if (caretPosition != newCaretPos && newCaretPos < text.length()) {
+            text = text.substring(0, newCaretPos);
+        }
+
         String wordBeingTyped = "";
         text = text.replaceAll("(\\r|\\n)", " ");// replace end of line characters
         if (text.contains(" ")) {
-            int tmp = text.lastIndexOf(" ");
-            if (tmp >= currentIndexOfSpace) {
-                currentIndexOfSpace = tmp;
-                wordBeingTyped = text.substring(text.lastIndexOf(" "));
-            }
+            wordBeingTyped = text.substring(text.lastIndexOf(" "));
         } else {
             wordBeingTyped = text;
         }
@@ -219,47 +231,39 @@ public class AutoSuggestor {
 
     private void showPopUpWindow() {
         autoSuggestionPopUpWindow.getContentPane().add(suggestionsPanel);
-        autoSuggestionPopUpWindow.setMinimumSize(new Dimension(textComp.getWidth(), 30));
+        autoSuggestionPopUpWindow.setMinimumSize(new Dimension(textComp.getWidth() / 2, 30));
         autoSuggestionPopUpWindow.setSize(tW, tH);
         autoSuggestionPopUpWindow.setVisible(true);
 
         int windowX = 0;
         int windowY = 0;
 
-        if (textComp instanceof JTextField) {// calculate x and y for JWindow at bottom of JTextField
-            windowX = container.getX() + textComp.getX() + 5;
-            if (suggestionsPanel.getHeight() > autoSuggestionPopUpWindow.getMinimumSize().height) {
-                windowY = container.getY() + textComp.getY() + textComp.getHeight() + autoSuggestionPopUpWindow.getMinimumSize().height;
-            } else {
-                windowY = container.getY() + textComp.getY() + textComp.getHeight() + autoSuggestionPopUpWindow.getHeight();
-            }
-        } else {// calculate x and y for JWindow on any JTextComponent using the carets position
-            Rectangle rect = null;
-            try {
-                rect = textComp.getUI().modelToView(textComp, textComp.getCaret().getDot());// get carets position
-                System.out.println(rect);
-            } catch (BadLocationException ex) {
-                ex.printStackTrace();
-            }
+        // calculate x and y for JWindow on any JTextComponent using the carets position
+        Rectangle rect = null;
+        try {
+            int limitPos = Math.min(textComp.getCaretPosition(), textComp.getText().length());
+            rect = textComp.getUI().modelToView(textComp, limitPos);// get carets position
+        } catch (BadLocationException ex) {
 
-            windowX = (int) (rect.getX() + 15 + this.container.getX());
-            windowY = (int) (rect.getY() + (rect.getHeight() * 3) + this.container.getY());
         }
+
+        windowX = (int) (rect.getX() + 15 + this.container.getX());
+        windowY = (int) (rect.getY() + (rect.getHeight() * 6) + this.container.getY());
 
         // show the pop up
         autoSuggestionPopUpWindow.setLocation(windowX, windowY);
-        autoSuggestionPopUpWindow.setMinimumSize(new Dimension(textComp.getWidth(), 30));
+        autoSuggestionPopUpWindow.setMinimumSize(new Dimension(textComp.getWidth() / 2, 30));
         autoSuggestionPopUpWindow.revalidate();
         autoSuggestionPopUpWindow.repaint();
 
     }
 
-    public void setDictionary(ArrayList<String> words) {
+    public void setDictionary(List<String> measureNames) {
         dictionary.clear();
-        if (words == null) {
+        if (measureNames == null) {
             return;// so we can call constructor with null value for dictionary without exception thrown
         }
-        for (String word : words) {
+        for (String word : measureNames) {
             dictionary.add(word);
         }
     }
@@ -285,7 +289,6 @@ public class AutoSuggestor {
         if (typedWord.isEmpty()) {
             return false;
         }
-        // System.out.println("Typed word: " + typedWord);
 
         boolean suggestionAdded = false;
 
@@ -312,18 +315,15 @@ public class AutoSuggestor {
 
     class SuggestionLabel extends JLabel {
 
+        private static final long serialVersionUID = 1L;
         private boolean focused = false;
         private final JWindow autoSuggestionsPopUpWindow;
-        private final JTextComponent textComponent;
-        private final AutoSuggestor autoSuggestor;
         private Color suggestionsTextColor, suggestionBorderColor;
 
         public SuggestionLabel(String string, final Color borderColor, Color suggestionsTextColor, AutoSuggestor autoSuggestor) {
             super(string);
 
             this.suggestionsTextColor = suggestionsTextColor;
-            this.autoSuggestor = autoSuggestor;
-            this.textComponent = autoSuggestor.getTextField();
             this.suggestionBorderColor = borderColor;
             this.autoSuggestionsPopUpWindow = autoSuggestor.getAutoSuggestionPopUpWindow();
 
@@ -340,13 +340,14 @@ public class AutoSuggestor {
                     super.mouseClicked(me);
 
                     replaceWithSuggestedText();
-
                     autoSuggestionsPopUpWindow.setVisible(false);
                 }
             });
 
             getInputMap(JComponent.WHEN_FOCUSED).put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0, true), "Enter released");
             getActionMap().put("Enter released", new AbstractAction() {
+                private static final long serialVersionUID = 1L;
+
                 @Override
                 public void actionPerformed(ActionEvent ae) {
                     replaceWithSuggestedText();
@@ -370,13 +371,14 @@ public class AutoSuggestor {
         }
 
         private void replaceWithSuggestedText() {
-            String suggestedWord = getText();
+            String suggestedWord = "#" + getText() + "#";
             String text = ((DialNewFormula) AutoSuggestor.this.container).iterateOverContent(textComp);
-            String typedWord = autoSuggestor.getCurrentlyTypedWord();
-            String t = text.substring(0, text.lastIndexOf(typedWord));
-            String tmp = t + text.substring(text.lastIndexOf(typedWord)).replace(typedWord, suggestedWord);
-            ((DialNewFormula) AutoSuggestor.this.container).parseFormula(tmp + " ");
-            // textComponent.setText(tmp + " ");
+            int lengthTypedWord = typedWord.length();
+            int lastCaretPos = Math.min(text.length(), newCaretPos);
+            String tmp1 = text.substring(0, lastCaretPos - lengthTypedWord);
+            String tmp2 = text.substring(lastCaretPos);
+            String finalText = tmp1 + suggestedWord + tmp2;
+            ((DialNewFormula) AutoSuggestor.this.container).parseFormula(finalText + " ");
         }
     }
 }

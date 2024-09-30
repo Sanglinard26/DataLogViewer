@@ -36,6 +36,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.DocumentType;
 import org.w3c.dom.Element;
 
+import calib.MdbData.ConfigEcu.ParamEcu;
 import calib.MdbWorkspace.VariableECU;
 import jxl.Workbook;
 import jxl.format.Alignment;
@@ -176,98 +177,6 @@ public final class MapCal {
         }
 
         return result;
-    }
-
-    public static final boolean toCdfx(List<Variable> listVariable, final File file) {
-
-        DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
-        DocumentBuilder docBuilder;
-        try {
-            docBuilder = dbFactory.newDocumentBuilder();
-
-            Document doc = docBuilder.newDocument();
-            doc.setXmlStandalone(true);
-
-            DOMImplementation domImpl = doc.getImplementation();
-            DocumentType doctype = domImpl.createDocumentType("MSRSW", "-//ASAM//DTD CALIBRATION DATA FORMAT:V2.1:LAI:IAI:XML //EN",
-                    "cdf_v2.1.0.sl.dtd");
-            doc.appendChild(doctype);
-
-            Element racine = doc.createElement("MSRSW");
-            racine.setAttribute("CREATOR-VERSION", "V1.0");
-            racine.setAttribute("CREATOR", "DataLogViewer");
-            doc.appendChild(racine);
-
-            Element shortName = doc.createElement("SHORT-NAME");
-            shortName.appendChild(doc.createTextNode("TEST_CDFX"));
-            racine.appendChild(shortName);
-
-            Element category = doc.createElement("CATEGORY");
-            category.appendChild(doc.createTextNode("CDF21"));
-            racine.appendChild(category);
-
-            // <SW-SYSTEMS>
-            Element swSystems = doc.createElement("SW-SYSTEMS");
-            racine.appendChild(swSystems);
-
-            Element swSystem = doc.createElement("SW-SYSTEM");
-            swSystems.appendChild(swSystem);
-
-            shortName = doc.createElement("SHORT-NAME");
-            shortName.appendChild(doc.createTextNode("BGM_ECU"));
-            swSystem.appendChild(shortName);
-
-            // <SW-INSTANCE-SPEC>
-            Element swInstanceSpec = doc.createElement("SW-INSTANCE-SPEC");
-            swSystem.appendChild(swInstanceSpec);
-
-            // <SW-INSTANCE-TREE>
-            Element swInstanceTree = doc.createElement("SW-INSTANCE-TREE");
-            swInstanceSpec.appendChild(swInstanceTree);
-
-            shortName = doc.createElement("SHORT-NAME");
-            shortName.appendChild(doc.createTextNode("..."));
-            swInstanceTree.appendChild(shortName);
-
-            category = doc.createElement("CATEGORY");
-            category.appendChild(doc.createTextNode("NO_VCD"));
-            swInstanceTree.appendChild(category);
-
-            // Input
-            Date date = new Date(System.currentTimeMillis());
-
-            // Conversion
-            SimpleDateFormat sdf;
-            sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
-            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-            String text = sdf.format(date);
-
-            for (Variable var : listVariable) {
-                if (var.getType().compareTo(Type.SCALAIRE) == 0 || var.getType().compareTo(Type.COURBE) == 0 || var.getType().compareTo(Type.MAP) == 0
-                        || var.getType().compareTo(Type.ARRAY) == 0 || var.getType().compareTo(Type.TEXT) == 0) {
-                    createSwInstance(doc, swInstanceTree, var, text);
-                }
-
-            }
-
-            TransformerFactory transformerFactory = TransformerFactory.newInstance();
-            Transformer transformer = transformerFactory.newTransformer();
-            transformer.setOutputProperty(OutputKeys.INDENT, "yes");
-            transformer.setOutputProperty(OutputKeys.METHOD, "xml");
-            transformer.setOutputProperty(OutputKeys.DOCTYPE_PUBLIC, doctype.getPublicId());
-            transformer.setOutputProperty(OutputKeys.DOCTYPE_SYSTEM, doctype.getSystemId());
-            DOMSource source = new DOMSource(doc);
-            StreamResult resultat = new StreamResult(file);
-
-            transformer.transform(source, resultat);
-
-            return true;
-
-        } catch (ParserConfigurationException | TransformerException e) {
-            e.printStackTrace();
-        }
-
-        return false;
     }
 
     private static final void createSwInstance(Document doc, Element parent, Variable var, String sDate) {
@@ -508,6 +417,176 @@ public final class MapCal {
         Element com = doc.createElement("P");
         remark.appendChild(com);
         com.appendChild(doc.createTextNode("Commentaire pour " + var.getName()));
+
+    }
+
+    public static final boolean toCdfx(List<Variable> listVariable, List<ParamEcu> paramsEcu, final File file) {
+
+        DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder docBuilder;
+        try {
+            docBuilder = dbFactory.newDocumentBuilder();
+
+            Document doc = docBuilder.newDocument();
+            doc.setXmlStandalone(true);
+
+            DOMImplementation domImpl = doc.getImplementation();
+            DocumentType doctype = domImpl.createDocumentType("MSRSW", "-//ASAM//DTD CALIBRATION DATA FORMAT:V2.1:LAI:IAI:XML //EN",
+                    "cdf_v2.1.0.sl.dtd");
+            doc.appendChild(doctype);
+
+            Element racine = doc.createElement("MSRSW");
+            racine.setAttribute("CREATOR-VERSION", "V1.0");
+            racine.setAttribute("CREATOR", "DataLogViewer");
+            doc.appendChild(racine);
+
+            Element shortName = doc.createElement("SHORT-NAME");
+            shortName.appendChild(doc.createTextNode("TEST_CDFX"));
+            racine.appendChild(shortName);
+
+            Element category = doc.createElement("CATEGORY");
+            category.appendChild(doc.createTextNode("CDF21"));
+            racine.appendChild(category);
+
+            // <SW-SYSTEMS>
+            Element swSystems = doc.createElement("SW-SYSTEMS");
+            racine.appendChild(swSystems);
+
+            Element swSystem = doc.createElement("SW-SYSTEM");
+            swSystems.appendChild(swSystem);
+
+            shortName = doc.createElement("SHORT-NAME");
+            shortName.appendChild(doc.createTextNode("BGM_ECU"));
+            swSystem.appendChild(shortName);
+
+            // <SW-INSTANCE-SPEC>
+            Element swInstanceSpec = doc.createElement("SW-INSTANCE-SPEC");
+            swSystem.appendChild(swInstanceSpec);
+
+            // <SW-INSTANCE-TREE>
+            Element swInstanceTree = doc.createElement("SW-INSTANCE-TREE");
+            swInstanceSpec.appendChild(swInstanceTree);
+
+            shortName = doc.createElement("SHORT-NAME");
+            shortName.appendChild(doc.createTextNode("..."));
+            swInstanceTree.appendChild(shortName);
+
+            category = doc.createElement("CATEGORY");
+            category.appendChild(doc.createTextNode("NO_VCD"));
+            swInstanceTree.appendChild(category);
+
+            // Input
+            Date date = new Date(System.currentTimeMillis());
+
+            // Conversion
+            SimpleDateFormat sdf;
+            sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+            String text = sdf.format(date);
+
+            for (Variable var : listVariable) {
+                if (var.getType().compareTo(Type.SCALAIRE) == 0 || var.getType().compareTo(Type.COURBE) == 0 || var.getType().compareTo(Type.MAP) == 0
+                        || var.getType().compareTo(Type.ARRAY) == 0 || var.getType().compareTo(Type.TEXT) == 0) {
+                    createSwInstance(doc, swInstanceTree, var, text);
+                }
+            }
+
+            for (ParamEcu paramEcu : paramsEcu) {
+                createSwInstance(doc, swInstanceTree, paramEcu, text);
+            }
+
+            TransformerFactory transformerFactory = TransformerFactory.newInstance();
+            Transformer transformer = transformerFactory.newTransformer();
+            transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+            transformer.setOutputProperty(OutputKeys.METHOD, "xml");
+            transformer.setOutputProperty(OutputKeys.DOCTYPE_PUBLIC, doctype.getPublicId());
+            transformer.setOutputProperty(OutputKeys.DOCTYPE_SYSTEM, doctype.getSystemId());
+            DOMSource source = new DOMSource(doc);
+            StreamResult resultat = new StreamResult(file);
+
+            transformer.transform(source, resultat);
+
+            return true;
+
+        } catch (ParserConfigurationException | TransformerException e) {
+            e.printStackTrace();
+        }
+
+        return false;
+    }
+
+    private static final void createSwInstance(Document doc, Element parent, ParamEcu paramEcu, String sDate) {
+        /*
+         * <SW-INSTANCE>
+         * <SHORT-NAME>CDF20.ARRAY.ELEMENT[0]</SHORT-NAME>
+         * <CATEGORY>VALUE</CATEGORY>
+         * <SW-FEATURE-REF>Vectors</SW-FEATURE-REF>
+         * <SW-VALUE-CONT>
+         * <UNIT-DISPLAY-NAME xml:space="preserve"></UNIT-DISPLAY-NAME>
+         * <SW-VALUES-PHYS>
+         * <V>5.0000</V>
+         * </SW-VALUES-PHYS>
+         * </SW-VALUE-CONT>
+         * </SW-INSTANCE>
+         */
+
+        Element swInstance = doc.createElement("SW-INSTANCE");
+        parent.appendChild(swInstance);
+
+        Element shortName = doc.createElement("SHORT-NAME");
+        shortName.appendChild(doc.createTextNode(paramEcu.getNom()));
+        swInstance.appendChild(shortName);
+
+        Element category = doc.createElement("CATEGORY");
+        category.appendChild(doc.createTextNode("VALUE"));
+        swInstance.appendChild(category);
+
+        Element swFeatureRef = doc.createElement("SW-FEATURE-REF");
+        swFeatureRef.appendChild(doc.createTextNode("ECU_CONFIG"));
+        swInstance.appendChild(swFeatureRef);
+
+        Element swValueCont = doc.createElement("SW-VALUE-CONT");
+        swInstance.appendChild(swValueCont);
+
+        Element unitDisplayName = doc.createElement("UNIT-DISPLAY-NAME");
+        unitDisplayName.setAttribute("xml:space", "preserve");
+        unitDisplayName.appendChild(doc.createTextNode("-"));
+        swValueCont.appendChild(unitDisplayName);
+
+        Element swValuePhys = doc.createElement("SW-VALUES-PHYS");
+        swValueCont.appendChild(swValuePhys);
+
+        String value = String.valueOf(paramEcu.getValeur());
+        Element valueNode = doc.createElement("V");
+        valueNode.appendChild(doc.createTextNode(value));
+        swValuePhys.appendChild(valueNode);
+
+        // SW-CS-HISTORY
+        Element swCsHistory = doc.createElement("SW-CS-HISTORY");
+        swInstance.appendChild(swCsHistory);
+
+        // CS-ENTRY
+        Element swCsEntry = doc.createElement("CS-ENTRY");
+        swCsHistory.appendChild(swCsEntry);
+
+        Element state = doc.createElement("STATE");
+        swCsEntry.appendChild(state);
+        state.appendChild(doc.createTextNode("---"));
+
+        Element date = doc.createElement("DATE");
+        swCsEntry.appendChild(date);
+        date.appendChild(doc.createTextNode(sDate));
+
+        Element user = doc.createElement("CSUS");
+        swCsEntry.appendChild(user);
+        user.appendChild(doc.createTextNode("User"));
+
+        Element remark = doc.createElement("REMARK");
+        swCsEntry.appendChild(remark);
+
+        Element com = doc.createElement("P");
+        remark.appendChild(com);
+        com.appendChild(doc.createTextNode("Commentaire pour " + paramEcu.getNom()));
 
     }
 

@@ -32,6 +32,8 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.swing.AbstractAction;
 import javax.swing.AbstractButton;
@@ -56,6 +58,7 @@ import javax.swing.JToggleButton;
 import javax.swing.JToolBar;
 import javax.swing.KeyStroke;
 import javax.swing.ListSelectionModel;
+import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.TransferHandler;
@@ -117,7 +120,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
     private static final long serialVersionUID = 1L;
 
-    private final static String VERSION = "v1.63";
+    private final static String VERSION = "v1.64";
     private static String APPLICATION_TITLE = "DataLogViewer " + VERSION;
 
     private final static String LOG_PANEL = "LOG";
@@ -136,9 +139,12 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
     private TableCursorValue tableCursorValues;
     private PanelCondition panelCondition;
     private JToggleButton btSynchro;
+    private JToggleButton btAncre;
 
     // Test
-    JSplitPane splitLogMap;
+    private JSplitPane splitLogMap;
+    private MyLogDisplay logDisplay;
+    public static Logger logger;
     //
 
     private int selectedIndexTab = -1;
@@ -190,11 +196,21 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
             root.add(splitLogMap, BorderLayout.CENTER);
         }
 
+        logDisplay = new MyLogDisplay();
+        JScrollPane pane = new JScrollPane(logDisplay);
+        pane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
+        root.add(pane, BorderLayout.SOUTH);
+
+        logger = Logger.getLogger(getClass().getName());
+        logger.addHandler(logDisplay.getHandler());
+
         pack();
         setMinimumSize(new Dimension(getWidth(), getHeight()));
 
         setExtendedState(JFrame.MAXIMIZED_BOTH);
         setVisible(true);
+
+        logger.log(Level.INFO, "Application démarrée");
     }
 
     private final JMenuBar createMenu() {
@@ -647,6 +663,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         final String ICON_NEW_PLOT = "/icon_newPlot_32.png";
         final String ICON_SHARE_AXIS = "/icon_shareAxis_32.png";
         final String ICON_NEW_TABLE = "/icon_table_32.png";
+        final String ICON_ANCRE = "/icon_ancre_32.png";
 
         JToolBar bar = new JToolBar();
         bar.setFloatable(false);
@@ -732,6 +749,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                 });
                 final int reponse = fc.showOpenDialog(Ihm.this);
                 if (reponse == JFileChooser.APPROVE_OPTION) {
+                    logger.log(Level.INFO, "Ouverture du fichier map: " + fc.getSelectedFile());
                     addMapFile(new MapCal(fc.getSelectedFile()));
                 }
 
@@ -818,7 +836,9 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                         if (i == idxWindow || otherChart.getDatasetType() > 1) {
                             continue;
                         }
+                        otherChart.getPlot().getDomainAxis().removeChangeListener(otherChart);
                         otherChart.getPlot().setDomainAxis(domainAxis);
+                        otherChart.getPlot().getDomainAxis().addChangeListener(otherChart);
                         otherChart.setScrollBarProperties(chartView.getScrollbar());
                     }
                 } else {
@@ -841,6 +861,28 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
             }
         });
         bar.add(btSynchro);
+
+        btAncre = new JToggleButton(new ImageIcon(getClass().getResource(ICON_ANCRE)));
+        btAncre.setToolTipText("Ancre le curseur sur une position de l'écran");
+        btAncre.addActionListener(new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+
+                ChartView chartView;
+                for (int i = 0; i < chartTabbedPane.getTabCount(); i++) {
+                    if (!(chartTabbedPane.getComponentAt(i) instanceof ChartView)) {
+                        continue;
+                    }
+                    chartView = (ChartView) chartTabbedPane.getComponentAt(i);
+                    if (chartView.getDatasetType() > 1) {
+                        continue;
+                    }
+                    chartView.setCursorBehaviour(btAncre.isSelected());
+                }
+            }
+        });
+        bar.add(btAncre);
 
         return bar;
     }
@@ -954,12 +996,34 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
                     if (chartView.getDatasetType() < 2) {
                         chartView.updateTableValue();
-                        chartView.applyCondition(listZone.get(panelCondition.getTableCondition().getNumActiveCondition()));
+                        if (!listZone.isEmpty()) {
+                            chartView.applyCondition(listZone.get(panelCondition.getTableCondition().getNumActiveCondition()));
+                        } else {
+                            int row = panelCondition.getTableCondition().getNumActiveCondition();
+
+                            if (row < 0) {
+                                return;
+                            }
+
+                            final Condition condition = (Condition) panelCondition.getTableCondition().getModel().getValueAt(row, 1);
+                            BitSet bitCondition = condition.applyCondition(log);
+                            if (condition.isActive()) {
+                                listZone.put(row, chartView.applyCondition(condition.isActive(), bitCondition, condition.getColor()));
+                                panelCondition.setListBoxAnnotation(listZone.get(row));
+                            } else {
+                                listZone.remove(row);
+                                chartView.removeCondition();
+                                panelCondition.setListBoxAnnotation(Collections.<IntervalMarker> emptyList());
+                            }
+                        }
+
                     } else {
                         Condition condition = panelCondition.getTableCondition().getActiveCondition();
                         if (condition != null) {
                             BitSet bitCondition = condition.applyCondition(log);
                             chartView.applyCondition(condition.isActive(), bitCondition, log);
+                        } else {
+                            chartView.applyCondition(false, null, log);
                         }
                     }
 
@@ -1044,7 +1108,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
                             float widthLine = ((BasicStroke) renderer.getSeriesStroke(serieIdx)).getLineWidth();
 
-                            for (int i = 0; i < 7; i++) {
+                            for (int i = 0; i < 5; i++) {
 
                                 if (!activeThread) {
                                     renderer.setSeriesStroke(serieIdx, new BasicStroke(widthLine));
@@ -1118,14 +1182,14 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                         if (log != null && chartTabbedPane.getComponentAt(idx) instanceof ChartView) {
                             final ChartView chartView = (ChartView) chartTabbedPane.getComponentAt(idx);
 
+                            BitSet bitCondition = condition.applyCondition(log);
+
                             if (chartView.getDatasetType() < 2) {
 
                                 Thread thread = new Thread(new Runnable() {
 
                                     @Override
                                     public void run() {
-                                        BitSet bitCondition = condition.applyCondition(log);
-
                                         if (condition.isActive()) {
                                             listZone.put(row, chartView.applyCondition(condition.isActive(), bitCondition, condition.getColor()));
                                             panelCondition.setListBoxAnnotation(listZone.get(row));
@@ -1143,9 +1207,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
                                     @Override
                                     public void run() {
-                                        BitSet bitCondition = condition.applyCondition(log);
                                         chartView.applyCondition(condition.isActive(), bitCondition, log);
-
                                     }
                                 });
                                 thread.start();
@@ -1255,6 +1317,8 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
             final int reponse = fc.showOpenDialog(Ihm.this);
 
             if (reponse == JFileChooser.APPROVE_OPTION) {
+
+                logger.log(Level.INFO, "Ouverture de " + fc.getSelectedFile().getName());
 
                 if (listModel.getSize() > 0) {
                     listModel.clear();
@@ -1452,6 +1516,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
             if (log != null) {
                 log.getMeasures().add(newMeasure);
             }
+            logger.log(Level.INFO, "'" + newMeasure.getName() + "'" + " a été ajouté à la liste de variable.");
         }
     }
 
@@ -1538,6 +1603,10 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         if (mainTabbedPane != null) {
             mainTabbedPane.setSelectedIndex(0);
         }
+    }
+
+    public final List<String> getListStringMeasure() {
+        return this.listModel.getStringList();
     }
 
     public final Set<Formula> getListFormula() {
@@ -1685,8 +1754,10 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
                             Measure yMeasure = pickMeasureFromList(yLabel);
                             Measure zMeasure = pickMeasureFromList(zLabel);
 
-                            ((DefaultXYZDataset) xyPlot.getDataset()).addSeries(serieKey,
-                                    new double[][] { xMeasure.getData(), yMeasure.getData(), zMeasure.getData() });
+                            if ((xMeasure.getDataLength() == yMeasure.getDataLength()) && (yMeasure.getDataLength() == zMeasure.getDataLength())) {
+                                ((DefaultXYZDataset) xyPlot.getDataset()).addSeries(serieKey,
+                                        new double[][] { xMeasure.getData(), yMeasure.getData(), zMeasure.getData() });
+                            }
 
                         } else {
                             Comparable<?> serieKey = ((DefaultXYDataset) xyPlot.getDataset()).getSeriesKey(nSerie);
@@ -1906,7 +1977,13 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
         factory.setIgnoringElementContentWhitespace(true);
         factory.setValidating(false);
 
+        logger.log(Level.INFO, "Ouverture de la configuration " + file.getName());
+        long start = 0;
+
         try {
+
+            start = System.currentTimeMillis();
+
             builder = factory.newDocumentBuilder();
             document = builder.parse(new File(file.toURI()));
 
@@ -2099,9 +2176,11 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
             }
 
         } catch (ParserConfigurationException | SAXException | IOException e) {
-            e.printStackTrace();
+            logger.log(Level.WARNING, "Erreur sur l'ouverture de la configuration " + file.getName());
         } finally {
             reloadLogData(log);
+
+            System.out.println("Config : " + (System.currentTimeMillis() - start) + "ms");
         }
 
     }
@@ -2109,7 +2188,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
     public static void main(String[] args) {
 
         // File[] fileToConvert = new File[] { new File("c:\\user\\U354706\\Perso\\Clio\\soft\\applicatif_04102021_Cor.inc"),
-        // new File("c:\\user\\U354706\\Perso\\Clio\\soft\\sfr167.inc"),
+        // new File("c:\\user\\U354706\\Perso\\Clio\\soft\\regf276e.def"),
         // new File("c:\\user\\U354706\\Perso\\Clio\\Calib\\RS2_pnp_PH1_V2_001\\RS2_pnp_PH1_V2_001.mdb") };
 
         // Conversion.AppIncToA2l(fileToConvert);
@@ -2216,7 +2295,8 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
         @Override
         protected Void doInBackground() throws Exception {
-            start = System.currentTimeMillis();
+
+            logger.log(Level.INFO, "Ouverture de la configuration " + this.cfg.toURI());
 
             DocumentBuilder builder;
             Document document = null;
@@ -2226,6 +2306,9 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
             factory.setValidating(false);
 
             try {
+
+                start = System.currentTimeMillis();
+
                 builder = factory.newDocumentBuilder();
                 document = builder.parse(new File(this.cfg.toURI()));
 
@@ -2391,7 +2474,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
                 }
             } catch (ParserConfigurationException | SAXException | IOException e) {
-                e.printStackTrace();
+                logger.log(Level.WARNING, "Erreur sur l'ouverture de la configuration " + this.cfg.toURI());
             } finally {
                 // reloadLogData(log);
             }
@@ -2427,7 +2510,7 @@ public final class Ihm extends JFrame implements MapCalListener, ActionListener 
 
             reloadLogData(log);
 
-            System.out.println("Config : " + (System.currentTimeMillis() - start) + "ms");
+            System.out.println("Config worker : " + (System.currentTimeMillis() - start) + "ms");
         }
 
     }

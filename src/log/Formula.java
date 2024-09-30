@@ -52,7 +52,6 @@ public final class Formula extends Measure {
         build();
 
         if (syntaxOK) {
-
             calculate(log, calib);
         } else {
             JOptionPane.showMessageDialog(null, "V\u00e9rifiez la synthaxe svp \n" + expression.getErrorMessage(), "Erreur",

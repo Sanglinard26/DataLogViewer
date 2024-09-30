@@ -166,7 +166,6 @@ public final class MdbData {
         private double max;
         private double min;
         private String detail;
-        private String type;
 
         public VariableInfo(String typeName, String sousType, boolean interpTable, int allocadr, int colbkptadr, int lgnbkptadr, int val_adr,
                 int varCol, int varLigne, short nbBkPtCol, short nbBkPtRow, int colBkptFactor, double rowBkptFactor, double factor, byte typeVar,
@@ -220,7 +219,7 @@ public final class MdbData {
         }
 
         public double getFactor() {
-            return factor;
+            return factor != 0 ? factor : 1.0;
         }
 
         public String getFormat() {
@@ -250,7 +249,7 @@ public final class MdbData {
         }
 
         public String getDetail() {
-            return detail;
+            return detail != null ? detail : "";
         }
 
         @Override
@@ -292,10 +291,16 @@ public final class MdbData {
             }
 
             if (nbCol > 1 && nbLigne == 0) {
+                if (!interpTable) {
+                    return "VAL_BLK";
+                }
                 return "CURVE";
             }
 
-            if (nbCol > 1 && nbLigne > 1 && typeVar == 0) {
+            if (nbCol > 1 && nbLigne > 1) {
+                if (!interpTable) {
+                    return "VAL_BLK";
+                }
                 return "MAP";
             }
 

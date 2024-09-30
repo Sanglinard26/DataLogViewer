@@ -3,6 +3,7 @@
  */
 package log;
 
+import java.util.Arrays;
 import java.util.BitSet;
 
 public class Measure implements Comparable<Measure> {
@@ -23,7 +24,6 @@ public class Measure implements Comparable<Measure> {
         this.unit = "";
         this.idx = 0;
         this.data = new double[dataSize];
-        // Arrays.fill(data, Double.NaN);
     }
 
     public final String getName() {
@@ -61,6 +61,10 @@ public class Measure implements Comparable<Measure> {
 
     public final double[] getData() {
         return this.data;
+    }
+
+    public final void resizeData(int newSize) {
+        data = Arrays.copyOf(data, newSize);
     }
 
     public final double get(int index) {

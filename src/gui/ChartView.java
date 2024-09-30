@@ -5,14 +5,18 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Cursor;
+import java.awt.Font;
+import java.awt.Point;
 import java.awt.Scrollbar;
 import java.awt.Shape;
+import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.AdjustmentEvent;
 import java.awt.event.AdjustmentListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseWheelEvent;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
@@ -86,12 +90,16 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
     private final MyChartPanel chartPanel;
     private final CombinedDomainXYPlot parentPlot;
+    private double xMaxRef = -1;
     private static Point2D popUpLocation;
 
     private CrosshairOverlay crosshairOverlay;
     private Crosshair crosshair;
     private static double oldXValue = Double.NaN;
     private static double xValue = Double.NaN;
+
+    public static boolean cursorAnchored = false;
+    private static double cursorPos2Dvalue = 0f;
     private static final HashMap<String, Double> tableValue = new HashMap<String, Double>();
 
     private List<Observateur> listObservateur = new ArrayList<Observateur>();
@@ -134,6 +142,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
 
         chartPanel.addMouseListener(new MyChartMouseListener());
         chartPanel.addMouseMotionListener(new MyChartMouseListener());
+        chartPanel.addMouseWheelListener(new MyChartMouseListener());
 
         chartPanel.setPopupMenu(createChartMenu()); // Déplacé de mouseMoved à ici
 
@@ -146,6 +155,10 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         private HashMap<String, Range> actualRanges2 = new HashMap<String, Range>();
         private Set<String> yAutoAxis = new HashSet<String>();
         private XYPlot plot;
+
+        private final Toolkit toolkit = Toolkit.getDefaultToolkit();
+        private final ImageIcon imgIcon = new ImageIcon(getClass().getResource("/icon_shift_32.png"));
+        private final Cursor myShiftCursor = toolkit.createCustomCursor(imgIcon.getImage(), new Point(16, 16), "cursor_shift");
 
         @Override
         public void mouseMoved(MouseEvent e) {
@@ -166,7 +179,12 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             ChartEntity chartEntity = chartPanel.getEntityForPoint((int) p.getX(), (int) p.getY());
 
             if (chartEntity instanceof AxisEntity && getDatasetType() == 1) {
-                setCursor(new Cursor(Cursor.HAND_CURSOR));
+                if (((AxisEntity) chartEntity).getAxis() == xAxis) {
+                    setCursor(myShiftCursor);
+                } else {
+                    setCursor(new Cursor(Cursor.HAND_CURSOR));
+                }
+
             } else {
                 setCursor(Cursor.getDefaultCursor());
             }
@@ -201,6 +219,45 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         public void mouseClicked(MouseEvent e) {
 
             if (SwingUtilities.isLeftMouseButton(e)) {
+
+                // Test
+                if (false) {
+                    Point2D p = chartPanel.translateScreenToJava2D(e.getPoint());
+
+                    ChartEntity chartEntity = chartPanel.getEntityForPoint((int) p.getX(), (int) p.getY());
+
+                    if (chartEntity instanceof AxisEntity) {
+                        AxisEntity axisEntity = (AxisEntity) chartEntity;
+                        if (axisEntity.getAxis().equals(parentPlot.getDomainAxis())) {
+                            return;
+                        }
+
+                        plot = (XYPlot) axisEntity.getAxis().getPlot();
+
+                        for (int i = 0; i < plot.getRangeAxisCount(); i++) {
+                            // plot.getRangeAxis(i).setVisible(true);
+                        }
+
+                        // axisEntity.getAxis().setLabel("empty_axis");
+                        int idx = plot.getRangeAxisIndex((ValueAxis) axisEntity.getAxis());
+
+                        // axisEntity.getAxis().setVisible(false);
+                        plot.setRangeAxis(idx, null);
+
+                        XYSeriesCollection dataset = (XYSeriesCollection) plot.getDataset(idx);
+
+                        for (Object serie : dataset.getSeries()) {
+
+                            tableValue.remove(((XYSeries) serie).getKey());
+                            updateObservateur("remove", ((XYSeries) serie).getKey());
+                        }
+
+                        dataset.removeAllSeries();
+
+                    }
+                }
+                // Fin test
+
                 updateTableValue(e);
             }
 
@@ -315,6 +372,41 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             updateTableValue(e);
         }
 
+        @Override
+        public void mouseWheelMoved(MouseWheelEvent e) {
+            if (getCursor().getName().equals(myShiftCursor.getName())) {
+                ValueAxis axis = parentPlot.getDomainAxis();
+                Range range = axis.getRange();
+                Range newRange = null;
+
+                if (!e.isControlDown()) {
+                    double shift = (range.getLength() / 10) * -e.getPreciseWheelRotation();
+                    newRange = Range.shift(range, shift);
+                } else {
+                    double scale = 1;
+                    if (e.getPreciseWheelRotation() < 0) {
+                        scale = 0.95;
+                    } else {
+                        scale = 1.05;
+                    }
+
+                    double minRange = range.getCentralValue() - (range.getLength() * scale / 2);
+                    double maxRange = range.getCentralValue() + (range.getLength() * scale / 2);
+
+                    if (maxRange > minRange) {
+                        newRange = new Range(minRange, maxRange);
+                    } else {
+                        newRange = range;
+                    }
+
+                }
+
+                if (newRange.getLowerBound() >= 0 && newRange.getUpperBound() <= xMaxRef) {
+                    axis.setRange(newRange);
+                }
+            }
+        }
+
     }
 
     private final void updateTableValue(MouseEvent e) {
@@ -327,6 +419,12 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         }
         ValueAxis xAxis = parentPlot.getDomainAxis();
         xValue = xAxis.java2DToValue(p.getX(), dataArea, org.jfree.chart.ui.RectangleEdge.BOTTOM);
+
+        // Test curseur ancré
+        if (cursorAnchored) {
+            cursorPos2Dvalue = xAxis.valueToJava2D(xValue, dataArea, org.jfree.chart.ui.RectangleEdge.BOTTOM);
+        }
+        // ------------------
 
         if (!xAxis.getRange().contains(xValue)) {
             xValue = Double.NaN;
@@ -375,10 +473,18 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             updateObservateur("values", tableValue);
             updateCursorObservateur(cursorIndex);
             crosshair.setValue(xValue);
+            crosshair.setLabelYOffset(dataArea.getHeight() - p.getY());
         }
 
         oldXValue = xValue;
 
+    }
+
+    public final void setCursorBehaviour(boolean anchor) {
+        cursorAnchored = anchor;
+        Rectangle2D dataArea = chartPanel.getScreenDataArea();
+        ValueAxis xAxis = parentPlot.getDomainAxis();
+        cursorPos2Dvalue = xAxis.valueToJava2D(xValue, dataArea, org.jfree.chart.ui.RectangleEdge.BOTTOM);
     }
 
     public final void moveMarker(double value) {
@@ -425,17 +531,24 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             String zLabel = ((PaintScaleLegend) chartPanel.getChart().getSubtitle(0)).getAxis().getLabel();
             Measure z = log.getMeasure(zLabel);
 
-            final DefaultXYZDataset xyzDataset = new DefaultXYZDataset();
+            // final DefaultXYZDataset xyzDataset = new DefaultXYZDataset();
+
+            final DefaultXYZDataset xyzDataset = (DefaultXYZDataset) ((XYPlot) parentPlot.getSubplots().get(0)).getDataset();
+            xyzDataset.removeSeries("Series 1");
 
             if (active) {
                 double[][] filterdXYZarray = { x.getDoubleValue(bitCondition), y.getDoubleValue(bitCondition), z.getDoubleValue(bitCondition) };
                 xyzDataset.addSeries("Series 1", filterdXYZarray);
             } else {
                 double[][] xYZarray = { x.getData(), y.getData(), z.getData() };
-                xyzDataset.addSeries("Series 1", xYZarray);
+                if ((xYZarray[0].length == xYZarray[1].length) && (xYZarray[1].length == xYZarray[2].length)) {
+                    xyzDataset.addSeries("Series 1", xYZarray);
+                } else {
+                    xyzDataset.addSeries("Series 1", new double[3][1]);
+                }
             }
 
-            plot.setDataset(0, xyzDataset);
+            // plot.setDataset(0, xyzDataset);
         } else {
             final DefaultXYDataset xyDataset = new DefaultXYDataset();
 
@@ -553,6 +666,9 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             Color cursorPaint = Utilitaire.parseRGBColor(cursorColor, 255);
 
             crosshair = new Crosshair(Double.NaN, cursorPaint, cursorStroke);
+            crosshair.setLabelVisible(true);
+            crosshair.setLabelBackgroundPaint(Color.WHITE);
+            crosshair.setLabelFont(new Font("Verdana", 0, 10));
             crosshairOverlay.addDomainCrosshair(crosshair);
 
             xValue = Double.NaN;
@@ -571,8 +687,6 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         final XYSeriesCollection collections = new XYSeriesCollection(series);
         final NumberAxis yAxis = new NumberAxis(measure.getName());
         yAxis.setAutoRangeIncludesZero(false);
-
-        // final XYItemRenderer renderer = new XYLineAndShapeRenderer(true, false);
 
         final XYItemRenderer renderer = new SamplingXYLineRenderer();
 
@@ -593,6 +707,9 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
             }
 
             crosshair = new Crosshair(Double.NaN, Color.BLUE, new BasicStroke(2));
+            crosshair.setLabelVisible(true);
+            crosshair.setLabelBackgroundPaint(Color.WHITE);
+            crosshair.setLabelFont(new Font("Verdana", 0, 10));
             crosshairOverlay.addDomainCrosshair(crosshair);
 
             if (nbPoint > 1) {
@@ -1320,7 +1437,7 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
         Range defaultRange = this.getPlot().getDomainAxis().getDefaultAutoRange();
 
         this.parentPlot.setNotify(false);
-
+        this.getPlot().getDomainAxis().removeChangeListener(this);
         this.getPlot().setDomainAxis(new NumberAxis(time.getName()));
         this.getPlot().getDomainAxis().setDefaultAutoRange(defaultRange);
         this.getPlot().getDomainAxis().setRange(xAxisRange);
@@ -1340,6 +1457,16 @@ public final class ChartView extends JPanel implements ActionListener, Adjustmen
     public void axisChanged(AxisChangeEvent arg0) {
         NumberAxis timeAxis = (NumberAxis) arg0.getAxis();
         Range timeAxisRange = timeAxis.getRange();
+
+        if (xMaxRef < 0) {
+            xMaxRef = timeAxisRange.getUpperBound();
+        }
+
+        if (cursorAnchored) {
+            xValue = timeAxis.java2DToValue(cursorPos2Dvalue, chartPanel.getScreenDataArea(), org.jfree.chart.ui.RectangleEdge.BOTTOM);
+            crosshair.setValue(xValue);
+            updateTableValue();
+        }
 
         for (Object plot : parentPlot.getSubplots()) {
             XYPlot xyplot = ((XYPlot) plot);

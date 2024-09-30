@@ -85,4 +85,13 @@ public final class FilteredListModel extends AbstractListModel<Measure> {
         return rv;
     }
 
+    public final List<String> getStringList() {
+        List<String> list = new ArrayList<>();
+
+        for (Measure measure : listLabel) {
+            list.add(measure.toString());
+        }
+        return list;
+    }
+
 }

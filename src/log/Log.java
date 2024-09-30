@@ -24,7 +24,6 @@ public final class Log {
     private List<Measure> datas;
     private int nbPoints = 0;
     private String timeName = "";
-    private float te;
 
     public Log(File file) {
 
@@ -206,8 +205,6 @@ public final class Log {
         } catch (IOException e1) {
         }
 
-        // System.out.println("Nb lines = " + nbLines);
-
         try (final BufferedReader bf = new BufferedReader(new FileReader(file))) {
 
             String line;
@@ -249,8 +246,6 @@ public final class Log {
                             this.datas.get(idxCol).addPoint(value);
                         }
                         this.nbPoints++;
-                    } else {
-                        // System.out.println("erreur ligne " + this.nbPoints);
                     }
 
                     break;
@@ -258,22 +253,11 @@ public final class Log {
                 cntLine++;
             }
 
-            /*
-             * final Measure time = this.getTime();
-             * te = 0;
-             * 
-             * for (int t = 0; t < nbPoints; t++) {
-             * if (t > 0) {
-             * double dT = time.get(t) - time.get(t - 1);
-             * te += dT;
-             * }
-             * }
-             * 
-             * te /= nbPoints;
-             * System.out.println("te = " + te + "s");
-             * 
-             * System.out.println(time.get(nbPoints - 1) / nbPoints);
-             */
+            if (getTime().getDataLength() != nbPoints) {
+                for (int i = 0; i < this.datas.size(); i++) {
+                    this.datas.get(i).resizeData(nbPoints);
+                }
+            }
 
         } catch (FileNotFoundException e) {
             e.printStackTrace();
